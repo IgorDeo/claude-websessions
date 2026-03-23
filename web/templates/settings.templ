@@ -12,6 +12,7 @@ type SettingsData struct {
 	NotifWaiting     bool
 	AuthEnabled      bool
 	AuthToken        string
+	HooksInstalled   bool
 }
 
 templ Settings(data SettingsData) {
@@ -88,6 +89,40 @@ templ Settings(data SettingsData) {
 									Waiting for Input
 								</label>
 							</div>
+						</div>
+					</div>
+					<div class="settings-section">
+						<h3>Claude Code Hooks</h3>
+						<p class="hooks-description">
+							Hooks let Claude Code notify websessions when sessions need attention
+							(tool approvals, completions). This adds entries to <code>~/.claude/settings.json</code>.
+						</p>
+						<div class="settings-row hooks-status">
+							if data.HooksInstalled {
+								<span class="hooks-badge hooks-active">Installed</span>
+								<form method="POST" action="/settings/hooks" style="display:inline;">
+									<input type="hidden" name="action" value="uninstall"/>
+									<button type="submit" class="btn-cancel btn-small">Uninstall Hooks</button>
+								</form>
+								<form method="POST" action="/settings/hooks" style="display:inline;">
+									<input type="hidden" name="action" value="install"/>
+									<button type="submit" class="btn-small" style="background:var(--accent);color:var(--bg-primary);border:none;border-radius:3px;padding:0.3rem 0.6rem;cursor:pointer;font-size:0.8rem;">Update URL</button>
+								</form>
+							} else {
+								<span class="hooks-badge hooks-inactive">Not installed</span>
+								<form method="POST" action="/settings/hooks" style="display:inline;">
+									<input type="hidden" name="action" value="install"/>
+									<button type="submit" class="btn-create btn-small">Install Hooks</button>
+								</form>
+							}
+						</div>
+						<div class="hooks-events">
+							<span class="settings-sublabel">Hook events:</span>
+							<ul class="hooks-event-list">
+								<li><strong>Notification</strong> (permission_prompt) — when Claude needs tool approval</li>
+								<li><strong>Stop</strong> — when Claude finishes its turn</li>
+								<li><strong>PreToolUse</strong> — before each tool execution</li>
+							</ul>
 						</div>
 					</div>
 					<div class="settings-section">

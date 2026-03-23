@@ -3,6 +3,7 @@ package server
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -14,8 +15,10 @@ import (
 	"time"
 
 	"github.com/igor-deoalves/websessions/internal/discovery"
+	"github.com/igor-deoalves/websessions/internal/hooks"
 	"github.com/igor-deoalves/websessions/internal/notification"
 	"github.com/igor-deoalves/websessions/internal/session"
+	"github.com/igor-deoalves/websessions/internal/store"
 	"github.com/igor-deoalves/websessions/web/templates"
 )
 
@@ -405,6 +408,81 @@ func (s *Server) handleClaudeSessions(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(sessions)
 }
 
+// handleHookCallback receives notifications from Claude Code hooks.
+func (s *Server) handleHookCallback(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Event     string `json:"event"`
+		SessionID string `json:"session_id"`
+		Project   string `json:"project"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	var eventType notification.EventType
+	switch payload.Event {
+	case "waiting":
+		eventType = notification.EventWaiting
+	case "completed":
+		eventType = notification.EventCompleted
+	case "tool_use":
+		// tool_use is informational, not a notification event
+		w.WriteHeader(http.StatusOK)
+		return
+	default:
+		eventType = notification.EventType(payload.Event)
+	}
+
+	event := notification.SessionEvent{
+		SessionID: payload.SessionID,
+		Type:      eventType,
+		Timestamp: time.Now(),
+		Message:   "Hook: " + payload.Event + " in " + filepath.Base(payload.Project),
+	}
+	s.bus.Publish(event)
+
+	// Also persist to store
+	if s.store != nil {
+		s.store.SaveNotification(store.NotificationRecord{
+			SessionID: payload.SessionID,
+			EventType: string(eventType),
+			Timestamp: time.Now(),
+		})
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleInstallHooks installs/uninstalls websessions hooks in Claude settings.
+func (s *Server) handleInstallHooks(w http.ResponseWriter, r *http.Request) {
+	action := r.FormValue("action")
+	baseURL := fmt.Sprintf("http://%s:%d", s.cfg.Server.Host, s.cfg.Server.Port)
+	// Use localhost if host is 0.0.0.0
+	if s.cfg.Server.Host == "0.0.0.0" {
+		baseURL = fmt.Sprintf("http://localhost:%d", s.cfg.Server.Port)
+	}
+
+	var err error
+	switch action {
+	case "install":
+		err = hooks.Install(baseURL)
+	case "uninstall":
+		err = hooks.Uninstall()
+	default:
+		http.Error(w, "action must be 'install' or 'uninstall'", http.StatusBadRequest)
+		return
+	}
+
+	if err != nil {
+		slog.Error("hook action failed", "action", action, "error", err)
+		http.Error(w, "failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/settings?hooks="+action+"d", http.StatusSeeOther)
+}
+
 func (s *Server) setupNotificationBridge() {
 	s.bus.Subscribe(func(e notification.SessionEvent) {
 		s.sink.Send(e)
@@ -442,6 +520,11 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		case "waiting":
 			data.NotifWaiting = true
 		}
+	}
+	// Check if hooks are installed
+	claudeSettings, err := hooks.Load()
+	if err == nil {
+		data.HooksInstalled = claudeSettings.IsInstalled()
 	}
 	templates.Settings(data).Render(r.Context(), w)
 }

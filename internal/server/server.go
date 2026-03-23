@@ -54,6 +54,8 @@ func (s *Server) routes() http.Handler {
 		r.Get("/", s.handleIndex)
 		r.Get("/settings", s.handleSettings)
 		r.Post("/settings", s.handleSaveSettings)
+		r.Post("/settings/hooks", s.handleInstallHooks)
+		r.Post("/api/hook", s.handleHookCallback)
 		r.Get("/sidebar", s.handleSidebar)
 		r.Get("/notifications", s.handleNotifications)
 		r.Get("/api/dirs", s.handleListDirs)

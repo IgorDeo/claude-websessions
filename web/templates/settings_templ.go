@@ -20,6 +20,7 @@ type SettingsData struct {
 	NotifWaiting     bool
 	AuthEnabled      bool
 	AuthToken        string
+	HooksInstalled   bool
 }
 
 func Settings(data SettingsData) templ.Component {
@@ -62,7 +63,7 @@ func Settings(data SettingsData) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(data.Port))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/settings.templ`, Line: 29, Col: 73}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/settings.templ`, Line: 30, Col: 73}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -75,7 +76,7 @@ func Settings(data SettingsData) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(data.Host)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/settings.templ`, Line: 33, Col: 65}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/settings.templ`, Line: 34, Col: 65}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -88,7 +89,7 @@ func Settings(data SettingsData) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(data.ScanInterval)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/settings.templ`, Line: 40, Col: 91}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/settings.templ`, Line: 41, Col: 91}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -101,7 +102,7 @@ func Settings(data SettingsData) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(data.OutputBufferSize)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/settings.templ`, Line: 44, Col: 105}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/settings.templ`, Line: 45, Col: 105}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -114,7 +115,7 @@ func Settings(data SettingsData) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(data.DefaultDir)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/settings.templ`, Line: 48, Col: 85}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/settings.templ`, Line: 49, Col: 85}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -180,35 +181,50 @@ func Settings(data SettingsData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "Waiting for Input</label></div></div></div><div class=\"settings-section\"><h3>Authentication</h3><div class=\"settings-row\"><label class=\"checkbox-label\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "Waiting for Input</label></div></div></div><div class=\"settings-section\"><h3>Claude Code Hooks</h3><p class=\"hooks-description\">Hooks let Claude Code notify websessions when sessions need attention (tool approvals, completions). This adds entries to <code>~/.claude/settings.json</code>.</p><div class=\"settings-row hooks-status\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if data.AuthEnabled {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<input type=\"checkbox\" name=\"auth_enabled\" checked> ")
+			if data.HooksInstalled {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<span class=\"hooks-badge hooks-active\">Installed</span><form method=\"POST\" action=\"/settings/hooks\" style=\"display:inline;\"><input type=\"hidden\" name=\"action\" value=\"uninstall\"> <button type=\"submit\" class=\"btn-cancel btn-small\">Uninstall Hooks</button></form><form method=\"POST\" action=\"/settings/hooks\" style=\"display:inline;\"><input type=\"hidden\" name=\"action\" value=\"install\"> <button type=\"submit\" class=\"btn-small\" style=\"background:var(--accent);color:var(--bg-primary);border:none;border-radius:3px;padding:0.3rem 0.6rem;cursor:pointer;font-size:0.8rem;\">Update URL</button></form>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<input type=\"checkbox\" name=\"auth_enabled\"> ")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<span class=\"hooks-badge hooks-inactive\">Not installed</span><form method=\"POST\" action=\"/settings/hooks\" style=\"display:inline;\"><input type=\"hidden\" name=\"action\" value=\"install\"> <button type=\"submit\" class=\"btn-create btn-small\">Install Hooks</button></form>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "Enable Token Authentication</label></div><div class=\"settings-row\"><label for=\"auth_token\">Auth Token</label> <input type=\"password\" id=\"auth_token\" name=\"auth_token\" value=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div><div class=\"hooks-events\"><span class=\"settings-sublabel\">Hook events:</span><ul class=\"hooks-event-list\"><li><strong>Notification</strong> (permission_prompt) — when Claude needs tool approval</li><li><strong>Stop</strong> — when Claude finishes its turn</li><li><strong>PreToolUse</strong> — before each tool execution</li></ul></div></div><div class=\"settings-section\"><h3>Authentication</h3><div class=\"settings-row\"><label class=\"checkbox-label\">")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if data.AuthEnabled {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "<input type=\"checkbox\" name=\"auth_enabled\" checked> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			} else {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 23, "<input type=\"checkbox\" name=\"auth_enabled\"> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 24, "Enable Token Authentication</label></div><div class=\"settings-row\"><label for=\"auth_token\">Auth Token</label> <input type=\"password\" id=\"auth_token\" name=\"auth_token\" value=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(data.AuthToken)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/settings.templ`, Line: 107, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/settings.templ`, Line: 142, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 22, "\" placeholder=\"Leave empty to keep current\"></div></div><div class=\"settings-actions\"><a href=\"/\" class=\"btn-cancel\">Cancel</a> <button type=\"submit\" class=\"btn-create\">Save Settings</button></div><p class=\"settings-note\">Some changes (port, host, auth) require a server restart to take effect.</p></form></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 25, "\" placeholder=\"Leave empty to keep current\"></div></div><div class=\"settings-actions\"><a href=\"/\" class=\"btn-cancel\">Cancel</a> <button type=\"submit\" class=\"btn-create\">Save Settings</button></div><p class=\"settings-note\">Some changes (port, host, auth) require a server restart to take effect.</p></form></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
