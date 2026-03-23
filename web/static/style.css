@@ -65,6 +65,17 @@ html, body { height: 100%; background: var(--bg-primary); color: var(--text-prim
 .tab[draggable] { cursor: grab; }
 .tab[draggable]:active { cursor: grabbing; }
 
+/* Drop zones for tab-to-split */
+.drop-zones { position: absolute; inset: 0; z-index: 50; pointer-events: none; }
+.drop-zone { position: absolute; pointer-events: all; display: flex; align-items: center; justify-content: center; border: 2px dashed transparent; transition: background 0.15s, border-color 0.15s; }
+.drop-zone::after { content: ''; display: block; width: 40px; height: 40px; border-radius: 4px; background: rgba(122, 162, 247, 0.1); border: 2px dashed var(--accent); opacity: 0.5; }
+.drop-zone-active { background: rgba(122, 162, 247, 0.12); border-color: var(--accent); }
+.drop-zone-active::after { opacity: 1; background: rgba(122, 162, 247, 0.25); }
+.drop-zone-left { left: 0; top: 0; bottom: 0; width: 25%; }
+.drop-zone-right { right: 0; top: 0; bottom: 0; width: 25%; }
+.drop-zone-top { top: 0; left: 25%; right: 25%; height: 30%; }
+.drop-zone-bottom { bottom: 0; left: 25%; right: 25%; height: 30%; }
+
 .terminal-area { flex: 1; display: flex; overflow: hidden; background: var(--bg-primary); }
 .terminal-pane { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
 .pane-header { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.5rem; background: var(--bg-tertiary); border-bottom: 1px solid var(--border); font-size: 0.75rem; }

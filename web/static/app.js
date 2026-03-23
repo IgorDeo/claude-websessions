@@ -457,17 +457,23 @@ window.websessions = (function() {
     bar.appendChild(newBtn);
   }
 
-  // Tab drag and drop
+  // Tab drag and drop (reorder tabs + drop-to-split on terminal area)
   var draggedTabId = null;
+
   function tabDragStart(e, tabId) {
     draggedTabId = tabId;
     e.target.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', '');
+    e.dataTransfer.setData('text/plain', tabId);
+    // Show drop zones on terminal area after a short delay
+    setTimeout(function() { showDropZones(); }, 100);
   }
+
   function tabDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+
   function tabDrop(e, targetId) {
     e.preventDefault();
+    hideDropZones();
     if (!draggedTabId || draggedTabId === targetId) return;
     var fromIdx = openTabs.findIndex(function(t) { return t.id === draggedTabId; });
     var toIdx = openTabs.findIndex(function(t) { return t.id === targetId; });
@@ -477,9 +483,60 @@ window.websessions = (function() {
     saveTabState();
     renderTabs();
   }
+
   function tabDragEnd(e) {
     e.target.classList.remove('dragging');
     draggedTabId = null;
+    hideDropZones();
+  }
+
+  // Drop zones on terminal area for split-by-drag
+  function showDropZones() {
+    var area = document.getElementById('terminal-area');
+    if (!area || !draggedTabId) return;
+    // Don't show if no active session to split with
+    if (!activeTabId || activeTabId === draggedTabId) return;
+
+    var zones = document.createElement('div');
+    zones.id = 'drop-zones';
+    zones.className = 'drop-zones';
+
+    ['left', 'right', 'top', 'bottom'].forEach(function(side) {
+      var zone = document.createElement('div');
+      zone.className = 'drop-zone drop-zone-' + side;
+      zone.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+        zone.classList.add('drop-zone-active');
+      });
+      zone.addEventListener('dragleave', function() {
+        zone.classList.remove('drop-zone-active');
+      });
+      zone.addEventListener('drop', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        hideDropZones();
+        if (!draggedTabId || draggedTabId === activeTabId) return;
+        var direction = (side === 'left' || side === 'right') ? 'horizontal' : 'vertical';
+        // For left/top, the dragged tab goes first; for right/bottom, it goes second
+        if (side === 'left' || side === 'top') {
+          doSplit(draggedTabId, activeTabId, direction);
+        } else {
+          doSplit(activeTabId, draggedTabId, direction);
+        }
+        draggedTabId = null;
+      });
+      zones.appendChild(zone);
+    });
+
+    area.style.position = 'relative';
+    area.appendChild(zones);
+  }
+
+  function hideDropZones() {
+    var zones = document.getElementById('drop-zones');
+    if (zones) zones.remove();
   }
 
   function saveTabState() {
