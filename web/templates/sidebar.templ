@@ -14,7 +14,10 @@ templ Sidebar(sessions []SessionView) {
 			>
 				<div class="drag-handle" title="Drag to reorder">&#8801;</div>
 				if s.State != "offline" {
-					<div class="session-clickable" hx-post={ "/sessions/" + s.ID + "/open" } hx-target="#terminal-area" hx-swap="innerHTML">
+					<div
+						class="session-clickable"
+						onclick={ openSession(s.ID, s.Name, s.State) }
+					>
 						<span class="status-dot"></span>
 						<div class="session-info">
 							<span class="session-name">{ s.Name }</span>
@@ -39,6 +42,10 @@ templ Sidebar(sessions []SessionView) {
 			</div>
 		}
 	</div>
+}
+
+script openSession(id string, name string, state string) {
+	window.websessions.openTab(id, name, state);
 }
 
 func stateClass(state string) string {

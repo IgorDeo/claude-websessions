@@ -1,6 +1,8 @@
 window.websessions = (function() {
   const terminals = {};
   const splitInstances = [];
+  var openTabs = []; // [{id, name, state}]
+  var activeTabId = null;
 
   function connectSession(sessionID, containerID) {
     const container = document.getElementById(containerID);
@@ -365,25 +367,152 @@ window.websessions = (function() {
     if (form) form.scrollIntoView({ behavior: 'smooth' });
   }
 
-  function killSession(sessionID) {
-    if (!confirm('Kill session "' + sessionID + '"?')) return;
-    fetch('/sessions/' + encodeURIComponent(sessionID) + '/kill', { method: 'POST' })
-      .then(function(r) {
-        if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
-        // Disconnect terminal
-        disconnectSession(sessionID);
-        // Show empty state
+  // Tab management
+  function openTab(sessionID, name, state) {
+    // Add to tabs if not already open
+    var existing = openTabs.find(function(t) { return t.id === sessionID; });
+    if (!existing) {
+      openTabs.push({ id: sessionID, name: name || sessionID, state: state || 'running' });
+      saveTabState();
+    }
+    activeTabId = sessionID;
+    renderTabs();
+    // Load terminal
+    htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID) + '/open', {
+      target: '#terminal-area',
+      swap: 'innerHTML'
+    });
+  }
+
+  function closeTab(sessionID, e) {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    openTabs = openTabs.filter(function(t) { return t.id !== sessionID; });
+    if (terminals[sessionID]) disconnectSession(sessionID);
+    saveTabState();
+    if (activeTabId === sessionID) {
+      if (openTabs.length > 0) {
+        openTab(openTabs[openTabs.length - 1].id, openTabs[openTabs.length - 1].name, openTabs[openTabs.length - 1].state);
+      } else {
+        activeTabId = null;
+        renderTabs();
         var area = document.getElementById('terminal-area');
         if (area) {
           while (area.firstChild) area.removeChild(area.firstChild);
           var empty = document.createElement('div');
           empty.className = 'empty-state';
           var p = document.createElement('p');
-          p.textContent = 'Session killed';
+          p.textContent = 'Select a session from the sidebar or create a new one';
           empty.appendChild(p);
           area.appendChild(empty);
         }
-        // Refresh sidebar
+      }
+    } else {
+      renderTabs();
+    }
+  }
+
+  function renderTabs() {
+    var bar = document.getElementById('tab-bar');
+    if (!bar) return;
+    while (bar.firstChild) bar.removeChild(bar.firstChild);
+    openTabs.forEach(function(tab) {
+      var btn = document.createElement('div');
+      btn.className = 'tab' + (tab.id === activeTabId ? ' tab-active' : '');
+      btn.setAttribute('data-tab-id', tab.id);
+      btn.setAttribute('draggable', 'true');
+      btn.addEventListener('click', function() { openTab(tab.id, tab.name, tab.state); });
+      btn.addEventListener('dragstart', function(e) { tabDragStart(e, tab.id); });
+      btn.addEventListener('dragover', function(e) { tabDragOver(e); });
+      btn.addEventListener('drop', function(e) { tabDrop(e, tab.id); });
+      btn.addEventListener('dragend', tabDragEnd);
+
+      var dot = document.createElement('span');
+      dot.className = 'tab-dot state-' + (tab.state || 'running');
+      btn.appendChild(dot);
+
+      var nameSpan = document.createElement('span');
+      nameSpan.textContent = tab.name;
+      btn.appendChild(nameSpan);
+
+      var closeSpan = document.createElement('span');
+      closeSpan.className = 'tab-close';
+      closeSpan.textContent = '\u00d7';
+      closeSpan.addEventListener('click', function(e) { closeTab(tab.id, e); });
+      btn.appendChild(closeSpan);
+
+      bar.appendChild(btn);
+    });
+
+    // Add "+" button
+    var newBtn = document.createElement('div');
+    newBtn.className = 'tab tab-new';
+    newBtn.textContent = '+';
+    newBtn.addEventListener('click', function() {
+      htmx.ajax('GET', '/sessions/new', { target: '#modal', swap: 'innerHTML' });
+    });
+    bar.appendChild(newBtn);
+  }
+
+  // Tab drag and drop
+  var draggedTabId = null;
+  function tabDragStart(e, tabId) {
+    draggedTabId = tabId;
+    e.target.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', '');
+  }
+  function tabDragOver(e) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }
+  function tabDrop(e, targetId) {
+    e.preventDefault();
+    if (!draggedTabId || draggedTabId === targetId) return;
+    var fromIdx = openTabs.findIndex(function(t) { return t.id === draggedTabId; });
+    var toIdx = openTabs.findIndex(function(t) { return t.id === targetId; });
+    if (fromIdx < 0 || toIdx < 0) return;
+    var item = openTabs.splice(fromIdx, 1)[0];
+    openTabs.splice(toIdx, 0, item);
+    saveTabState();
+    renderTabs();
+  }
+  function tabDragEnd(e) {
+    e.target.classList.remove('dragging');
+    draggedTabId = null;
+  }
+
+  function saveTabState() {
+    try { localStorage.setItem('ws-open-tabs', JSON.stringify(openTabs)); } catch(e) {}
+    try { localStorage.setItem('ws-active-tab', activeTabId || ''); } catch(e) {}
+  }
+
+  function loadTabState() {
+    try {
+      var saved = JSON.parse(localStorage.getItem('ws-open-tabs'));
+      if (saved && saved.length) openTabs = saved;
+      activeTabId = localStorage.getItem('ws-active-tab') || null;
+    } catch(e) {}
+  }
+
+  // Load tabs on page load
+  loadTabState();
+  document.addEventListener('DOMContentLoaded', function() {
+    renderTabs();
+    // Reopen the active tab
+    if (activeTabId) {
+      var tab = openTabs.find(function(t) { return t.id === activeTabId; });
+      if (tab) {
+        htmx.ajax('POST', '/sessions/' + encodeURIComponent(activeTabId) + '/open', {
+          target: '#terminal-area',
+          swap: 'innerHTML'
+        });
+      }
+    }
+  });
+
+  function killSession(sessionID) {
+    if (!confirm('Kill session "' + sessionID + '"?')) return;
+    fetch('/sessions/' + encodeURIComponent(sessionID) + '/kill', { method: 'POST' })
+      .then(function(r) {
+        if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
+        closeTab(sessionID);
         htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
       })
       .catch(function(err) { console.error('kill failed:', err); });
@@ -475,6 +604,8 @@ window.websessions = (function() {
   return {
     connectSession: connectSession,
     disconnectSession: disconnectSession,
+    openTab: openTab,
+    closeTab: closeTab,
     splitPane: splitPane,
     killSession: killSession,
     startRename: startRename,
