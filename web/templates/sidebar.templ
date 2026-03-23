@@ -1,9 +1,18 @@
 package templates
 
 templ Sidebar(sessions []SessionView) {
-	<div class="session-list">
+	<div class="session-list" id="session-list">
 		for _, s := range sessions {
-			<div class={ "session-item", stateClass(s.State) }>
+			<div
+				class={ "session-item", stateClass(s.State) }
+				data-session-id={ s.ID }
+				draggable="true"
+				ondragstart="window.websessions.dragStart(event)"
+				ondragover="window.websessions.dragOver(event)"
+				ondrop="window.websessions.drop(event)"
+				ondragend="window.websessions.dragEnd(event)"
+			>
+				<div class="drag-handle" title="Drag to reorder">&#8801;</div>
 				if s.State != "offline" {
 					<div class="session-clickable" hx-post={ "/sessions/" + s.ID + "/open" } hx-target="#terminal-area" hx-swap="innerHTML">
 						<span class="status-dot"></span>

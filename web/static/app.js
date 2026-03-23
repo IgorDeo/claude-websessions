@@ -365,6 +365,89 @@ window.websessions = (function() {
     if (form) form.scrollIntoView({ behavior: 'smooth' });
   }
 
+  // Drag and drop reordering
+  var draggedEl = null;
+
+  function dragStart(e) {
+    draggedEl = e.target.closest('.session-item');
+    if (!draggedEl) return;
+    draggedEl.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', ''); // required for Firefox
+  }
+
+  function dragOver(e) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    var target = e.target.closest('.session-item');
+    if (!target || target === draggedEl) return;
+    var list = target.parentNode;
+    var items = Array.from(list.children);
+    var dragIdx = items.indexOf(draggedEl);
+    var targetIdx = items.indexOf(target);
+    if (dragIdx < targetIdx) {
+      list.insertBefore(draggedEl, target.nextSibling);
+    } else {
+      list.insertBefore(draggedEl, target);
+    }
+  }
+
+  function drop(e) {
+    e.preventDefault();
+    saveSessionOrder();
+  }
+
+  function dragEnd(e) {
+    if (draggedEl) {
+      draggedEl.classList.remove('dragging');
+      draggedEl = null;
+    }
+  }
+
+  function saveSessionOrder() {
+    var list = document.getElementById('session-list');
+    if (!list) return;
+    var order = [];
+    list.querySelectorAll('.session-item[data-session-id]').forEach(function(el) {
+      order.push(el.getAttribute('data-session-id'));
+    });
+    try { localStorage.setItem('ws-session-order', JSON.stringify(order)); } catch(e) {}
+  }
+
+  function applySessionOrder() {
+    var list = document.getElementById('session-list');
+    if (!list) return;
+    var order;
+    try { order = JSON.parse(localStorage.getItem('ws-session-order')); } catch(e) { return; }
+    if (!order || !order.length) return;
+    var items = {};
+    list.querySelectorAll('.session-item[data-session-id]').forEach(function(el) {
+      items[el.getAttribute('data-session-id')] = el;
+    });
+    // Re-insert items in saved order; items not in saved order stay at end
+    order.forEach(function(id) {
+      if (items[id]) {
+        list.appendChild(items[id]);
+        delete items[id];
+      }
+    });
+    // Append remaining items not in the saved order
+    Object.keys(items).forEach(function(id) {
+      list.appendChild(items[id]);
+    });
+  }
+
+  // Apply saved order after sidebar loads/refreshes
+  var origAfterSwap = null;
+  document.addEventListener('htmx:afterSettle', function(event) {
+    if (event.detail.target.id === 'sidebar' || event.detail.target.querySelector('#session-list')) {
+      applySessionOrder();
+    }
+  });
+
+  // Also apply on initial page load
+  document.addEventListener('DOMContentLoaded', function() { applySessionOrder(); });
+
   return {
     connectSession: connectSession,
     disconnectSession: disconnectSession,
@@ -373,6 +456,10 @@ window.websessions = (function() {
     dirAutocomplete: dirAutocomplete,
     selectDir: selectDir,
     quickSession: quickSession,
+    dragStart: dragStart,
+    dragOver: dragOver,
+    drop: drop,
+    dragEnd: dragEnd,
     terminals: terminals,
   };
 })();

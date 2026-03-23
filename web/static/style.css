@@ -42,6 +42,10 @@ html, body { height: 100%; background: var(--bg-primary); color: var(--text-prim
 .session-info { display: flex; flex-direction: column; overflow: hidden; }
 .session-name { font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session-dir { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.drag-handle { color: var(--text-muted); cursor: grab; font-size: 0.9rem; flex-shrink: 0; user-select: none; padding: 0 0.1rem; }
+.drag-handle:active { cursor: grabbing; }
+.session-item.dragging { opacity: 0.4; background: var(--bg-tertiary); }
+.session-item { transition: opacity 0.15s; }
 .session-clickable { display: flex; align-items: center; gap: 0.5rem; flex: 1; overflow: hidden; cursor: pointer; }
 .takeover-btn, .restart-btn { border: none; padding: 0.2rem 0.5rem; border-radius: 3px; font-size: 0.7rem; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
 .takeover-btn { background: var(--accent); color: var(--bg-primary); }
@@ -99,10 +103,10 @@ html, body { height: 100%; background: var(--bg-primary); color: var(--text-prim
 .recent-projects { margin-bottom: 0.75rem; }
 .recent-label { display: block; font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.4rem; }
 .recent-list { display: flex; flex-direction: column; gap: 0.25rem; max-height: 200px; overflow-y: auto; }
-.recent-item { display: flex; flex-direction: column; align-items: flex-start; padding: 0.5rem 0.6rem; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; text-align: left; color: var(--text-primary); font-family: inherit; overflow: hidden; }
+.recent-item { display: flex; flex-direction: column; align-items: flex-start; padding: 0.5rem 0.6rem; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; text-align: left; color: var(--text-primary); font-family: 'JetBrains Mono', 'Fira Code', monospace; font-size: 0.85rem; overflow: hidden; width: 100%; }
 .recent-item:hover { border-color: var(--accent); background: var(--bg-tertiary); }
-.recent-name { font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.recent-path { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.recent-name { font-size: 0.85rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.recent-path { font-size: 0.75rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .modal-divider { display: flex; align-items: center; gap: 0.75rem; margin: 0.75rem 0; color: var(--text-muted); font-size: 0.75rem; }
 .modal-divider::before, .modal-divider::after { content: ''; flex: 1; border-top: 1px solid var(--border); }
 
