@@ -365,6 +365,30 @@ window.websessions = (function() {
     if (form) form.scrollIntoView({ behavior: 'smooth' });
   }
 
+  function killSession(sessionID) {
+    if (!confirm('Kill session "' + sessionID + '"?')) return;
+    fetch('/sessions/' + encodeURIComponent(sessionID) + '/kill', { method: 'POST' })
+      .then(function(r) {
+        if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
+        // Disconnect terminal
+        disconnectSession(sessionID);
+        // Show empty state
+        var area = document.getElementById('terminal-area');
+        if (area) {
+          while (area.firstChild) area.removeChild(area.firstChild);
+          var empty = document.createElement('div');
+          empty.className = 'empty-state';
+          var p = document.createElement('p');
+          p.textContent = 'Session killed';
+          empty.appendChild(p);
+          area.appendChild(empty);
+        }
+        // Refresh sidebar
+        htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+      })
+      .catch(function(err) { console.error('kill failed:', err); });
+  }
+
   // Drag and drop reordering
   var draggedEl = null;
 
@@ -452,6 +476,7 @@ window.websessions = (function() {
     connectSession: connectSession,
     disconnectSession: disconnectSession,
     splitPane: splitPane,
+    killSession: killSession,
     startRename: startRename,
     dirAutocomplete: dirAutocomplete,
     selectDir: selectDir,

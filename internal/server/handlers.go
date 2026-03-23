@@ -186,6 +186,29 @@ func (s *Server) handleRenameSession(w http.ResponseWriter, r *http.Request, ses
 	w.WriteHeader(http.StatusOK)
 }
 
+func (s *Server) handleKillSession(w http.ResponseWriter, r *http.Request, sessionID string) {
+	sess, ok := s.mgr.Get(sessionID)
+	if !ok {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+	state := sess.GetState()
+	if state == session.StateRunning || state == session.StateWaiting || state == session.StateCreated {
+		if err := s.mgr.Kill(sessionID); err != nil {
+			slog.Error("kill failed", "session", sessionID, "error", err)
+			http.Error(w, "failed to kill session: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		// Wait for process to finish
+		go s.mgr.Wait(sessionID)
+	}
+	// For offline/discovered, just remove from the list
+	if state == session.StateOffline || state == session.StateDiscovered {
+		s.mgr.Remove(sessionID)
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func (s *Server) handleRestartSession(w http.ResponseWriter, r *http.Request, sessionID string) {
 	newSess, err := s.mgr.Restart(sessionID)
 	if err != nil {
