@@ -1,0 +1,177 @@
+package session
+
+import (
+	"fmt"
+	"io"
+	"log/slog"
+	"os"
+	"os/exec"
+	"sync"
+	"time"
+
+	"github.com/creack/pty"
+)
+
+type StateChangeFunc func(s *Session, from, to State)
+type OutputFunc func(sessionID string, data []byte)
+
+type Manager struct {
+	mu            sync.RWMutex
+	sessions      map[string]*Session
+	bufferSize    int64
+	onStateChange StateChangeFunc
+	onOutput      OutputFunc
+}
+
+func NewManager(bufferSize int64) *Manager {
+	return &Manager{
+		sessions:   make(map[string]*Session),
+		bufferSize: bufferSize,
+	}
+}
+
+func (m *Manager) OnStateChange(fn StateChangeFunc) { m.onStateChange = fn }
+func (m *Manager) OnOutput(fn OutputFunc)            { m.onOutput = fn }
+
+func (m *Manager) Create(id, workDir, command string, args []string) (*Session, error) {
+	s := &Session{
+		ID: id, Name: id, WorkDir: workDir,
+		State: StateCreated, StartTime: time.Now(), Owned: true,
+		output: NewRingBuf(int(m.bufferSize)),
+	}
+	cmd := exec.Command(command, args...)
+	cmd.Dir = workDir
+	ptmx, err := pty.Start(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("starting PTY: %w", err)
+	}
+	s.SetPTY(ptmx, cmd.Process)
+	from := s.State
+	s.State = StateRunning
+	if m.onStateChange != nil {
+		m.onStateChange(s, from, StateRunning)
+	}
+	m.mu.Lock()
+	m.sessions[id] = s
+	m.mu.Unlock()
+	go m.readPTY(s)
+	return s, nil
+}
+
+func (m *Manager) readPTY(s *Session) {
+	buf := make([]byte, 4096)
+	for {
+		n, err := s.PTY().Read(buf)
+		if n > 0 {
+			s.Output().Write(buf[:n])
+			if m.onOutput != nil {
+				m.onOutput(s.ID, buf[:n])
+			}
+		}
+		if err != nil {
+			if err != io.EOF {
+				slog.Debug("PTY read error", "session", s.ID, "error", err)
+			}
+			break
+		}
+	}
+}
+
+func (m *Manager) Wait(id string) {
+	s, ok := m.Get(id)
+	if !ok {
+		return
+	}
+	proc := s.proc
+	if proc == nil {
+		return
+	}
+	state, err := proc.Wait()
+	from := s.GetState()
+	if err != nil || !state.Success() {
+		s.mu.Lock()
+		s.State = StateErrored
+		s.EndTime = time.Now()
+		if state != nil {
+			s.ExitCode = state.ExitCode()
+		}
+		s.mu.Unlock()
+		if m.onStateChange != nil {
+			m.onStateChange(s, from, StateErrored)
+		}
+	} else {
+		s.mu.Lock()
+		s.State = StateCompleted
+		s.EndTime = time.Now()
+		s.ExitCode = 0
+		s.mu.Unlock()
+		if m.onStateChange != nil {
+			m.onStateChange(s, from, StateCompleted)
+		}
+	}
+	if p := s.PTY(); p != nil {
+		p.Close()
+	}
+}
+
+func (m *Manager) Get(id string) (*Session, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	s, ok := m.sessions[id]
+	return s, ok
+}
+
+func (m *Manager) List() []*Session {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	result := make([]*Session, 0, len(m.sessions))
+	for _, s := range m.sessions {
+		result = append(result, s)
+	}
+	return result
+}
+
+func (m *Manager) Kill(id string) error {
+	s, ok := m.Get(id)
+	if !ok {
+		return fmt.Errorf("session %s not found", id)
+	}
+	s.mu.RLock()
+	proc := s.proc
+	s.mu.RUnlock()
+	if proc == nil {
+		return fmt.Errorf("session %s has no process", id)
+	}
+	return proc.Signal(os.Kill)
+}
+
+func (m *Manager) AddDiscovered(id, claudeID, workDir string, pid int, startTime time.Time) *Session {
+	s := &Session{
+		ID: id, ClaudeID: claudeID, Name: workDir, WorkDir: workDir,
+		State: StateDiscovered, PID: pid, StartTime: startTime, Owned: false,
+		output: NewRingBuf(int(m.bufferSize)),
+	}
+	m.mu.Lock()
+	m.sessions[id] = s
+	m.mu.Unlock()
+	return s
+}
+
+func (m *Manager) Remove(id string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	delete(m.sessions, id)
+}
+
+func (m *Manager) WriteInput(id string, data []byte) error {
+	s, ok := m.Get(id)
+	if !ok {
+		return fmt.Errorf("session %s not found", id)
+	}
+	p := s.PTY()
+	if p == nil {
+		return fmt.Errorf("session %s has no PTY", id)
+	}
+	_, err := p.Write(data)
+	return err
+}
