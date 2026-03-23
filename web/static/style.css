@@ -57,7 +57,10 @@ html, body { height: 100%; background: var(--bg-primary); color: var(--text-prim
 .terminal-area { flex: 1; display: flex; overflow: hidden; background: var(--bg-primary); }
 .terminal-pane { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
 .pane-header { display: flex; align-items: center; gap: 0.5rem; padding: 0.25rem 0.5rem; background: var(--bg-tertiary); border-bottom: 1px solid var(--border); font-size: 0.75rem; }
-.pane-title { font-weight: 500; }
+.pane-title { font-weight: 500; cursor: default; }
+.pane-title:hover { text-decoration: underline dotted; }
+.rename-input { background: var(--bg-primary); border: 1px solid var(--accent); color: var(--text-primary); font-size: 0.75rem; font-family: inherit; padding: 0.1rem 0.3rem; border-radius: 2px; width: 120px; outline: none; }
+.split-pane { overflow: hidden; }
 .pane-status { color: var(--text-muted); }
 .pane-dir { color: var(--text-muted); margin-left: auto; }
 .pane-actions { display: flex; gap: 0.25rem; }

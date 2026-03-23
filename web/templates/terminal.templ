@@ -3,15 +3,27 @@ package templates
 templ Terminal(sessionID string, sessionName string, workDir string, state string) {
 	<div class="terminal-pane" data-session-id={ sessionID }>
 		<div class="pane-header">
-			<span class="pane-title">{ sessionName }</span>
+			<span
+				class="pane-title"
+				title="Double-click to rename"
+				ondblclick="window.websessions.startRename(this)"
+				data-session-id={ sessionID }
+			>{ sessionName }</span>
 			<span class="pane-status">{ state }</span>
 			<span class="pane-dir">{ workDir }</span>
 			<div class="pane-actions">
-				<button class="split-h-btn" title="Split horizontal">&#9776;</button>
-				<button class="split-v-btn" title="Split vertical">&#9783;</button>
-				<button class="maximize-btn" title="Maximize">&#9744;</button>
+				<button class="split-h-btn" title="Split horizontal" onclick={ splitHAction(sessionID) }>&#9776;</button>
+				<button class="split-v-btn" title="Split vertical" onclick={ splitVAction(sessionID) }>&#9783;</button>
 			</div>
 		</div>
 		<div class="terminal-container" id={ "term-" + sessionID }></div>
 	</div>
+}
+
+script splitHAction(sessionID string) {
+	window.websessions.splitPane(sessionID, "horizontal");
+}
+
+script splitVAction(sessionID string) {
+	window.websessions.splitPane(sessionID, "vertical");
 }

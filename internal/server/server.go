@@ -55,10 +55,14 @@ func (s *Server) routes() http.Handler {
 		r.Get("/notifications", s.handleNotifications)
 		r.Get("/api/dirs", s.handleListDirs)
 		r.Get("/api/recent", s.handleRecentProjects)
+		r.Get("/api/sessions", s.handleListSessions)
 		r.Get("/sessions/new", s.handleNewSessionModal)
 		r.Post("/sessions", s.handleCreateSession)
 		r.Post("/sessions/{sessionID}/open", func(w http.ResponseWriter, r *http.Request) {
 			s.handleOpenSession(w, r, chi.URLParam(r, "sessionID"))
+		})
+		r.Post("/sessions/{sessionID}/rename", func(w http.ResponseWriter, r *http.Request) {
+			s.handleRenameSession(w, r, chi.URLParam(r, "sessionID"))
 		})
 		r.Post("/sessions/{sessionID}/takeover", func(w http.ResponseWriter, r *http.Request) {
 			s.handleTakeover(w, r, chi.URLParam(r, "sessionID"))

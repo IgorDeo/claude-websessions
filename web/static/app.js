@@ -74,11 +74,110 @@ window.websessions = (function() {
     delete terminals[sessionID];
   }
 
-  function splitPane(sessionID, direction) {
+  function splitPane(currentSessionID, direction) {
     var area = document.getElementById('terminal-area');
     if (!area) return;
-    htmx.ajax('POST', '/sessions/' + sessionID + '/split?direction=' + direction, {
-      target: '#terminal-area',
+
+    // Prompt user to pick a session for the new pane
+    // Fetch sidebar sessions and show a quick picker
+    fetch('/api/sessions')
+      .then(function(r) { return r.json(); })
+      .then(function(sessions) {
+        showSplitPicker(currentSessionID, direction, sessions);
+      })
+      .catch(function() {
+        // Fallback: just ask for session ID
+        var sid = prompt('Session ID to open in new pane:');
+        if (sid) doSplit(currentSessionID, sid, direction);
+      });
+  }
+
+  function showSplitPicker(currentSessionID, direction, sessions) {
+    // Create a small picker overlay
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.addEventListener('click', function() { overlay.remove(); });
+    var content = document.createElement('div');
+    content.className = 'modal-content';
+    content.style.width = '300px';
+    content.addEventListener('click', function(e) { e.stopPropagation(); });
+    var title = document.createElement('h2');
+    title.textContent = 'Open in split';
+    content.appendChild(title);
+    sessions.forEach(function(s) {
+      if (s.id === currentSessionID) return;
+      var btn = document.createElement('button');
+      btn.className = 'recent-item';
+      btn.style.width = '100%';
+      btn.style.marginBottom = '0.25rem';
+      var nameSpan = document.createElement('span');
+      nameSpan.className = 'recent-name';
+      nameSpan.textContent = s.name;
+      var pathSpan = document.createElement('span');
+      pathSpan.className = 'recent-path';
+      pathSpan.textContent = s.state + ' - ' + s.work_dir;
+      btn.appendChild(nameSpan);
+      btn.appendChild(pathSpan);
+      btn.addEventListener('click', function() {
+        overlay.remove();
+        doSplit(currentSessionID, s.id, direction);
+      });
+      content.appendChild(btn);
+    });
+    if (sessions.length <= 1) {
+      var msg = document.createElement('p');
+      msg.textContent = 'No other sessions available';
+      msg.style.color = '#565f89';
+      msg.style.textAlign = 'center';
+      msg.style.padding = '1rem';
+      content.appendChild(msg);
+    }
+    overlay.appendChild(content);
+    document.body.appendChild(overlay);
+  }
+
+  function doSplit(sessionID1, sessionID2, direction) {
+    var area = document.getElementById('terminal-area');
+    if (!area) return;
+
+    // Disconnect existing terminals in the area
+    for (var sid in terminals) {
+      if (document.getElementById('term-' + sid) && area.contains(document.getElementById('term-' + sid))) {
+        disconnectSession(sid);
+      }
+    }
+
+    // Create two pane containers
+    var pane1 = document.createElement('div');
+    pane1.className = 'split-pane';
+    pane1.id = 'split-' + sessionID1;
+    var pane2 = document.createElement('div');
+    pane2.className = 'split-pane';
+    pane2.id = 'split-' + sessionID2;
+
+    // Clear area and add panes
+    while (area.firstChild) area.removeChild(area.firstChild);
+    area.appendChild(pane1);
+    area.appendChild(pane2);
+
+    // Set flex direction based on split direction
+    area.style.flexDirection = direction === 'horizontal' ? 'row' : 'column';
+
+    // Use Split.js
+    Split(['#split-' + sessionID1, '#split-' + sessionID2], {
+      direction: direction === 'horizontal' ? 'horizontal' : 'vertical',
+      sizes: [50, 50],
+      minSize: 100,
+      gutterSize: 4,
+    });
+
+    // Load terminal content into each pane via htmx
+    htmx.ajax('POST', '/sessions/' + sessionID1 + '/open', {
+      target: pane1,
+      swap: 'innerHTML'
+    });
+    htmx.ajax('POST', '/sessions/' + sessionID2 + '/open', {
+      target: pane2,
       swap: 'innerHTML'
     });
   }
@@ -207,28 +306,64 @@ window.websessions = (function() {
     if (!e.target.closest('.form-group')) { closeDirSuggestions(); }
   });
 
+  // Rename session — double-click on pane title
+  function startRename(titleEl) {
+    var sessionID = titleEl.getAttribute('data-session-id');
+    var currentName = titleEl.textContent.trim();
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentName;
+    input.className = 'rename-input';
+    input.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { finishRename(titleEl, input, sessionID); }
+      if (e.key === 'Escape') { cancelRename(titleEl, input, currentName); }
+    });
+    input.addEventListener('blur', function() { finishRename(titleEl, input, sessionID); });
+    titleEl.textContent = '';
+    titleEl.appendChild(input);
+    input.focus();
+    input.select();
+  }
+
+  function finishRename(titleEl, input, sessionID) {
+    var newName = input.value.trim();
+    if (!newName) newName = sessionID;
+    titleEl.textContent = newName;
+    // Persist rename to server
+    fetch('/sessions/' + encodeURIComponent(sessionID) + '/rename', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'name=' + encodeURIComponent(newName),
+    }).then(function() {
+      // Refresh sidebar to show new name
+      htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+    });
+  }
+
+  function cancelRename(titleEl, input, originalName) {
+    titleEl.textContent = originalName;
+  }
+
+  // Populate form fields from a recent project selection
   function quickSession(btn) {
     var dir = btn.getAttribute('data-dir');
     var name = btn.getAttribute('data-name');
-    var form = new FormData();
-    form.append('name', name);
-    form.append('work_dir', dir);
-    form.append('prompt', '');
-    fetch('/sessions', { method: 'POST', body: form })
-      .then(function(r) { return r.text(); })
-      .then(function(html) {
-        // Close modal
-        var modal = btn.closest('.modal-overlay');
-        if (modal) modal.remove();
-        // Refresh sidebar
-        htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
-      });
+    var nameInput = document.getElementById('name');
+    var dirInput = document.getElementById('work_dir');
+    var promptInput = document.getElementById('prompt');
+    if (dirInput) dirInput.value = dir;
+    if (nameInput) { nameInput.value = name; nameInput.focus(); nameInput.select(); }
+    if (promptInput) promptInput.value = '';
+    // Scroll to form
+    var form = document.getElementById('new-session-form');
+    if (form) form.scrollIntoView({ behavior: 'smooth' });
   }
 
   return {
     connectSession: connectSession,
     disconnectSession: disconnectSession,
     splitPane: splitPane,
+    startRename: startRename,
     dirAutocomplete: dirAutocomplete,
     selectDir: selectDir,
     quickSession: quickSession,

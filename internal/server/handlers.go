@@ -146,6 +146,46 @@ func (s *Server) handleTakeover(w http.ResponseWriter, r *http.Request, sessionI
 	templates.Terminal(v.ID, v.Name, v.WorkDir, v.State).Render(r.Context(), w)
 }
 
+// handleListSessions returns a JSON list of all sessions for the split picker.
+func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
+	sessions := s.mgr.List()
+	type sessionJSON struct {
+		ID      string `json:"id"`
+		Name    string `json:"name"`
+		WorkDir string `json:"work_dir"`
+		State   string `json:"state"`
+	}
+	var result []sessionJSON
+	for _, sess := range sessions {
+		result = append(result, sessionJSON{
+			ID: sess.ID, Name: sess.Name, WorkDir: sess.WorkDir,
+			State: string(sess.GetState()),
+		})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+// handleRenameSession renames a session.
+func (s *Server) handleRenameSession(w http.ResponseWriter, r *http.Request, sessionID string) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	name := r.FormValue("name")
+	if name == "" {
+		http.Error(w, "name required", http.StatusBadRequest)
+		return
+	}
+	sess, ok := s.mgr.Get(sessionID)
+	if !ok {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+	sess.Name = name
+	w.WriteHeader(http.StatusOK)
+}
+
 func (s *Server) setupNotificationBridge() {
 	s.bus.Subscribe(func(e notification.SessionEvent) { s.sink.Send(e) })
 }
