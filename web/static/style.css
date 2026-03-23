@@ -37,11 +37,15 @@ html, body { height: 100%; background: var(--bg-primary); color: var(--text-prim
 .state-errored .status-dot { background: var(--red); }
 .state-waiting .status-dot { background: var(--yellow); animation: pulse 1.5s infinite; }
 .state-discovered .status-dot { background: var(--blue); }
+.state-offline .status-dot { background: var(--text-muted); border: 1px dashed var(--text-muted); background: none; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 .session-info { display: flex; flex-direction: column; overflow: hidden; }
 .session-name { font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session-dir { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.takeover-btn { background: var(--accent); color: var(--bg-primary); border: none; padding: 0.2rem 0.5rem; border-radius: 3px; font-size: 0.7rem; cursor: pointer; white-space: nowrap; }
+.session-clickable { display: flex; align-items: center; gap: 0.5rem; flex: 1; overflow: hidden; cursor: pointer; }
+.takeover-btn, .restart-btn { border: none; padding: 0.2rem 0.5rem; border-radius: 3px; font-size: 0.7rem; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+.takeover-btn { background: var(--accent); color: var(--bg-primary); }
+.restart-btn { background: var(--green); color: var(--bg-primary); }
 
 .content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 

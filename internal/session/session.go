@@ -19,6 +19,7 @@ const (
 	StateWaiting    State = "waiting"
 	StateCompleted  State = "completed"
 	StateErrored    State = "errored"
+	StateOffline    State = "offline"
 )
 
 type Session struct {

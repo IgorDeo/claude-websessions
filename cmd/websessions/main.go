@@ -100,6 +100,17 @@ func main() {
 		})
 	})
 
+	// Restore previous sessions from SQLite as offline
+	prevSessions, err := st.ListSessions(50)
+	if err == nil {
+		for _, rec := range prevSessions {
+			if rec.Status == "running" || rec.Status == "waiting" || rec.Status == "created" {
+				mgr.AddOffline(rec.ID, rec.ID, rec.ClaudeID, rec.WorkDir)
+				slog.Info("restored offline session", "id", rec.ID, "dir", rec.WorkDir)
+			}
+		}
+	}
+
 	go func() {
 		processes, err := discovery.Scan()
 		if err != nil {

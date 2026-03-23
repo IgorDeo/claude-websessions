@@ -179,6 +179,51 @@ func (m *Manager) AddDiscovered(id, claudeID, workDir string, pid int, startTime
 	return s
 }
 
+// AddOffline adds a session from a previous server run (loaded from SQLite).
+func (m *Manager) AddOffline(id, name, claudeID, workDir string) *Session {
+	s := &Session{
+		ID: id, ClaudeID: claudeID, Name: name, WorkDir: workDir,
+		State: StateOffline, Owned: false,
+		output: NewRingBuf(int(m.bufferSize)),
+	}
+	if name == "" {
+		s.Name = filepath.Base(workDir)
+	}
+	m.mu.Lock()
+	m.sessions[id] = s
+	m.mu.Unlock()
+	return s
+}
+
+// Restart creates a new claude session in the same directory, replacing an offline session.
+func (m *Manager) Restart(id string) (*Session, error) {
+	s, ok := m.Get(id)
+	if !ok {
+		return nil, fmt.Errorf("session %s not found", id)
+	}
+	if s.GetState() != StateOffline {
+		return nil, fmt.Errorf("session %s is not offline", id)
+	}
+
+	name := s.Name
+	workDir := s.WorkDir
+	claudeID := s.ClaudeID
+
+	m.Remove(id)
+
+	args := []string{}
+	if claudeID != "" {
+		args = append(args, "--resume", claudeID)
+	}
+
+	newSess, err := m.Create(id, workDir, "claude", args)
+	if err != nil {
+		return nil, err
+	}
+	newSess.Name = name
+	return newSess, nil
+}
+
 func (m *Manager) Remove(id string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

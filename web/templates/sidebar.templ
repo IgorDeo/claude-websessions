@@ -3,14 +3,29 @@ package templates
 templ Sidebar(sessions []SessionView) {
 	<div class="session-list">
 		for _, s := range sessions {
-			<div class={ "session-item", stateClass(s.State) } hx-post={ "/sessions/" + s.ID + "/open" } hx-target="#terminal-area" hx-swap="innerHTML">
-				<span class="status-dot"></span>
-				<div class="session-info">
-					<span class="session-name">{ s.Name }</span>
-					<span class="session-dir">{ s.WorkDir }</span>
-				</div>
+			<div class={ "session-item", stateClass(s.State) }>
+				if s.State != "offline" {
+					<div class="session-clickable" hx-post={ "/sessions/" + s.ID + "/open" } hx-target="#terminal-area" hx-swap="innerHTML">
+						<span class="status-dot"></span>
+						<div class="session-info">
+							<span class="session-name">{ s.Name }</span>
+							<span class="session-dir">{ s.WorkDir }</span>
+						</div>
+					</div>
+				} else {
+					<div class="session-clickable">
+						<span class="status-dot"></span>
+						<div class="session-info">
+							<span class="session-name">{ s.Name }</span>
+							<span class="session-dir">{ s.WorkDir }</span>
+						</div>
+					</div>
+				}
 				if s.State == "discovered" {
-					<button class="takeover-btn" hx-post={ "/sessions/" + s.ID + "/takeover" } hx-swap="none">Take Over</button>
+					<button class="takeover-btn" hx-post={ "/sessions/" + s.ID + "/takeover" } hx-target="#terminal-area" hx-swap="innerHTML">Take Over</button>
+				}
+				if s.State == "offline" {
+					<button class="restart-btn" hx-post={ "/sessions/" + s.ID + "/restart" } hx-target="#terminal-area" hx-swap="innerHTML">Restart</button>
 				}
 			</div>
 		}
@@ -24,6 +39,7 @@ func stateClass(state string) string {
 	case "errored": return "state-errored"
 	case "waiting": return "state-waiting"
 	case "discovered": return "state-discovered"
+	case "offline": return "state-offline"
 	default: return ""
 	}
 }

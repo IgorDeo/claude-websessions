@@ -186,6 +186,17 @@ func (s *Server) handleRenameSession(w http.ResponseWriter, r *http.Request, ses
 	w.WriteHeader(http.StatusOK)
 }
 
+func (s *Server) handleRestartSession(w http.ResponseWriter, r *http.Request, sessionID string) {
+	newSess, err := s.mgr.Restart(sessionID)
+	if err != nil {
+		slog.Error("restart failed", "session", sessionID, "error", err)
+		http.Error(w, "failed to restart session: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	v := sessionToView(newSess)
+	templates.Terminal(v.ID, v.Name, v.WorkDir, v.State).Render(r.Context(), w)
+}
+
 func (s *Server) setupNotificationBridge() {
 	s.bus.Subscribe(func(e notification.SessionEvent) { s.sink.Send(e) })
 }

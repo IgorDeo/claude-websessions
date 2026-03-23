@@ -225,6 +225,11 @@ window.websessions = (function() {
       }
       connectSession(sessionID, containerID);
     });
+
+    // If a terminal was loaded into the terminal area, refresh sidebar to update states
+    if (event.detail.target.id === 'terminal-area' && panes.length > 0) {
+      htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+    }
   });
 
   // Close new session modal after successful form submission
