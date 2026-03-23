@@ -30,6 +30,7 @@ templ NewSessionModal(defaultDir string, recentDirs []string) {
 				</div>
 			}
 			<form id="new-session-form" hx-post="/sessions" hx-target="#sidebar" hx-swap="innerHTML">
+				<input type="hidden" id="resume_id" name="resume_id" value=""/>
 				<div class="form-group">
 					<label for="name">Session Name</label>
 					<input type="text" id="name" name="name" placeholder="my-session" required/>
@@ -37,8 +38,13 @@ templ NewSessionModal(defaultDir string, recentDirs []string) {
 				<div class="form-group" style="position:relative;">
 					<label for="work_dir">Working Directory</label>
 					<input type="text" id="work_dir" name="work_dir" value={ defaultDir } required autocomplete="off"
-						oninput="window.websessions.dirAutocomplete(this)"/>
+						oninput="window.websessions.dirAutocomplete(this)"
+						onchange="window.websessions.loadClaudeSessions(this.value)"/>
 					<div id="dir-suggestions" class="dir-suggestions"></div>
+				</div>
+				<div id="claude-sessions-section" class="claude-sessions-section" style="display:none;">
+					<label class="recent-label">Resume previous Claude session</label>
+					<div id="claude-sessions-list" class="recent-list"></div>
 				</div>
 				<div class="form-group">
 					<label for="prompt">Initial Prompt (optional)</label>

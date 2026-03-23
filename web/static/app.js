@@ -359,9 +359,13 @@ window.websessions = (function() {
     var nameInput = document.getElementById('name');
     var dirInput = document.getElementById('work_dir');
     var promptInput = document.getElementById('prompt');
+    var resumeInput = document.getElementById('resume_id');
     if (dirInput) dirInput.value = dir;
     if (nameInput) { nameInput.value = name; nameInput.focus(); nameInput.select(); }
     if (promptInput) promptInput.value = '';
+    if (resumeInput) resumeInput.value = '';
+    // Load claude sessions for this directory
+    loadClaudeSessions(dir);
     // Scroll to form
     var form = document.getElementById('new-session-form');
     if (form) form.scrollIntoView({ behavior: 'smooth' });
@@ -518,6 +522,54 @@ window.websessions = (function() {
       .catch(function(err) { console.error('kill failed:', err); });
   }
 
+  // Load claude sessions for a directory
+  function loadClaudeSessions(dir) {
+    if (!dir) return;
+    var section = document.getElementById('claude-sessions-section');
+    var list = document.getElementById('claude-sessions-list');
+    if (!section || !list) return;
+
+    fetch('/api/claude-sessions?dir=' + encodeURIComponent(dir))
+      .then(function(r) { return r.json(); })
+      .then(function(sessions) {
+        while (list.firstChild) list.removeChild(list.firstChild);
+        if (!sessions || sessions.length === 0) {
+          section.style.display = 'none';
+          return;
+        }
+        section.style.display = 'block';
+        sessions.forEach(function(s) {
+          var div = document.createElement('div');
+          div.className = 'recent-item claude-session-item';
+          div.setAttribute('role', 'button');
+          div.setAttribute('tabindex', '0');
+
+          var nameSpan = document.createElement('span');
+          nameSpan.className = 'recent-name';
+          nameSpan.textContent = s.summary || s.id.substring(0, 8) + '...';
+
+          var metaSpan = document.createElement('span');
+          metaSpan.className = 'recent-path';
+          metaSpan.textContent = s.date + ' · ' + s.size_kb + 'KB';
+
+          div.appendChild(nameSpan);
+          div.appendChild(metaSpan);
+
+          div.addEventListener('click', function() {
+            // Set resume ID in hidden field
+            var resumeInput = document.getElementById('resume_id');
+            if (resumeInput) resumeInput.value = s.id;
+            // Highlight selected
+            list.querySelectorAll('.claude-session-item').forEach(function(el) {
+              el.classList.remove('selected');
+            });
+            div.classList.add('selected');
+          });
+          list.appendChild(div);
+        });
+      });
+  }
+
   // Drag and drop reordering
   var draggedEl = null;
 
@@ -610,6 +662,7 @@ window.websessions = (function() {
     killSession: killSession,
     startRename: startRename,
     dirAutocomplete: dirAutocomplete,
+    loadClaudeSessions: loadClaudeSessions,
     selectDir: selectDir,
     quickSession: quickSession,
     dragStart: dragStart,

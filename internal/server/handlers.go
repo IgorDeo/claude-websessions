@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bufio"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -47,7 +48,11 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "name and work_dir required", http.StatusBadRequest)
 		return
 	}
-	args := []string{}
+	args := []string{"--name", name}
+	resumeID := r.FormValue("resume_id")
+	if resumeID != "" {
+		args = append(args, "--resume", resumeID)
+	}
 	if prompt != "" {
 		args = append(args, "-p", prompt)
 	}
@@ -218,6 +223,118 @@ func (s *Server) handleRestartSession(w http.ResponseWriter, r *http.Request, se
 	}
 	v := sessionToView(newSess)
 	templates.Terminal(v.ID, v.Name, v.WorkDir, v.State).Render(r.Context(), w)
+}
+
+// handleClaudeSessions lists claude sessions available for a given project directory.
+func (s *Server) handleClaudeSessions(w http.ResponseWriter, r *http.Request) {
+	workDir := r.URL.Query().Get("dir")
+	if workDir == "" {
+		http.Error(w, "dir required", http.StatusBadRequest)
+		return
+	}
+	// Expand ~
+	if strings.HasPrefix(workDir, "~") {
+		home, _ := os.UserHomeDir()
+		workDir = home + workDir[1:]
+	}
+	// Clean trailing slash
+	workDir = strings.TrimSuffix(workDir, "/")
+
+	// Convert path to claude's project folder name: /home/user/foo -> -home-user-foo
+	projectName := strings.ReplaceAll(workDir, "/", "-")
+	if strings.HasPrefix(projectName, "-") {
+		// keep the leading dash, that's claude's format
+	}
+
+	home, _ := os.UserHomeDir()
+	sessionsDir := filepath.Join(home, ".claude", "projects", projectName)
+
+	entries, err := os.ReadDir(sessionsDir)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]interface{}{})
+		return
+	}
+
+	type claudeSession struct {
+		ID      string `json:"id"`
+		Date    string `json:"date"`
+		Summary string `json:"summary"`
+		SizeKB  int64  `json:"size_kb"`
+	}
+
+	var sessions []claudeSession
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		sessionID := strings.TrimSuffix(entry.Name(), ".jsonl")
+		info, _ := entry.Info()
+		if info == nil {
+			continue
+		}
+
+		summary := ""
+		fpath := filepath.Join(sessionsDir, entry.Name())
+		f, err := os.Open(fpath)
+		if err == nil {
+			scanner := bufio.NewScanner(f)
+			scanner.Buffer(make([]byte, 1024*64), 1024*64)
+			for scanner.Scan() {
+				line := scanner.Text()
+				if line == "" {
+					continue
+				}
+				var obj map[string]interface{}
+				if json.Unmarshal([]byte(line), &obj) != nil {
+					continue
+				}
+				if obj["type"] == "user" {
+					if msg, ok := obj["message"].(map[string]interface{}); ok {
+						if content, ok := msg["content"].(string); ok {
+							summary = content
+							if len(summary) > 100 {
+								summary = summary[:100]
+							}
+							break
+						}
+						if contentList, ok := msg["content"].([]interface{}); ok {
+							for _, c := range contentList {
+								if cm, ok := c.(map[string]interface{}); ok {
+									if text, ok := cm["text"].(string); ok {
+										summary = text
+										if len(summary) > 100 {
+											summary = summary[:100]
+										}
+										break
+									}
+								}
+							}
+							if summary != "" {
+								break
+							}
+						}
+					}
+				}
+			}
+			f.Close()
+		}
+
+		sessions = append(sessions, claudeSession{
+			ID:      sessionID,
+			Date:    info.ModTime().Format("2006-01-02 15:04"),
+			Summary: summary,
+			SizeKB:  info.Size() / 1024,
+		})
+	}
+
+	// Sort by date descending (most recent first)
+	sort.Slice(sessions, func(i, j int) bool {
+		return sessions[i].Date > sessions[j].Date
+	})
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(sessions)
 }
 
 func (s *Server) setupNotificationBridge() {

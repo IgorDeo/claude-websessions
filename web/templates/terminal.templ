@@ -14,7 +14,7 @@ templ Terminal(sessionID string, sessionName string, workDir string, state strin
 			<div class="pane-actions">
 				<button class="split-h-btn" title="Split horizontal" onclick={ splitHAction(sessionID) }>&#9776;</button>
 				<button class="split-v-btn" title="Split vertical" onclick={ splitVAction(sessionID) }>&#9783;</button>
-				<button class="kill-btn" title="Kill session" onclick={ killAction(sessionID) }>&#10005;</button>
+				<button class="kill-btn" title="Kill session (terminates process)" onclick={ killAction(sessionID) }>&#9632;</button>
 			</div>
 		</div>
 		<div class="terminal-container" id={ "term-" + sessionID }></div>

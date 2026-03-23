@@ -103,20 +103,20 @@ func NewSessionModal(defaultDir string, recentDirs []string) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<form id=\"new-session-form\" hx-post=\"/sessions\" hx-target=\"#sidebar\" hx-swap=\"innerHTML\"><div class=\"form-group\"><label for=\"name\">Session Name</label> <input type=\"text\" id=\"name\" name=\"name\" placeholder=\"my-session\" required></div><div class=\"form-group\" style=\"position:relative;\"><label for=\"work_dir\">Working Directory</label> <input type=\"text\" id=\"work_dir\" name=\"work_dir\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<form id=\"new-session-form\" hx-post=\"/sessions\" hx-target=\"#sidebar\" hx-swap=\"innerHTML\"><input type=\"hidden\" id=\"resume_id\" name=\"resume_id\" value=\"\"><div class=\"form-group\"><label for=\"name\">Session Name</label> <input type=\"text\" id=\"name\" name=\"name\" placeholder=\"my-session\" required></div><div class=\"form-group\" style=\"position:relative;\"><label for=\"work_dir\">Working Directory</label> <input type=\"text\" id=\"work_dir\" name=\"work_dir\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var6 string
 		templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(defaultDir)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/newsession.templ`, Line: 39, Col: 72}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/newsession.templ`, Line: 40, Col: 72}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" required autocomplete=\"off\" oninput=\"window.websessions.dirAutocomplete(this)\"><div id=\"dir-suggestions\" class=\"dir-suggestions\"></div></div><div class=\"form-group\"><label for=\"prompt\">Initial Prompt (optional)</label> <textarea id=\"prompt\" name=\"prompt\" rows=\"3\" placeholder=\"What should Claude work on?\"></textarea></div><div class=\"form-actions\"><button type=\"button\" class=\"btn-cancel\" onclick=\"this.closest('.modal-overlay').remove()\">Cancel</button> <button type=\"submit\" class=\"btn-create\">Create</button></div></form></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" required autocomplete=\"off\" oninput=\"window.websessions.dirAutocomplete(this)\" onchange=\"window.websessions.loadClaudeSessions(this.value)\"><div id=\"dir-suggestions\" class=\"dir-suggestions\"></div></div><div id=\"claude-sessions-section\" class=\"claude-sessions-section\" style=\"display:none;\"><label class=\"recent-label\">Resume previous Claude session</label><div id=\"claude-sessions-list\" class=\"recent-list\"></div></div><div class=\"form-group\"><label for=\"prompt\">Initial Prompt (optional)</label> <textarea id=\"prompt\" name=\"prompt\" rows=\"3\" placeholder=\"What should Claude work on?\"></textarea></div><div class=\"form-actions\"><button type=\"button\" class=\"btn-cancel\" onclick=\"this.closest('.modal-overlay').remove()\">Cancel</button> <button type=\"submit\" class=\"btn-create\">Create</button></div></form></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

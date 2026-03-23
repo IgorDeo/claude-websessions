@@ -56,6 +56,7 @@ func (s *Server) routes() http.Handler {
 		r.Get("/api/dirs", s.handleListDirs)
 		r.Get("/api/recent", s.handleRecentProjects)
 		r.Get("/api/sessions", s.handleListSessions)
+		r.Get("/api/claude-sessions", s.handleClaudeSessions)
 		r.Get("/sessions/new", s.handleNewSessionModal)
 		r.Post("/sessions", s.handleCreateSession)
 		r.Post("/sessions/{sessionID}/open", func(w http.ResponseWriter, r *http.Request) {
