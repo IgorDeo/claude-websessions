@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"sync"
 	"time"
 
@@ -146,7 +147,35 @@ func (m *Manager) List() []*Session {
 	for _, s := range m.sessions {
 		result = append(result, s)
 	}
+	// Sort: running/waiting first, then discovered, then offline, then completed/errored.
+	// Within each group, sort by name.
+	sort.Slice(result, func(i, j int) bool {
+		pi, pj := statePriority(result[i].GetState()), statePriority(result[j].GetState())
+		if pi != pj {
+			return pi < pj
+		}
+		return result[i].Name < result[j].Name
+	})
 	return result
+}
+
+func statePriority(s State) int {
+	switch s {
+	case StateRunning, StateWaiting:
+		return 0
+	case StateCreated:
+		return 1
+	case StateDiscovered:
+		return 2
+	case StateOffline:
+		return 3
+	case StateCompleted:
+		return 4
+	case StateErrored:
+		return 5
+	default:
+		return 6
+	}
 }
 
 func (m *Manager) Kill(id string) error {
