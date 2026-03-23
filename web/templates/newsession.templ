@@ -1,10 +1,34 @@
 package templates
 
-templ NewSessionModal(defaultDir string) {
+import "path/filepath"
+
+templ NewSessionModal(defaultDir string, recentDirs []string) {
 	<div class="modal-overlay" onclick="this.remove()">
 		<div class="modal-content" onclick="event.stopPropagation()">
 			<h2>New Session</h2>
-			<form hx-post="/sessions" hx-target="#sidebar" hx-swap="innerHTML">
+			if len(recentDirs) > 0 {
+				<div class="recent-projects">
+					<label class="recent-label">Recent Projects</label>
+					<div class="recent-list">
+						for _, dir := range recentDirs {
+							<button
+								type="button"
+								class="recent-item"
+								onclick="window.websessions.quickSession(this)"
+								data-dir={ dir }
+								data-name={ filepath.Base(dir) }
+							>
+								<span class="recent-name">{ filepath.Base(dir) }</span>
+								<span class="recent-path">{ dir }</span>
+							</button>
+						}
+					</div>
+				</div>
+				<div class="modal-divider">
+					<span>or create manually</span>
+				</div>
+			}
+			<form hx-post="/sessions" hx-target="#sidebar" hx-swap="innerHTML" onsubmit="this.closest('.modal-overlay').remove()">
 				<div class="form-group">
 					<label for="name">Session Name</label>
 					<input type="text" id="name" name="name" placeholder="my-session" required/>

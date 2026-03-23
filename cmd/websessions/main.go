@@ -142,7 +142,7 @@ func main() {
 		}()
 	}
 
-	srv := server.New(cfg, mgr, bus, sink)
+	srv := server.New(cfg, mgr, bus, sink, st)
 	httpServer := &http.Server{Addr: srv.Addr(), Handler: srv.Handler()}
 
 	done := make(chan os.Signal, 1)

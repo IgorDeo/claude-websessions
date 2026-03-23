@@ -126,6 +126,26 @@ func (s *Store) MarkNotificationRead(id int64) error {
 	return err
 }
 
+// RecentDirs returns distinct working directories from recent sessions, most recent first.
+func (s *Store) RecentDirs(limit int) ([]string, error) {
+	rows, err := s.db.Query(
+		`SELECT DISTINCT work_dir FROM sessions WHERE work_dir != '' ORDER BY start_time DESC LIMIT ?`, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var dirs []string
+	for rows.Next() {
+		var d string
+		if err := rows.Scan(&d); err != nil {
+			return nil, err
+		}
+		dirs = append(dirs, d)
+	}
+	return dirs, rows.Err()
+}
+
 func (s *Store) LogAudit(action, sessionID, clientIP string) error {
 	_, err := s.db.Exec(
 		`INSERT INTO audit_log (action, session_id, client_ip, timestamp) VALUES (?, ?, ?, ?)`,

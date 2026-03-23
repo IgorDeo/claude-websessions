@@ -123,27 +123,82 @@ window.websessions = (function() {
         .then(function(dirs) {
           var box = document.getElementById('dir-suggestions');
           if (!box) return;
-          // Clear previous suggestions safely
           while (box.firstChild) box.removeChild(box.firstChild);
           if (!dirs || dirs.length === 0) return;
           dirs.forEach(function(d) {
             var div = document.createElement('div');
             div.className = 'dir-suggestion';
-            div.textContent = d;
-            div.addEventListener('click', function() { selectDir(d); });
+            // Show folder name highlighted, full path muted
+            var name = d.split('/').pop();
+            var nameSpan = document.createElement('span');
+            nameSpan.className = 'dir-name';
+            nameSpan.textContent = name;
+            var pathSpan = document.createElement('span');
+            pathSpan.className = 'dir-path';
+            pathSpan.textContent = d;
+            div.appendChild(nameSpan);
+            div.appendChild(pathSpan);
+            // Single click = select this dir and close
+            div.addEventListener('click', function(e) {
+              e.stopPropagation();
+              selectDir(d, false);
+            });
+            // Double click = drill into subdirectories
+            div.addEventListener('dblclick', function(e) {
+              e.stopPropagation();
+              selectDir(d, true);
+            });
             box.appendChild(div);
           });
         });
     }, 200);
   }
 
-  function selectDir(path) {
+  function selectDir(path, drillDown) {
     var input = document.getElementById('work_dir');
-    if (input) input.value = path + '/';
+    if (input) input.value = path;
     var box = document.getElementById('dir-suggestions');
     if (box) { while (box.firstChild) box.removeChild(box.firstChild); }
-    // Trigger another autocomplete to show subdirectories
-    if (input) dirAutocomplete(input);
+    if (drillDown && input) {
+      input.value = path + '/';
+      dirAutocomplete(input);
+    } else {
+      // Focus name field so user can proceed
+      var nameInput = document.getElementById('name');
+      if (nameInput && !nameInput.value) {
+        // Auto-fill session name from directory name
+        nameInput.value = path.split('/').pop();
+      }
+      if (nameInput) nameInput.focus();
+    }
+  }
+
+  function closeDirSuggestions() {
+    var box = document.getElementById('dir-suggestions');
+    if (box) { while (box.firstChild) box.removeChild(box.firstChild); }
+  }
+
+  // Close suggestions when clicking outside
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.form-group')) { closeDirSuggestions(); }
+  });
+
+  function quickSession(btn) {
+    var dir = btn.getAttribute('data-dir');
+    var name = btn.getAttribute('data-name');
+    var form = new FormData();
+    form.append('name', name);
+    form.append('work_dir', dir);
+    form.append('prompt', '');
+    fetch('/sessions', { method: 'POST', body: form })
+      .then(function(r) { return r.text(); })
+      .then(function(html) {
+        // Close modal
+        var modal = btn.closest('.modal-overlay');
+        if (modal) modal.remove();
+        // Refresh sidebar
+        htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+      });
   }
 
   return {
@@ -152,6 +207,7 @@ window.websessions = (function() {
     splitPane: splitPane,
     dirAutocomplete: dirAutocomplete,
     selectDir: selectDir,
+    quickSession: quickSession,
     terminals: terminals,
   };
 })();

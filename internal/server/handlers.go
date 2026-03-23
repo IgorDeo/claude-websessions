@@ -71,7 +71,33 @@ func (s *Server) handleOpenSession(w http.ResponseWriter, r *http.Request, sessi
 }
 
 func (s *Server) handleNewSessionModal(w http.ResponseWriter, r *http.Request) {
-	templates.NewSessionModal(s.cfg.Sessions.DefaultDir).Render(r.Context(), w)
+	var recentDirs []string
+	if s.store != nil {
+		recentDirs, _ = s.store.RecentDirs(10)
+	}
+	// Also add working dirs from currently discovered/running sessions
+	for _, sess := range s.mgr.List() {
+		found := false
+		for _, d := range recentDirs {
+			if d == sess.WorkDir {
+				found = true
+				break
+			}
+		}
+		if !found && sess.WorkDir != "" {
+			recentDirs = append(recentDirs, sess.WorkDir)
+		}
+	}
+	templates.NewSessionModal(s.cfg.Sessions.DefaultDir, recentDirs).Render(r.Context(), w)
+}
+
+func (s *Server) handleRecentProjects(w http.ResponseWriter, r *http.Request) {
+	var dirs []string
+	if s.store != nil {
+		dirs, _ = s.store.RecentDirs(10)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(dirs)
 }
 
 func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {

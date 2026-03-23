@@ -9,6 +9,7 @@ import (
 	"github.com/igor-deoalves/websessions/internal/config"
 	"github.com/igor-deoalves/websessions/internal/notification"
 	"github.com/igor-deoalves/websessions/internal/session"
+	"github.com/igor-deoalves/websessions/internal/store"
 	"github.com/igor-deoalves/websessions/web"
 )
 
@@ -17,12 +18,16 @@ type Server struct {
 	mgr     *session.Manager
 	bus     *notification.Bus
 	sink    *notification.InAppSink
+	store   *store.Store
 	hub     *wsHub
 	handler http.Handler
 }
 
-func New(cfg *config.Config, mgr *session.Manager, bus *notification.Bus, sink *notification.InAppSink) *Server {
+func New(cfg *config.Config, mgr *session.Manager, bus *notification.Bus, sink *notification.InAppSink, st ...*store.Store) *Server {
 	s := &Server{cfg: cfg, mgr: mgr, bus: bus, sink: sink, hub: newWSHub()}
+	if len(st) > 0 {
+		s.store = st[0]
+	}
 	s.handler = s.routes()
 	s.setupNotificationBridge()
 	mgr.OnOutput(func(sessionID string, data []byte) { s.hub.broadcast(sessionID, data) })
@@ -49,6 +54,7 @@ func (s *Server) routes() http.Handler {
 		r.Get("/sidebar", s.handleSidebar)
 		r.Get("/notifications", s.handleNotifications)
 		r.Get("/api/dirs", s.handleListDirs)
+		r.Get("/api/recent", s.handleRecentProjects)
 		r.Get("/sessions/new", s.handleNewSessionModal)
 		r.Post("/sessions", s.handleCreateSession)
 		r.Post("/sessions/{sessionID}/open", func(w http.ResponseWriter, r *http.Request) {
