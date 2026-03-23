@@ -107,10 +107,24 @@ func (s *Server) handleRecentProjects(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
-	events := s.sink.Pending()
-	views := make([]templates.NotificationView, len(events))
-	for i, e := range events {
-		views[i] = templates.NotificationView{SessionID: e.SessionID, EventType: string(e.Type)}
+	var views []templates.NotificationView
+	if s.store != nil {
+		records, _ := s.store.ListNotifications(20, false)
+		for _, rec := range records {
+			views = append(views, templates.NotificationView{
+				ID:        rec.ID,
+				SessionID: rec.SessionID,
+				EventType: rec.EventType,
+			})
+		}
+	} else {
+		events := s.sink.Pending()
+		for _, e := range events {
+			views = append(views, templates.NotificationView{
+				SessionID: e.SessionID,
+				EventType: string(e.Type),
+			})
+		}
 	}
 	templates.Notifications(views).Render(r.Context(), w)
 }
@@ -391,7 +405,18 @@ func (s *Server) handleClaudeSessions(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) setupNotificationBridge() {
-	s.bus.Subscribe(func(e notification.SessionEvent) { s.sink.Send(e) })
+	s.bus.Subscribe(func(e notification.SessionEvent) {
+		s.sink.Send(e)
+		// Push to all connected notification WebSocket clients
+		msg, _ := json.Marshal(map[string]string{
+			"type":      "notification",
+			"event":     string(e.Type),
+			"sessionID": e.SessionID,
+			"message":   e.Message,
+			"timestamp": e.Timestamp.Format("15:04:05"),
+		})
+		s.hub.broadcastNotification(msg)
+	})
 }
 
 // handleListDirs returns a JSON list of directories for the file finder autocomplete.

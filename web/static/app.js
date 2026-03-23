@@ -841,6 +841,46 @@ window.websessions = (function() {
   // Also apply on initial page load
   document.addEventListener('DOMContentLoaded', function() { applySessionOrder(); });
 
+  // Global notification WebSocket
+  var notifWs = null;
+  function connectNotifications() {
+    var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    notifWs = new WebSocket(protocol + '//' + window.location.host + '/ws/notifications');
+    notifWs.onmessage = function(event) {
+      try {
+        var msg = JSON.parse(event.data);
+        if (msg.type === 'notification') {
+          // Update badge
+          var bell = document.querySelector('.notification-bell');
+          var badge = bell ? bell.querySelector('.badge') : null;
+          if (!badge && bell) {
+            badge = document.createElement('span');
+            badge.className = 'badge';
+            badge.textContent = '0';
+            bell.appendChild(badge);
+          }
+          if (badge) {
+            badge.textContent = String(parseInt(badge.textContent || '0') + 1);
+          }
+          // Desktop notification
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('websessions: ' + msg.event, {
+              body: 'Session ' + msg.sessionID + (msg.message ? ': ' + msg.message : ''),
+              tag: 'ws-' + msg.sessionID + '-' + msg.event,
+            });
+          }
+          // Refresh sidebar to update session states
+          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+        }
+      } catch(e) {}
+    };
+    notifWs.onclose = function() {
+      // Reconnect after 3 seconds
+      setTimeout(connectNotifications, 3000);
+    };
+  }
+  connectNotifications();
+
   return {
     connectSession: connectSession,
     disconnectSession: disconnectSession,

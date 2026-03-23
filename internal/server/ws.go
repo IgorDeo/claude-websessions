@@ -22,12 +22,45 @@ type wsMessage struct {
 }
 
 type wsHub struct {
-	mu      sync.RWMutex
-	clients map[string]map[*websocket.Conn]bool
+	mu            sync.RWMutex
+	clients       map[string]map[*websocket.Conn]bool
+	globalClients map[*websocket.Conn]bool // for notification push
 }
 
 func newWSHub() *wsHub {
-	return &wsHub{clients: make(map[string]map[*websocket.Conn]bool)}
+	return &wsHub{
+		clients:       make(map[string]map[*websocket.Conn]bool),
+		globalClients: make(map[*websocket.Conn]bool),
+	}
+}
+
+func (h *wsHub) addGlobal(conn *websocket.Conn) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.globalClients[conn] = true
+}
+
+func (h *wsHub) removeGlobal(conn *websocket.Conn) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	delete(h.globalClients, conn)
+}
+
+func (h *wsHub) broadcastNotification(event []byte) {
+	h.mu.RLock()
+	conns := make(map[*websocket.Conn]bool)
+	for c := range h.globalClients {
+		conns[c] = true
+	}
+	h.mu.RUnlock()
+	for conn := range conns {
+		conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+		if err := conn.WriteMessage(websocket.TextMessage, event); err != nil {
+			slog.Debug("notification ws write error", "error", err)
+			conn.Close()
+			h.removeGlobal(conn)
+		}
+	}
 }
 
 func (h *wsHub) add(sessionID string, conn *websocket.Conn) {
@@ -60,6 +93,24 @@ func (h *wsHub) broadcast(sessionID string, data []byte) {
 			slog.Debug("ws write error", "error", err)
 			conn.Close()
 			h.remove(sessionID, conn)
+		}
+	}
+}
+
+func (s *Server) handleNotificationWS(w http.ResponseWriter, r *http.Request) {
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		slog.Error("notification ws upgrade failed", "error", err)
+		return
+	}
+	defer conn.Close()
+	s.hub.addGlobal(conn)
+	defer s.hub.removeGlobal(conn)
+	// Keep connection alive, read pings
+	for {
+		_, _, err := conn.ReadMessage()
+		if err != nil {
+			break
 		}
 	}
 }

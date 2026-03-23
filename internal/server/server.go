@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/fs"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/igor-deoalves/websessions/internal/config"
@@ -79,6 +80,19 @@ func (s *Server) routes() http.Handler {
 		})
 		r.Get("/ws/{sessionID}", func(w http.ResponseWriter, r *http.Request) {
 			s.handleWS(w, r, chi.URLParam(r, "sessionID"), s.mgr)
+		})
+		r.Get("/ws/notifications", s.handleNotificationWS)
+		r.Post("/notifications/{id}/read", func(w http.ResponseWriter, r *http.Request) {
+			idStr := chi.URLParam(r, "id")
+			id, err := strconv.ParseInt(idStr, 10, 64)
+			if err != nil {
+				http.Error(w, "invalid id", http.StatusBadRequest)
+				return
+			}
+			if s.store != nil {
+				s.store.MarkNotificationRead(id)
+			}
+			w.WriteHeader(http.StatusOK)
 		})
 	})
 	return r

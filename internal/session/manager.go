@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -77,6 +78,49 @@ func (m *Manager) Create(id, workDir, command string, args []string) (*Session, 
 	return s, nil
 }
 
+var waitingPatterns = []string{
+	"Allow", "Deny",
+	"Do you want to",
+	"[Y/n]", "[y/N]",
+	"? (y/n)",
+}
+
+func (m *Manager) checkWaitingState(s *Session, data []byte) {
+	line := string(data)
+	currentState := s.GetState()
+
+	if currentState == StateWaiting {
+		// Any new substantial output means we're no longer waiting
+		if len(data) > 10 {
+			from := currentState
+			s.mu.Lock()
+			s.State = StateRunning
+			s.mu.Unlock()
+			if m.onStateChange != nil {
+				m.onStateChange(s, from, StateRunning)
+			}
+		}
+		return
+	}
+
+	if currentState != StateRunning {
+		return
+	}
+
+	for _, pattern := range waitingPatterns {
+		if strings.Contains(line, pattern) {
+			from := currentState
+			s.mu.Lock()
+			s.State = StateWaiting
+			s.mu.Unlock()
+			if m.onStateChange != nil {
+				m.onStateChange(s, from, StateWaiting)
+			}
+			return
+		}
+	}
+}
+
 func (m *Manager) readPTY(s *Session) {
 	buf := make([]byte, 4096)
 	for {
@@ -86,6 +130,7 @@ func (m *Manager) readPTY(s *Session) {
 			if m.onOutput != nil {
 				m.onOutput(s.ID, buf[:n])
 			}
+			m.checkWaitingState(s, buf[:n])
 		}
 		if err != nil {
 			if err != io.EOF {
