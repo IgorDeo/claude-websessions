@@ -522,6 +522,44 @@ window.websessions = (function() {
       .catch(function(err) { console.error('kill failed:', err); });
   }
 
+  // Close a split pane without killing the session
+  function unsplitPane(sessionID) {
+    var area = document.getElementById('terminal-area');
+    if (!area) return;
+
+    var panes = area.querySelectorAll('.split-pane');
+    // If not in a split layout, just close the tab
+    if (panes.length < 2) {
+      closeTab(sessionID);
+      return;
+    }
+
+    // Find the other pane(s) — keep those, remove this one
+    var keepSessionID = null;
+    panes.forEach(function(pane) {
+      var termPane = pane.querySelector('.terminal-pane[data-session-id]');
+      if (termPane) {
+        var sid = termPane.getAttribute('data-session-id');
+        if (sid === sessionID) {
+          // Disconnect this terminal
+          disconnectSession(sid);
+        } else {
+          keepSessionID = sid;
+        }
+      }
+    });
+
+    // Rebuild area with just the remaining session
+    if (keepSessionID) {
+      // Clear everything and reload the remaining session
+      area.style.flexDirection = '';
+      htmx.ajax('POST', '/sessions/' + encodeURIComponent(keepSessionID) + '/open', {
+        target: '#terminal-area',
+        swap: 'innerHTML'
+      });
+    }
+  }
+
   // Git diff viewer
   function showDiff(sessionID) {
     fetch('/sessions/' + encodeURIComponent(sessionID) + '/diff')
@@ -752,6 +790,7 @@ window.websessions = (function() {
     openTab: openTab,
     closeTab: closeTab,
     showDiff: showDiff,
+    unsplitPane: unsplitPane,
     splitPane: splitPane,
     killSession: killSession,
     startRename: startRename,
