@@ -142,18 +142,19 @@ window.websessions = (function() {
 
     // Disconnect existing terminals in the area
     for (var sid in terminals) {
-      if (document.getElementById('term-' + sid) && area.contains(document.getElementById('term-' + sid))) {
+      var el = document.getElementById('term-' + sid);
+      if (el && area.contains(el)) {
         disconnectSession(sid);
       }
     }
 
-    // Create two pane containers
+    // Create two pane containers (no IDs with session names — use data attributes)
     var pane1 = document.createElement('div');
     pane1.className = 'split-pane';
-    pane1.id = 'split-' + sessionID1;
+    pane1.setAttribute('data-split-session', sessionID1);
     var pane2 = document.createElement('div');
     pane2.className = 'split-pane';
-    pane2.id = 'split-' + sessionID2;
+    pane2.setAttribute('data-split-session', sessionID2);
 
     // Clear area and add panes
     while (area.firstChild) area.removeChild(area.firstChild);
@@ -163,8 +164,8 @@ window.websessions = (function() {
     // Set flex direction based on split direction
     area.style.flexDirection = direction === 'horizontal' ? 'row' : 'column';
 
-    // Use Split.js
-    Split(['#split-' + sessionID1, '#split-' + sessionID2], {
+    // Use Split.js with DOM elements directly (not CSS selectors)
+    Split([pane1, pane2], {
       direction: direction === 'horizontal' ? 'horizontal' : 'vertical',
       sizes: [50, 50],
       minSize: 100,
@@ -172,11 +173,11 @@ window.websessions = (function() {
     });
 
     // Load terminal content into each pane via htmx
-    htmx.ajax('POST', '/sessions/' + sessionID1 + '/open', {
+    htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID1) + '/open', {
       target: pane1,
       swap: 'innerHTML'
     });
-    htmx.ajax('POST', '/sessions/' + sessionID2 + '/open', {
+    htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID2) + '/open', {
       target: pane2,
       swap: 'innerHTML'
     });

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -163,8 +164,12 @@ func (m *Manager) Kill(id string) error {
 }
 
 func (m *Manager) AddDiscovered(id, claudeID, workDir string, pid int, startTime time.Time) *Session {
+	name := filepath.Base(workDir)
+	if name == "" || name == "." {
+		name = workDir
+	}
 	s := &Session{
-		ID: id, ClaudeID: claudeID, Name: workDir, WorkDir: workDir,
+		ID: id, ClaudeID: claudeID, Name: name, WorkDir: workDir,
 		State: StateDiscovered, PID: pid, StartTime: startTime, Owned: false,
 		output: NewRingBuf(int(m.bufferSize)),
 	}
