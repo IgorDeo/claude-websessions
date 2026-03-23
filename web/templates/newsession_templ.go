@@ -103,7 +103,7 @@ func NewSessionModal(defaultDir string, recentDirs []string) templ.Component {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<form hx-post=\"/sessions\" hx-target=\"#sidebar\" hx-swap=\"innerHTML\" onsubmit=\"this.closest('.modal-overlay').remove()\"><div class=\"form-group\"><label for=\"name\">Session Name</label> <input type=\"text\" id=\"name\" name=\"name\" placeholder=\"my-session\" required></div><div class=\"form-group\" style=\"position:relative;\"><label for=\"work_dir\">Working Directory</label> <input type=\"text\" id=\"work_dir\" name=\"work_dir\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<form id=\"new-session-form\" hx-post=\"/sessions\" hx-target=\"#sidebar\" hx-swap=\"innerHTML\"><div class=\"form-group\"><label for=\"name\">Session Name</label> <input type=\"text\" id=\"name\" name=\"name\" placeholder=\"my-session\" required></div><div class=\"form-group\" style=\"position:relative;\"><label for=\"work_dir\">Working Directory</label> <input type=\"text\" id=\"work_dir\" name=\"work_dir\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

@@ -28,7 +28,7 @@ templ NewSessionModal(defaultDir string, recentDirs []string) {
 					<span>or create manually</span>
 				</div>
 			}
-			<form hx-post="/sessions" hx-target="#sidebar" hx-swap="innerHTML" onsubmit="this.closest('.modal-overlay').remove()">
+			<form id="new-session-form" hx-post="/sessions" hx-target="#sidebar" hx-swap="innerHTML">
 				<div class="form-group">
 					<label for="name">Session Name</label>
 					<input type="text" id="name" name="name" placeholder="my-session" required/>

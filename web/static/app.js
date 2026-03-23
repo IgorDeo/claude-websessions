@@ -102,6 +102,7 @@ window.websessions = (function() {
   }
 
   document.addEventListener('htmx:afterSwap', function(event) {
+    // Initialize terminal panes after swap
     var panes = event.detail.target.querySelectorAll('.terminal-pane[data-session-id]');
     panes.forEach(function(pane) {
       var sessionID = pane.dataset.sessionId;
@@ -110,6 +111,15 @@ window.websessions = (function() {
         connectSession(sessionID, containerID);
       }
     });
+  });
+
+  // Close new session modal after successful form submission
+  document.addEventListener('htmx:afterRequest', function(event) {
+    var form = event.detail.elt;
+    if (form && form.id === 'new-session-form' && event.detail.successful) {
+      var modal = form.closest('.modal-overlay');
+      if (modal) modal.remove();
+    }
   });
 
   var dirDebounce = null;
