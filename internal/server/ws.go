@@ -1,0 +1,104 @@
+package server
+
+import (
+	"encoding/json"
+	"log/slog"
+	"net/http"
+	"sync"
+	"time"
+
+	"github.com/gorilla/websocket"
+	"github.com/igor-deoalves/websessions/internal/session"
+)
+
+var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool { return true },
+}
+
+type wsMessage struct {
+	Type string `json:"type"`
+	Rows int    `json:"rows,omitempty"`
+	Cols int    `json:"cols,omitempty"`
+}
+
+type wsHub struct {
+	mu      sync.RWMutex
+	clients map[string]map[*websocket.Conn]bool
+}
+
+func newWSHub() *wsHub {
+	return &wsHub{clients: make(map[string]map[*websocket.Conn]bool)}
+}
+
+func (h *wsHub) add(sessionID string, conn *websocket.Conn) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.clients[sessionID] == nil {
+		h.clients[sessionID] = make(map[*websocket.Conn]bool)
+	}
+	h.clients[sessionID][conn] = true
+}
+
+func (h *wsHub) remove(sessionID string, conn *websocket.Conn) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if conns, ok := h.clients[sessionID]; ok {
+		delete(conns, conn)
+		if len(conns) == 0 {
+			delete(h.clients, sessionID)
+		}
+	}
+}
+
+func (h *wsHub) broadcast(sessionID string, data []byte) {
+	h.mu.RLock()
+	conns := h.clients[sessionID]
+	h.mu.RUnlock()
+	for conn := range conns {
+		conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+		if err := conn.WriteMessage(websocket.BinaryMessage, data); err != nil {
+			slog.Debug("ws write error", "error", err)
+			conn.Close()
+			h.remove(sessionID, conn)
+		}
+	}
+}
+
+func (s *Server) handleWS(w http.ResponseWriter, r *http.Request, sessionID string, mgr *session.Manager) {
+	sess, ok := mgr.Get(sessionID)
+	if !ok {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		slog.Error("ws upgrade failed", "error", err)
+		return
+	}
+	defer conn.Close()
+	s.hub.add(sessionID, conn)
+	defer s.hub.remove(sessionID, conn)
+	// Replay ring buffer
+	if buf := sess.Output().Bytes(); len(buf) > 0 {
+		conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+		conn.WriteMessage(websocket.BinaryMessage, buf)
+	}
+	// Read user input
+	for {
+		msgType, data, err := conn.ReadMessage()
+		if err != nil {
+			break
+		}
+		switch msgType {
+		case websocket.TextMessage:
+			var msg wsMessage
+			if err := json.Unmarshal(data, &msg); err == nil && msg.Type == "resize" {
+				sess.Resize(uint16(msg.Rows), uint16(msg.Cols))
+				continue
+			}
+			mgr.WriteInput(sessionID, data)
+		case websocket.BinaryMessage:
+			mgr.WriteInput(sessionID, data)
+		}
+	}
+}
