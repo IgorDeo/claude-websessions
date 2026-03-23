@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -223,6 +224,59 @@ func (s *Server) handleRestartSession(w http.ResponseWriter, r *http.Request, se
 	}
 	v := sessionToView(newSess)
 	templates.Terminal(v.ID, v.Name, v.WorkDir, v.State).Render(r.Context(), w)
+}
+
+// handleGitDiff returns git diff and status for a session's working directory.
+func (s *Server) handleGitDiff(w http.ResponseWriter, r *http.Request, sessionID string) {
+	sess, ok := s.mgr.Get(sessionID)
+	if !ok {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+	workDir := sess.WorkDir
+
+	type gitDiffResponse struct {
+		Diff    string   `json:"diff"`
+		Status  string   `json:"status"`
+		Files   []string `json:"files"`
+		WorkDir string   `json:"work_dir"`
+	}
+
+	// git status
+	statusCmd := exec.Command("git", "status", "--short")
+	statusCmd.Dir = workDir
+	statusOut, _ := statusCmd.Output()
+
+	// git diff (staged + unstaged)
+	diffCmd := exec.Command("git", "diff", "HEAD", "--no-color")
+	diffCmd.Dir = workDir
+	diffOut, err := diffCmd.Output()
+	if err != nil {
+		// Maybe no HEAD yet, try just git diff
+		diffCmd2 := exec.Command("git", "diff", "--no-color")
+		diffCmd2.Dir = workDir
+		diffOut, _ = diffCmd2.Output()
+	}
+
+	// Also get untracked/new files diff
+	statusLines := strings.Split(strings.TrimSpace(string(statusOut)), "\n")
+	var files []string
+	for _, line := range statusLines {
+		line = strings.TrimSpace(line)
+		if line != "" {
+			files = append(files, line)
+		}
+	}
+
+	resp := gitDiffResponse{
+		Diff:    string(diffOut),
+		Status:  string(statusOut),
+		Files:   files,
+		WorkDir: workDir,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
 }
 
 // handleClaudeSessions lists claude sessions available for a given project directory.

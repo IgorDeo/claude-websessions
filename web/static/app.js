@@ -522,6 +522,99 @@ window.websessions = (function() {
       .catch(function(err) { console.error('kill failed:', err); });
   }
 
+  // Git diff viewer
+  function showDiff(sessionID) {
+    fetch('/sessions/' + encodeURIComponent(sessionID) + '/diff')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        var overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.addEventListener('click', function() { overlay.remove(); });
+
+        var content = document.createElement('div');
+        content.className = 'modal-content diff-modal';
+        content.addEventListener('click', function(e) { e.stopPropagation(); });
+
+        var header = document.createElement('div');
+        header.className = 'diff-header';
+
+        var title = document.createElement('h2');
+        title.textContent = 'Changes in ' + data.work_dir.split('/').pop();
+        header.appendChild(title);
+
+        var closeBtn = document.createElement('button');
+        closeBtn.className = 'btn-cancel';
+        closeBtn.textContent = 'Close';
+        closeBtn.addEventListener('click', function() { overlay.remove(); });
+        header.appendChild(closeBtn);
+
+        content.appendChild(header);
+
+        // File list summary
+        if (data.files && data.files.length > 0) {
+          var summary = document.createElement('div');
+          summary.className = 'diff-summary';
+          data.files.forEach(function(f) {
+            var fileDiv = document.createElement('div');
+            fileDiv.className = 'diff-file-entry';
+            var status = f.substring(0, 2).trim();
+            var fname = f.substring(3);
+            var statusSpan = document.createElement('span');
+            statusSpan.className = 'diff-file-status diff-status-' + status.charAt(0).toLowerCase();
+            statusSpan.textContent = status;
+            var nameSpan = document.createElement('span');
+            nameSpan.textContent = fname;
+            fileDiv.appendChild(statusSpan);
+            fileDiv.appendChild(nameSpan);
+            summary.appendChild(fileDiv);
+          });
+          content.appendChild(summary);
+        }
+
+        // Diff output
+        if (data.diff) {
+          var diffContainer = document.createElement('div');
+          diffContainer.className = 'diff-content';
+          renderDiff(diffContainer, data.diff);
+          content.appendChild(diffContainer);
+        } else {
+          var noChanges = document.createElement('p');
+          noChanges.className = 'diff-empty';
+          noChanges.textContent = 'No changes detected';
+          content.appendChild(noChanges);
+        }
+
+        overlay.appendChild(content);
+        document.body.appendChild(overlay);
+      });
+  }
+
+  function renderDiff(container, diffText) {
+    var lines = diffText.split('\n');
+    var pre = document.createElement('pre');
+    pre.className = 'diff-pre';
+
+    lines.forEach(function(line) {
+      var span = document.createElement('div');
+      span.className = 'diff-line';
+      if (line.startsWith('+++') || line.startsWith('---')) {
+        span.className += ' diff-line-file';
+      } else if (line.startsWith('@@')) {
+        span.className += ' diff-line-hunk';
+      } else if (line.startsWith('+')) {
+        span.className += ' diff-line-add';
+      } else if (line.startsWith('-')) {
+        span.className += ' diff-line-del';
+      } else if (line.startsWith('diff ')) {
+        span.className += ' diff-line-header';
+      }
+      span.textContent = line;
+      pre.appendChild(span);
+    });
+
+    container.appendChild(pre);
+  }
+
   // Load claude sessions for a directory
   function loadClaudeSessions(dir) {
     if (!dir) return;
@@ -658,6 +751,7 @@ window.websessions = (function() {
     disconnectSession: disconnectSession,
     openTab: openTab,
     closeTab: closeTab,
+    showDiff: showDiff,
     splitPane: splitPane,
     killSession: killSession,
     startRename: startRename,

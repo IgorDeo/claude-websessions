@@ -12,6 +12,7 @@ templ Terminal(sessionID string, sessionName string, workDir string, state strin
 			<span class="pane-status">{ state }</span>
 			<span class="pane-dir">{ workDir }</span>
 			<div class="pane-actions">
+				<button class="diff-btn" title="View git changes" onclick={ diffAction(sessionID) }>&#916;</button>
 				<button class="split-h-btn" title="Split horizontal" onclick={ splitHAction(sessionID) }>&#9776;</button>
 				<button class="split-v-btn" title="Split vertical" onclick={ splitVAction(sessionID) }>&#9783;</button>
 				<button class="kill-btn" title="Kill session (terminates process)" onclick={ killAction(sessionID) }>&#9632;</button>
@@ -31,4 +32,8 @@ script splitVAction(sessionID string) {
 
 script killAction(sessionID string) {
 	window.websessions.killSession(sessionID);
+}
+
+script diffAction(sessionID string) {
+	window.websessions.showDiff(sessionID);
 }
