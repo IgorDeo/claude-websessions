@@ -29,7 +29,7 @@ func NewSessionModal(defaultDir string) templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"modal-overlay\" onclick=\"this.remove()\"><div class=\"modal-content\" onclick=\"event.stopPropagation()\"><h2>New Session</h2><form hx-post=\"/sessions\" hx-target=\"#sidebar\" hx-swap=\"innerHTML\"><div class=\"form-group\"><label for=\"name\">Session Name</label> <input type=\"text\" id=\"name\" name=\"name\" placeholder=\"my-session\" required></div><div class=\"form-group\"><label for=\"work_dir\">Working Directory</label> <input type=\"text\" id=\"work_dir\" name=\"work_dir\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"modal-overlay\" onclick=\"this.remove()\"><div class=\"modal-content\" onclick=\"event.stopPropagation()\"><h2>New Session</h2><form hx-post=\"/sessions\" hx-target=\"#sidebar\" hx-swap=\"innerHTML\"><div class=\"form-group\"><label for=\"name\">Session Name</label> <input type=\"text\" id=\"name\" name=\"name\" placeholder=\"my-session\" required></div><div class=\"form-group\" style=\"position:relative;\"><label for=\"work_dir\">Working Directory</label> <input type=\"text\" id=\"work_dir\" name=\"work_dir\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -42,7 +42,7 @@ func NewSessionModal(defaultDir string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" required></div><div class=\"form-group\"><label for=\"prompt\">Initial Prompt (optional)</label> <textarea id=\"prompt\" name=\"prompt\" rows=\"3\" placeholder=\"What should Claude work on?\"></textarea></div><div class=\"form-actions\"><button type=\"button\" class=\"btn-cancel\" onclick=\"this.closest('.modal-overlay').remove()\">Cancel</button> <button type=\"submit\" class=\"btn-create\">Create</button></div></form></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" required autocomplete=\"off\" oninput=\"window.websessions.dirAutocomplete(this)\"><div id=\"dir-suggestions\" class=\"dir-suggestions\"></div></div><div class=\"form-group\"><label for=\"prompt\">Initial Prompt (optional)</label> <textarea id=\"prompt\" name=\"prompt\" rows=\"3\" placeholder=\"What should Claude work on?\"></textarea></div><div class=\"form-actions\"><button type=\"button\" class=\"btn-cancel\" onclick=\"this.closest('.modal-overlay').remove()\">Cancel</button> <button type=\"submit\" class=\"btn-create\">Create</button></div></form></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

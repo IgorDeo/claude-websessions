@@ -9,9 +9,11 @@ templ NewSessionModal(defaultDir string) {
 					<label for="name">Session Name</label>
 					<input type="text" id="name" name="name" placeholder="my-session" required/>
 				</div>
-				<div class="form-group">
+				<div class="form-group" style="position:relative;">
 					<label for="work_dir">Working Directory</label>
-					<input type="text" id="work_dir" name="work_dir" value={ defaultDir } required/>
+					<input type="text" id="work_dir" name="work_dir" value={ defaultDir } required autocomplete="off"
+						oninput="window.websessions.dirAutocomplete(this)"/>
+					<div id="dir-suggestions" class="dir-suggestions"></div>
 				</div>
 				<div class="form-group">
 					<label for="prompt">Initial Prompt (optional)</label>

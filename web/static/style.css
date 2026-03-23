@@ -88,6 +88,11 @@ html, body { height: 100%; background: var(--bg-primary); color: var(--text-prim
 .notif-dismiss { background: none; border: none; color: var(--text-muted); cursor: pointer; margin-left: auto; }
 .no-notifications { color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 1rem; }
 
+/* Directory autocomplete */
+.dir-suggestions { position: absolute; left: 0; right: 0; top: 100%; background: var(--bg-primary); border: 1px solid var(--border); border-top: none; border-radius: 0 0 4px 4px; max-height: 200px; overflow-y: auto; z-index: 300; }
+.dir-suggestion { padding: 0.4rem 0.5rem; cursor: pointer; font-size: 0.8rem; color: var(--text-secondary); }
+.dir-suggestion:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+
 .gutter { background-color: var(--border); background-repeat: no-repeat; background-position: 50%; }
 .gutter.gutter-horizontal { cursor: col-resize; }
 .gutter.gutter-vertical { cursor: row-resize; }

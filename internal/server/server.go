@@ -48,6 +48,7 @@ func (s *Server) routes() http.Handler {
 		r.Get("/", s.handleIndex)
 		r.Get("/sidebar", s.handleSidebar)
 		r.Get("/notifications", s.handleNotifications)
+		r.Get("/api/dirs", s.handleListDirs)
 		r.Get("/sessions/new", s.handleNewSessionModal)
 		r.Post("/sessions", s.handleCreateSession)
 		r.Post("/sessions/{sessionID}/open", func(w http.ResponseWriter, r *http.Request) {

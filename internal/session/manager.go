@@ -34,12 +34,29 @@ func (m *Manager) OnStateChange(fn StateChangeFunc) { m.onStateChange = fn }
 func (m *Manager) OnOutput(fn OutputFunc)            { m.onOutput = fn }
 
 func (m *Manager) Create(id, workDir, command string, args []string) (*Session, error) {
+	// Expand ~ in workDir
+	if len(workDir) > 0 && workDir[0] == '~' {
+		home, _ := os.UserHomeDir()
+		workDir = home + workDir[1:]
+	}
+
+	// Validate directory exists
+	if info, err := os.Stat(workDir); err != nil || !info.IsDir() {
+		return nil, fmt.Errorf("working directory does not exist: %s", workDir)
+	}
+
+	// Resolve command path (handles symlinks)
+	resolvedCmd, err := exec.LookPath(command)
+	if err != nil {
+		return nil, fmt.Errorf("command not found: %s", command)
+	}
+
 	s := &Session{
 		ID: id, Name: id, WorkDir: workDir,
 		State: StateCreated, StartTime: time.Now(), Owned: true,
 		output: NewRingBuf(int(m.bufferSize)),
 	}
-	cmd := exec.Command(command, args...)
+	cmd := exec.Command(resolvedCmd, args...)
 	cmd.Dir = workDir
 	ptmx, err := pty.Start(cmd)
 	if err != nil {

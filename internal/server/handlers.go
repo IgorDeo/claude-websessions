@@ -1,8 +1,13 @@
 package server
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/igor-deoalves/websessions/internal/discovery"
@@ -117,4 +122,53 @@ func (s *Server) handleTakeover(w http.ResponseWriter, r *http.Request, sessionI
 
 func (s *Server) setupNotificationBridge() {
 	s.bus.Subscribe(func(e notification.SessionEvent) { s.sink.Send(e) })
+}
+
+// handleListDirs returns a JSON list of directories for the file finder autocomplete.
+func (s *Server) handleListDirs(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		query = "~"
+	}
+
+	// Expand ~
+	if strings.HasPrefix(query, "~") {
+		home, _ := os.UserHomeDir()
+		query = home + query[1:]
+	}
+
+	// If query doesn't end with /, list parent dir filtered by prefix
+	dir := query
+	prefix := ""
+	if !strings.HasSuffix(query, "/") {
+		dir = filepath.Dir(query)
+		prefix = filepath.Base(query)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]string{})
+		return
+	}
+
+	var dirs []string
+	for _, entry := range entries {
+		if !entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+		if prefix != "" && !strings.HasPrefix(strings.ToLower(entry.Name()), strings.ToLower(prefix)) {
+			continue
+		}
+		dirs = append(dirs, filepath.Join(dir, entry.Name()))
+	}
+	sort.Strings(dirs)
+
+	// Limit results
+	if len(dirs) > 20 {
+		dirs = dirs[:20]
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(dirs)
 }

@@ -112,10 +112,46 @@ window.websessions = (function() {
     });
   });
 
+  var dirDebounce = null;
+  function dirAutocomplete(input) {
+    clearTimeout(dirDebounce);
+    dirDebounce = setTimeout(function() {
+      var q = input.value;
+      if (!q) return;
+      fetch('/api/dirs?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(dirs) {
+          var box = document.getElementById('dir-suggestions');
+          if (!box) return;
+          // Clear previous suggestions safely
+          while (box.firstChild) box.removeChild(box.firstChild);
+          if (!dirs || dirs.length === 0) return;
+          dirs.forEach(function(d) {
+            var div = document.createElement('div');
+            div.className = 'dir-suggestion';
+            div.textContent = d;
+            div.addEventListener('click', function() { selectDir(d); });
+            box.appendChild(div);
+          });
+        });
+    }, 200);
+  }
+
+  function selectDir(path) {
+    var input = document.getElementById('work_dir');
+    if (input) input.value = path + '/';
+    var box = document.getElementById('dir-suggestions');
+    if (box) { while (box.firstChild) box.removeChild(box.firstChild); }
+    // Trigger another autocomplete to show subdirectories
+    if (input) dirAutocomplete(input);
+  }
+
   return {
     connectSession: connectSession,
     disconnectSession: disconnectSession,
     splitPane: splitPane,
+    dirAutocomplete: dirAutocomplete,
+    selectDir: selectDir,
     terminals: terminals,
   };
 })();
