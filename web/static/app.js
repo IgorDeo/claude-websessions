@@ -101,15 +101,29 @@ window.websessions = (function() {
     Notification.requestPermission();
   }
 
+  // Clean up terminals whose DOM elements were removed before swapping new ones in
+  document.addEventListener('htmx:beforeSwap', function(event) {
+    if (event.detail.target.id !== 'terminal-area') return;
+    // Disconnect all terminals in the area being replaced
+    for (var sid in terminals) {
+      var container = document.getElementById('term-' + sid);
+      if (container && event.detail.target.contains(container)) {
+        disconnectSession(sid);
+      }
+    }
+  });
+
   document.addEventListener('htmx:afterSwap', function(event) {
     // Initialize terminal panes after swap
     var panes = event.detail.target.querySelectorAll('.terminal-pane[data-session-id]');
     panes.forEach(function(pane) {
       var sessionID = pane.dataset.sessionId;
       var containerID = 'term-' + sessionID;
-      if (!terminals[sessionID]) {
-        connectSession(sessionID, containerID);
+      // Always reconnect — old instance was cleaned up in beforeSwap
+      if (terminals[sessionID]) {
+        disconnectSession(sessionID);
       }
+      connectSession(sessionID, containerID);
     });
   });
 
