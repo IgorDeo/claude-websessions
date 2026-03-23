@@ -78,10 +78,10 @@ func (s *Server) routes() http.Handler {
 		r.Post("/sessions/{sessionID}/takeover", func(w http.ResponseWriter, r *http.Request) {
 			s.handleTakeover(w, r, chi.URLParam(r, "sessionID"))
 		})
+		r.Get("/ws/notifications", s.handleNotificationWS)
 		r.Get("/ws/{sessionID}", func(w http.ResponseWriter, r *http.Request) {
 			s.handleWS(w, r, chi.URLParam(r, "sessionID"), s.mgr)
 		})
-		r.Get("/ws/notifications", s.handleNotificationWS)
 		r.Post("/notifications/{id}/read", func(w http.ResponseWriter, r *http.Request) {
 			idStr := chi.URLParam(r, "id")
 			id, err := strconv.ParseInt(idStr, 10, 64)
