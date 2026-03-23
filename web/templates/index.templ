@@ -1,0 +1,66 @@
+package templates
+
+import "fmt"
+
+type SessionView struct {
+	ID      string
+	Name    string
+	WorkDir string
+	State   string
+	Owned   bool
+}
+
+type NotificationView struct {
+	ID        int64
+	SessionID string
+	EventType string
+	Message   string
+}
+
+type PageData struct {
+	Sessions      []SessionView
+	Notifications []NotificationView
+	UnreadCount   int
+}
+
+templ Index(data PageData) {
+	@Layout("websessions") {
+		<div class="app">
+			<header class="topbar">
+				<h1 class="topbar-title">websessions</h1>
+				<div class="topbar-actions">
+					<button class="notification-bell" hx-get="/notifications" hx-target="#notification-dropdown" hx-swap="innerHTML">
+						<span class="bell-icon">&#128276;</span>
+						if data.UnreadCount > 0 {
+							<span class="badge">{ itoa(data.UnreadCount) }</span>
+						}
+					</button>
+					<div id="notification-dropdown" class="dropdown"></div>
+				</div>
+			</header>
+			<div class="main">
+				<aside id="sidebar" class="sidebar" hx-get="/sidebar" hx-trigger="every 5s" hx-swap="innerHTML">
+					@Sidebar(data.Sessions)
+				</aside>
+				<div class="content">
+					<div id="tab-bar" class="tab-bar">
+						@Tabs(nil, "")
+					</div>
+					<div id="terminal-area" class="terminal-area">
+						<div class="empty-state">
+							<p>Select a session from the sidebar or create a new one</p>
+						</div>
+					</div>
+				</div>
+			</div>
+			<footer class="footer">
+				<button class="new-session-btn" hx-get="/sessions/new" hx-target="#modal" hx-swap="innerHTML">+ New Session</button>
+			</footer>
+			<div id="modal"></div>
+		</div>
+	}
+}
+
+func itoa(n int) string {
+	return fmt.Sprintf("%d", n)
+}

@@ -1,0 +1,29 @@
+package templates
+
+templ Sidebar(sessions []SessionView) {
+	<div class="session-list">
+		for _, s := range sessions {
+			<div class={ "session-item", stateClass(s.State) } hx-post={ "/sessions/" + s.ID + "/open" } hx-target="#terminal-area" hx-swap="innerHTML">
+				<span class="status-dot"></span>
+				<div class="session-info">
+					<span class="session-name">{ s.Name }</span>
+					<span class="session-dir">{ s.WorkDir }</span>
+				</div>
+				if s.State == "discovered" {
+					<button class="takeover-btn" hx-post={ "/sessions/" + s.ID + "/takeover" } hx-swap="none">Take Over</button>
+				}
+			</div>
+		}
+	</div>
+}
+
+func stateClass(state string) string {
+	switch state {
+	case "running": return "state-running"
+	case "completed": return "state-completed"
+	case "errored": return "state-errored"
+	case "waiting": return "state-waiting"
+	case "discovered": return "state-discovered"
+	default: return ""
+	}
+}

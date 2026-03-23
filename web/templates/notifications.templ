@@ -1,0 +1,18 @@
+package templates
+
+import "fmt"
+
+templ Notifications(notifications []NotificationView) {
+	<div class="notification-list">
+		if len(notifications) == 0 {
+			<p class="no-notifications">No new notifications</p>
+		}
+		for _, n := range notifications {
+			<div class={ "notification-item", "notif-" + n.EventType }>
+				<span class="notif-type">{ n.EventType }</span>
+				<span class="notif-session">{ n.SessionID }</span>
+				<button class="notif-dismiss" hx-post={ fmt.Sprintf("/notifications/%d/read", n.ID) } hx-swap="outerHTML" hx-target="closest .notification-item">&times;</button>
+			</div>
+		}
+	</div>
+}

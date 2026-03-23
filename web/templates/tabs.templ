@@ -1,0 +1,21 @@
+package templates
+
+templ Tabs(openSessions []SessionView, activeID string) {
+	<div class="tabs">
+		if openSessions != nil {
+			for _, s := range openSessions {
+				<button class={ "tab", tabActiveClass(s.ID, activeID) } hx-post={ "/sessions/" + s.ID + "/open" } hx-target="#terminal-area" hx-swap="innerHTML">
+					<span class={ "tab-dot", stateClass(s.State) }></span>
+					{ s.Name }
+					<span class="tab-close" hx-delete={ "/tabs/" + s.ID } hx-swap="none">&times;</span>
+				</button>
+			}
+		}
+		<button class="tab tab-new" hx-get="/sessions/new" hx-target="#modal" hx-swap="innerHTML">+</button>
+	</div>
+}
+
+func tabActiveClass(id, activeID string) string {
+	if id == activeID { return "tab-active" }
+	return ""
+}

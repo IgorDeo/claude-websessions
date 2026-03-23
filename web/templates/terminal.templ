@@ -1,0 +1,17 @@
+package templates
+
+templ Terminal(sessionID string, sessionName string, workDir string, state string) {
+	<div class="terminal-pane" data-session-id={ sessionID }>
+		<div class="pane-header">
+			<span class="pane-title">{ sessionName }</span>
+			<span class="pane-status">{ state }</span>
+			<span class="pane-dir">{ workDir }</span>
+			<div class="pane-actions">
+				<button class="split-h-btn" title="Split horizontal">&#9776;</button>
+				<button class="split-v-btn" title="Split vertical">&#9783;</button>
+				<button class="maximize-btn" title="Maximize">&#9744;</button>
+			</div>
+		</div>
+		<div class="terminal-container" id={ "term-" + sessionID }></div>
+	</div>
+}
