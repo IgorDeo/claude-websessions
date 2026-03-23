@@ -9,7 +9,7 @@ Running multiple Claude Code sessions in terminal splits (Terminator, tmux) quic
 ## Goals
 
 - Launch new Claude Code sessions from a web UI
-- Discover and re-attach to already-running Claude Code sessions
+- Discover already-running Claude Code sessions and take them over via kill + `--resume`
 - Full interactive terminal access to each session from the browser
 - Notifications when sessions complete, error, or need input
 - Split-pane view to monitor multiple sessions simultaneously
@@ -52,7 +52,7 @@ The core component. Responsibilities:
 - Allocates PTYs and spawns `claude` processes
 - Scans for existing `claude` processes on startup and periodically re-discovers
 - Multiplexes PTY output to connected browser clients via WebSocket
-- Keeps a ring buffer per session (default ~10K lines) for instant context when switching tabs
+- Keeps a ring buffer per session (default ~10MB) for instant context when switching tabs
 
 ### Web Server
 
@@ -61,15 +61,42 @@ Built on `net/http` with a lightweight router (chi or similar):
 - Handles htmx partial page updates (tab switches, session list refresh, split pane management)
 - Upgrades to WebSocket for terminal streaming and real-time notifications
 
+### WebSocket Concurrency
+
+- Multiple browser tabs/clients can connect to the same session simultaneously
+- All viewers receive the same PTY output stream
+- All viewers can send input (last-writer-wins — collaborative, not locked)
+- On connect, the ring buffer contents are replayed to the new client so they see recent history
+- Slow clients: if a WebSocket write exceeds a deadline (e.g., 10s), the connection is dropped. The client can reconnect and get the buffer replayed.
+
 ## Session Lifecycle
 
 ```
-discovered → attaching → running → completed
-                ↑                      ↓
-             created ──→ running → errored
-                              ↓
-                           waiting (needs input/approval)
+                                    ┌─────────┐
+                                    │completed│
+                                    └────▲────┘
+                                         │ exit 0
+discovered → takeover → running ────────┤
+                ↑                        │ exit non-zero
+             created ──→ running ───────►┌───────┐
+                              │          │errored│
+                              ▼          └───────┘
+                          waiting
+                         (needs input)
+                              │
+                              ▼
+                           running
 ```
+
+### States
+
+- **discovered** — found via process scan, not yet taken over
+- **takeover** — killing original process and resuming via `claude --resume`
+- **created** — freshly launched from the UI
+- **running** — actively producing output, fully interactive
+- **waiting** — Claude is asking for input (detected heuristically, see below)
+- **completed** — process exited 0
+- **errored** — process exited non-zero or crashed
 
 ### Creating a new session
 
@@ -77,18 +104,34 @@ discovered → attaching → running → completed
 2. Session Manager allocates a PTY, spawns `claude` with given args
 3. Session enters `running` state, output streams to the UI
 
-### Discovering existing sessions
+### Discovering and taking over existing sessions
 
-1. On startup and periodically (default 30s), scan `/proc/*/cmdline` for `claude` processes
-2. Extract metadata: PID, working directory (`/proc/<pid>/cwd`), start time, command args
-3. Skip already-tracked processes
-4. Attempt PTY re-attach via `/proc/<pid>/fd`
-5. If successful → full interactive session. If not → metadata-only (visible in sidebar but no terminal)
+1. On startup and periodically (default 30s), scan for `claude` processes
+   - **Linux:** read `/proc/*/cmdline`
+   - **macOS:** fall back to `ps aux | grep claude` (discovery is cross-platform, `/proc` is not)
+2. Extract metadata: PID, working directory, start time, command args
+3. Extract Claude Code session ID from process args or `~/.claude/` session files
+4. Skip already-tracked processes
+5. Session appears in sidebar as `discovered` with metadata
+6. User can click "Take Over" which:
+   a. Sends SIGTERM to the original process (graceful shutdown)
+   b. Waits for exit (with timeout, then SIGKILL)
+   c. Spawns `claude --resume <session-id>` in a new PTY owned by websessions
+   d. Session transitions to `running` with full interactive control
+7. If takeover fails (e.g., can't find session ID, `--resume` fails due to stale/corrupted session), the session transitions to `errored` with a user-visible message explaining the failure
+
+### Waiting state detection
+
+Detecting when Claude needs input is heuristic-based and best-effort in v1. The session manager watches PTY output for known patterns:
+- Tool approval prompts (e.g., "Allow", "Deny" patterns)
+- Question prompts waiting for user response
+
+This is fragile and Claude-version-dependent. False positives show an unnecessary notification; false negatives mean you don't get notified. Both are acceptable for v1.
 
 ### Process ownership
 
-- **Owned sessions** (launched by websessions): full lifecycle control — can kill, restart
-- **Adopted sessions** (discovered): interactive if re-attached, but killing requires explicit confirmation
+- **Owned sessions** (launched or taken over by websessions): full lifecycle control — can kill, restart
+- **Discovered sessions** (not yet taken over): metadata-only in sidebar. User must explicitly take over to get interactive access.
 
 ### Cleanup
 
@@ -96,6 +139,26 @@ discovered → attaching → running → completed
 - Session transitions to `completed` or `errored`
 - PTY resources freed; output buffer retained until user dismisses
 - Health checks periodically verify tracked PIDs are still alive
+
+## Server Lifecycle
+
+### Startup
+
+1. Load config from `~/.websessions/config.yaml` (or path from `--config` flag)
+2. Open/migrate SQLite database
+3. Start HTTP server
+4. Run initial process discovery scan
+5. Restore any previously-owned sessions that are still running (matched by PID from SQLite, validated by comparing process command name and start time to prevent PID reuse collisions)
+
+### Graceful shutdown (SIGTERM / SIGINT)
+
+1. Stop accepting new HTTP connections
+2. Close all WebSocket connections (clients see a "server shutting down" message)
+3. Persist active session metadata to SQLite (PID, session ID, state)
+4. **Leave spawned Claude processes running** — they are independent processes
+5. Exit cleanly
+
+On next startup, the discovery scan finds these still-running processes and offers them for takeover again. This means server restarts don't kill your Claude sessions.
 
 ## Web UI Layout
 
@@ -142,7 +205,7 @@ The session area supports Terminator-style splits:
 
 - Right-click or keyboard shortcut to split horizontally/vertically
 - Each pane is an independent xterm.js instance
-- Drag dividers to resize
+- Drag dividers to resize (using vendored `split.js` ~2KB for reliable resize handling)
 - Splits are nestable
 - Double-click pane header to maximize (escape to restore)
 - Each tab can have its own split layout
@@ -194,7 +257,7 @@ Per-session and global notification settings. Stored in config file.
 
 - Session history (start time, end time, directory, exit status, duration)
 - Notification history (event type, timestamp, read/unread)
-- Audit log (who launched/killed what, when)
+- Audit log (action taken, timestamp, client IP)
 
 ### YAML (`~/.websessions/config.yaml`)
 
@@ -204,7 +267,7 @@ server:
   host: 0.0.0.0
 sessions:
   scan_interval: 30s
-  output_buffer_lines: 10000
+  output_buffer_size: 10MB
   default_dir: ~/projects
 notifications:
   desktop: true
@@ -223,6 +286,22 @@ auth:
 
 Lightweight shared-token gate. When enabled, all requests require a bearer token. No user management. Token set via config or `WEBSESSIONS_AUTH_TOKEN` env var.
 
+**TLS:** For non-localhost use, deploy behind a reverse proxy with TLS (nginx, Caddy). The token is sent in the clear over HTTP, so plaintext exposure on a network is a security risk.
+
+## Error Handling
+
+All startup-critical errors (port in use, `claude` binary not in PATH, SQLite DB inaccessible) cause the process to exit with a clear error message.
+
+Runtime errors are handled gracefully:
+- PTY allocation failure → session creation fails with error shown in UI
+- SQLite write failure → logged, operation retried; if persistent, surfaced in UI
+- WebSocket errors → connection closed, client reconnects automatically
+- Process scan failures → logged, next scan continues normally
+
+## Logging
+
+Uses Go's `slog` (structured logging). Output goes to stderr by default. Log level configurable via config or `--log-level` flag (debug, info, warn, error). Default: info.
+
 ## Project Structure
 
 ```
@@ -233,7 +312,7 @@ websessions/
 ├── internal/
 │   ├── server/                  # HTTP server, routes, WebSocket handlers
 │   ├── session/                 # Session manager, PTY allocation, lifecycle
-│   ├── discovery/               # Process scanner, PTY re-attach
+│   ├── discovery/               # Process scanner, session takeover
 │   ├── notification/            # Event bus, sinks (in-app, desktop)
 │   ├── store/                   # SQLite repository (history, audit)
 │   └── config/                  # YAML config loading
@@ -259,6 +338,8 @@ websessions/
 | `gopkg.in/yaml.v3` | Config parsing |
 | `github.com/go-chi/chi/v5` | HTTP router |
 
+Vendored JS (embedded, no npm): htmx.min.js, xterm.js, split.js
+
 ## Future Considerations (not in scope for v1)
 
 - Slack / webhook notification sinks
@@ -266,3 +347,4 @@ websessions/
 - Session templates (predefined commands/directories)
 - Session sharing between users (real-time collaboration)
 - Keyboard shortcut customization
+- `reptyr`-based PTY re-attach as alternative to kill+resume takeover
