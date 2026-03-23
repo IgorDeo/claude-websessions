@@ -294,13 +294,13 @@ window.websessions = (function() {
       input.value = path + '/';
       dirAutocomplete(input);
     } else {
-      // Focus name field so user can proceed
       var nameInput = document.getElementById('name');
       if (nameInput && !nameInput.value) {
-        // Auto-fill session name from directory name
         nameInput.value = path.split('/').pop();
       }
       if (nameInput) nameInput.focus();
+      // Load claude sessions for the selected directory
+      loadClaudeSessions(path);
     }
   }
 

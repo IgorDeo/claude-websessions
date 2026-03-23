@@ -294,11 +294,10 @@ func (s *Server) handleClaudeSessions(w http.ResponseWriter, r *http.Request) {
 	// Clean trailing slash
 	workDir = strings.TrimSuffix(workDir, "/")
 
-	// Convert path to claude's project folder name: /home/user/foo -> -home-user-foo
+	// Convert path to claude's project folder name: /home/user.name/foo -> -home-user-name-foo
+	// Claude replaces both / and . with -
 	projectName := strings.ReplaceAll(workDir, "/", "-")
-	if strings.HasPrefix(projectName, "-") {
-		// keep the leading dash, that's claude's format
-	}
+	projectName = strings.ReplaceAll(projectName, ".", "-")
 
 	home, _ := os.UserHomeDir()
 	sessionsDir := filepath.Join(home, ".claude", "projects", projectName)
