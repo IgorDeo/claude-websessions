@@ -11,16 +11,17 @@ templ NewSessionModal(defaultDir string, recentDirs []string) {
 					<label class="recent-label">Recent Projects</label>
 					<div class="recent-list">
 						for _, dir := range recentDirs {
-							<button
-								type="button"
+							<div
 								class="recent-item"
+								role="button"
+								tabindex="0"
 								onclick="window.websessions.quickSession(this)"
 								data-dir={ dir }
 								data-name={ filepath.Base(dir) }
 							>
 								<span class="recent-name">{ filepath.Base(dir) }</span>
 								<span class="recent-path">{ dir }</span>
-							</button>
+							</div>
 						}
 					</div>
 				</div>
