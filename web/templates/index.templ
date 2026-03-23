@@ -29,6 +29,7 @@ templ Index(data PageData) {
 			<header class="topbar">
 				<h1 class="topbar-title">websessions</h1>
 				<div class="topbar-actions">
+					<a href="/settings" class="settings-link" title="Settings">&#9881;</a>
 					<button class="notification-bell" hx-get="/notifications" hx-target="#notification-dropdown" hx-swap="innerHTML">
 						<span class="bell-icon">&#128276;</span>
 						if data.UnreadCount > 0 {

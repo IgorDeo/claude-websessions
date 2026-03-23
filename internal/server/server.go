@@ -52,6 +52,8 @@ func (s *Server) routes() http.Handler {
 			r.Use(authMiddleware(s.cfg.Auth.Token))
 		}
 		r.Get("/", s.handleIndex)
+		r.Get("/settings", s.handleSettings)
+		r.Post("/settings", s.handleSaveSettings)
 		r.Get("/sidebar", s.handleSidebar)
 		r.Get("/notifications", s.handleNotifications)
 		r.Get("/api/dirs", s.handleListDirs)

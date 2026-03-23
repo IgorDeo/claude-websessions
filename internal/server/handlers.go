@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -420,6 +421,71 @@ func (s *Server) setupNotificationBridge() {
 }
 
 // handleListDirs returns a JSON list of directories for the file finder autocomplete.
+func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
+	data := templates.SettingsData{
+		Port:             s.cfg.Server.Port,
+		Host:             s.cfg.Server.Host,
+		ScanInterval:     s.cfg.Sessions.ScanIntervalRaw,
+		OutputBufferSize: s.cfg.Sessions.OutputBufferRaw,
+		DefaultDir:       s.cfg.Sessions.DefaultDir,
+		DesktopNotifs:    s.cfg.Notifications.Desktop,
+		AuthEnabled:      s.cfg.Auth.Enabled,
+		AuthToken:        s.cfg.Auth.Token,
+	}
+	// Check which events are enabled
+	for _, e := range s.cfg.Notifications.Events {
+		switch e {
+		case "completed":
+			data.NotifCompleted = true
+		case "errored":
+			data.NotifErrored = true
+		case "waiting":
+			data.NotifWaiting = true
+		}
+	}
+	templates.Settings(data).Render(r.Context(), w)
+}
+
+func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+
+	s.cfg.Server.Port, _ = strconv.Atoi(r.FormValue("port"))
+	s.cfg.Server.Host = r.FormValue("host")
+	s.cfg.Sessions.ScanIntervalRaw = r.FormValue("scan_interval")
+	s.cfg.Sessions.OutputBufferRaw = r.FormValue("output_buffer_size")
+	s.cfg.Sessions.DefaultDir = r.FormValue("default_dir")
+	s.cfg.Notifications.Desktop = r.FormValue("desktop_notifs") == "on"
+
+	var events []string
+	if r.FormValue("notif_completed") == "on" {
+		events = append(events, "completed")
+	}
+	if r.FormValue("notif_errored") == "on" {
+		events = append(events, "errored")
+	}
+	if r.FormValue("notif_waiting") == "on" {
+		events = append(events, "waiting")
+	}
+	s.cfg.Notifications.Events = events
+
+	s.cfg.Auth.Enabled = r.FormValue("auth_enabled") == "on"
+	if token := r.FormValue("auth_token"); token != "" {
+		s.cfg.Auth.Token = token
+	}
+
+	// Save config to disk
+	if err := s.cfg.Save(); err != nil {
+		slog.Error("failed to save config", "error", err)
+		http.Error(w, "failed to save: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/settings?saved=1", http.StatusSeeOther)
+}
+
 func (s *Server) handleListDirs(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query().Get("q")
 	if query == "" {

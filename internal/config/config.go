@@ -95,6 +95,19 @@ func (c *Config) applyEnvOverrides() {
 	}
 }
 
+func (c *Config) Save() error {
+	homeDir, _ := os.UserHomeDir()
+	dir := homeDir + "/.websessions"
+	os.MkdirAll(dir, 0755)
+	path := dir + "/config.yaml"
+
+	data, err := yaml.Marshal(c)
+	if err != nil {
+		return fmt.Errorf("marshaling config: %w", err)
+	}
+	return os.WriteFile(path, data, 0644)
+}
+
 func parseByteSize(s string) (int64, error) {
 	s = strings.TrimSpace(strings.ToUpper(s))
 	multiplier := int64(1)

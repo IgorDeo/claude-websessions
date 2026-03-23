@@ -1,0 +1,119 @@
+package templates
+
+type SettingsData struct {
+	Port             int
+	Host             string
+	ScanInterval     string
+	OutputBufferSize string
+	DefaultDir       string
+	DesktopNotifs    bool
+	NotifCompleted   bool
+	NotifErrored     bool
+	NotifWaiting     bool
+	AuthEnabled      bool
+	AuthToken        string
+}
+
+templ Settings(data SettingsData) {
+	@Layout("websessions - Settings") {
+		<div class="app">
+			<header class="topbar">
+				<h1 class="topbar-title"><a href="/" class="topbar-link">websessions</a> / Settings</h1>
+			</header>
+			<div class="settings-page">
+				<form id="settings-form" method="POST" action="/settings">
+					<div class="settings-section">
+						<h3>Server</h3>
+						<div class="settings-row">
+							<label for="port">Port</label>
+							<input type="number" id="port" name="port" value={ itoa(data.Port) }/>
+						</div>
+						<div class="settings-row">
+							<label for="host">Host</label>
+							<input type="text" id="host" name="host" value={ data.Host }/>
+						</div>
+					</div>
+					<div class="settings-section">
+						<h3>Sessions</h3>
+						<div class="settings-row">
+							<label for="scan_interval">Discovery Scan Interval</label>
+							<input type="text" id="scan_interval" name="scan_interval" value={ data.ScanInterval } placeholder="30s"/>
+						</div>
+						<div class="settings-row">
+							<label for="output_buffer_size">Output Buffer Size</label>
+							<input type="text" id="output_buffer_size" name="output_buffer_size" value={ data.OutputBufferSize } placeholder="10MB"/>
+						</div>
+						<div class="settings-row">
+							<label for="default_dir">Default Working Directory</label>
+							<input type="text" id="default_dir" name="default_dir" value={ data.DefaultDir }/>
+						</div>
+					</div>
+					<div class="settings-section">
+						<h3>Notifications</h3>
+						<div class="settings-row">
+							<label class="checkbox-label">
+								if data.DesktopNotifs {
+									<input type="checkbox" name="desktop_notifs" checked/>
+								} else {
+									<input type="checkbox" name="desktop_notifs"/>
+								}
+								Desktop Notifications
+							</label>
+						</div>
+						<div class="settings-row">
+							<span class="settings-sublabel">Notify on:</span>
+							<div class="checkbox-group">
+								<label class="checkbox-label">
+									if data.NotifCompleted {
+										<input type="checkbox" name="notif_completed" checked/>
+									} else {
+										<input type="checkbox" name="notif_completed"/>
+									}
+									Completed
+								</label>
+								<label class="checkbox-label">
+									if data.NotifErrored {
+										<input type="checkbox" name="notif_errored" checked/>
+									} else {
+										<input type="checkbox" name="notif_errored"/>
+									}
+									Errored
+								</label>
+								<label class="checkbox-label">
+									if data.NotifWaiting {
+										<input type="checkbox" name="notif_waiting" checked/>
+									} else {
+										<input type="checkbox" name="notif_waiting"/>
+									}
+									Waiting for Input
+								</label>
+							</div>
+						</div>
+					</div>
+					<div class="settings-section">
+						<h3>Authentication</h3>
+						<div class="settings-row">
+							<label class="checkbox-label">
+								if data.AuthEnabled {
+									<input type="checkbox" name="auth_enabled" checked/>
+								} else {
+									<input type="checkbox" name="auth_enabled"/>
+								}
+								Enable Token Authentication
+							</label>
+						</div>
+						<div class="settings-row">
+							<label for="auth_token">Auth Token</label>
+							<input type="password" id="auth_token" name="auth_token" value={ data.AuthToken } placeholder="Leave empty to keep current"/>
+						</div>
+					</div>
+					<div class="settings-actions">
+						<a href="/" class="btn-cancel">Cancel</a>
+						<button type="submit" class="btn-create">Save Settings</button>
+					</div>
+					<p class="settings-note">Some changes (port, host, auth) require a server restart to take effect.</p>
+				</form>
+			</div>
+		</div>
+	}
+}
