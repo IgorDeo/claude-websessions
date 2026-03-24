@@ -184,7 +184,7 @@ func Settings(data SettingsData) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if data.HooksInstalled {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<span class=\"hooks-badge hooks-active\">Installed</span> <button type=\"button\" class=\"btn-cancel btn-small\" onclick=\"window.websessions.manageHooks('uninstall')\">Uninstall</button> <button type=\"button\" class=\"btn-small\" style=\"background:var(--accent);color:var(--bg-primary);border:none;border-radius:3px;padding:0.3rem 0.6rem;cursor:pointer;font-size:0.8rem;\" onclick=\"window.websessions.manageHooks('install')\">Update URL</button>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<span class=\"hooks-badge hooks-active\">Installed</span> <button type=\"button\" class=\"btn-cancel btn-small\" onclick=\"window.websessions.manageHooks('uninstall')\">Uninstall</button>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}

@@ -787,13 +787,6 @@ window.websessions = (function() {
         uninstBtn.addEventListener('click', function() { manageHooks('uninstall'); });
         status.appendChild(uninstBtn);
 
-        var updateBtn = document.createElement('button');
-        updateBtn.type = 'button';
-        updateBtn.className = 'btn-small';
-        updateBtn.style.cssText = 'background:var(--accent);color:var(--bg-primary);border:none;border-radius:3px;padding:0.3rem 0.6rem;cursor:pointer;font-size:0.8rem;';
-        updateBtn.textContent = 'Update URL';
-        updateBtn.addEventListener('click', function() { manageHooks('install'); });
-        status.appendChild(updateBtn);
       } else {
         var badge2 = document.createElement('span');
         badge2.className = 'hooks-badge hooks-inactive';

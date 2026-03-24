@@ -107,7 +107,6 @@ templ Settings(data SettingsData) {
 						if data.HooksInstalled {
 							<span class="hooks-badge hooks-active">Installed</span>
 							<button type="button" class="btn-cancel btn-small" onclick="window.websessions.manageHooks('uninstall')">Uninstall</button>
-							<button type="button" class="btn-small" style="background:var(--accent);color:var(--bg-primary);border:none;border-radius:3px;padding:0.3rem 0.6rem;cursor:pointer;font-size:0.8rem;" onclick="window.websessions.manageHooks('install')">Update URL</button>
 						} else {
 							<span class="hooks-badge hooks-inactive">Not installed</span>
 							<button type="button" class="btn-create btn-small" onclick="window.websessions.manageHooks('install')">Install Hooks</button>

@@ -553,6 +553,9 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	oldPort := s.cfg.Server.Port
+	oldHost := s.cfg.Server.Host
+
 	s.cfg.Server.Port, _ = strconv.Atoi(r.FormValue("port"))
 	s.cfg.Server.Host = r.FormValue("host")
 	s.cfg.Sessions.ScanIntervalRaw = r.FormValue("scan_interval")
@@ -571,6 +574,15 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		events = append(events, "waiting")
 	}
 	s.cfg.Notifications.Events = events
+
+	// If port or host changed, uninstall hooks (they contain the old URL)
+	if s.cfg.Server.Port != oldPort || s.cfg.Server.Host != oldHost {
+		claudeSettings, err := hooks.Load()
+		if err == nil && claudeSettings.IsInstalled() {
+			hooks.Uninstall()
+			slog.Info("hooks uninstalled due to server address change — reinstall from settings")
+		}
+	}
 
 	// Save config to disk
 	if err := s.cfg.Save(); err != nil {
