@@ -724,6 +724,37 @@ html, body {
 .doctor-detail { font-size: 0.65rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* ============================================================
+   Toast Notifications (in-app fallback for webview/GUI mode)
+   ============================================================ */
+#toast-container {
+  position: fixed; top: 12px; right: 12px; z-index: 10000;
+  display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+}
+.toast {
+  pointer-events: auto; cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 0.6rem 0.85rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  min-width: 260px; max-width: 360px;
+  animation: toast-in 0.25s ease-out;
+  transition: opacity 0.3s, transform 0.3s;
+  border-left: 3px solid var(--accent);
+}
+.toast-completed { border-left-color: #7ec87e; }
+.toast-errored { border-left-color: #e87070; }
+.toast-waiting { border-left-color: #d4a843; }
+.toast-title {
+  font-family: var(--font-sans); font-size: 0.72rem; font-weight: 600;
+  color: var(--text-primary); margin-bottom: 0.15rem;
+}
+.toast-body {
+  font-family: var(--font-mono); font-size: 0.65rem;
+  color: var(--text-secondary); line-height: 1.3;
+}
+.toast-fade { opacity: 0; transform: translateX(20px); }
+@keyframes toast-in { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+
+/* ============================================================
    Responsive
    ============================================================ */
 

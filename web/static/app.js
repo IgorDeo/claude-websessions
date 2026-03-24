@@ -258,17 +258,46 @@ window.websessions = (function() {
     });
   }
 
+  function showToast(title, body, event) {
+    var container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      document.body.appendChild(container);
+    }
+    var toast = document.createElement('div');
+    toast.className = 'toast toast-' + (event || 'info');
+    var titleEl = document.createElement('div');
+    titleEl.className = 'toast-title';
+    titleEl.textContent = title;
+    var bodyEl = document.createElement('div');
+    bodyEl.className = 'toast-body';
+    bodyEl.textContent = body;
+    toast.appendChild(titleEl);
+    toast.appendChild(bodyEl);
+    toast.onclick = function() { toast.remove(); };
+    container.appendChild(toast);
+    setTimeout(function() {
+      toast.classList.add('toast-fade');
+      setTimeout(function() { toast.remove(); }, 300);
+    }, 5000);
+  }
+
   function handleNotification(msg) {
     var badge = document.querySelector('.badge');
     if (badge) {
       var count = parseInt(badge.textContent || '0') + 1;
       badge.textContent = count;
     }
+    var title = 'websessions: ' + msg.event;
+    var body = 'Session ' + msg.sessionID + ': ' + msg.event;
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('websessions: ' + msg.event, {
-        body: 'Session ' + msg.sessionID + ': ' + msg.event,
+      new Notification(title, {
+        body: body,
         tag: 'ws-' + msg.sessionID + '-' + msg.event,
       });
+    } else {
+      showToast(title, body, msg.event);
     }
   }
 
@@ -1412,12 +1441,16 @@ window.websessions = (function() {
           }
           // Play sound
           playNotifSound(msg.event);
-          // Desktop notification
+          // Desktop notification (or in-app toast fallback for webview/GUI mode)
+          var notifTitle = 'websessions: ' + msg.event;
+          var notifBody = 'Session ' + msg.sessionID + (msg.message ? ': ' + msg.message : '');
           if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('websessions: ' + msg.event, {
-              body: 'Session ' + msg.sessionID + (msg.message ? ': ' + msg.message : ''),
+            new Notification(notifTitle, {
+              body: notifBody,
               tag: 'ws-' + msg.sessionID + '-' + msg.event,
             });
+          } else {
+            showToast(notifTitle, notifBody, msg.event);
           }
           // Refresh sidebar to update session states
           htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
