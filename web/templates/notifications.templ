@@ -8,20 +8,21 @@ templ Notifications(notifications []NotificationView) {
 		<div class="notif-panel-header">
 			<span class="notif-panel-title">Notifications</span>
 			if len(notifications) > 0 {
+				<span class="notif-panel-count">{ fmt.Sprintf("%d", len(notifications)) }</span>
 				<button class="notif-clear-all" onclick="window.websessions.clearAllNotifications()">Clear all</button>
 			}
 		</div>
 		<div class="notif-panel-body">
 			if len(notifications) == 0 {
 				<div class="notif-empty">
-					<span>No notifications</span>
+					<span>All caught up</span>
 				</div>
 			}
 			for _, n := range notifications {
 				<div
 					class={ "notif-item", "notif-" + n.EventType }
 					id={ fmt.Sprintf("notif-%d", n.ID) }
-					onclick={ openNotifSession(n.SessionID, n.SessionName) }
+					onclick={ openNotifSession(n.SessionID, n.SessionName, n.EventType) }
 				>
 					<div class="notif-item-icon">
 						if n.EventType == "completed" {
@@ -40,12 +41,16 @@ templ Notifications(notifications []NotificationView) {
 					<div class="notif-item-content">
 						<div class="notif-item-top">
 							<span class="notif-item-title">{ n.SessionName }</span>
-							<span class="notif-item-time">{ n.TimeAgo }</span>
+							<span class="notif-item-time" title={ n.Timestamp }>{ n.TimeAgo }</span>
 						</div>
 						<span class="notif-item-message">{ n.Message }</span>
-						if n.WorkDir != "" {
-							<span class="notif-item-dir">{ filepath.Base(n.WorkDir) }</span>
-						}
+						<div class="notif-item-meta">
+							if n.WorkDir != "" {
+								<span class="notif-item-dir">{ filepath.Base(n.WorkDir) }</span>
+								<span class="notif-item-path">{ n.WorkDir }</span>
+							}
+							<span class={ "notif-item-state", "notif-state-" + n.EventType }>{ n.EventType }</span>
+						</div>
 					</div>
 					<button class="notif-item-dismiss" onclick={ dismissNotifEvent(n.ID) } title="Dismiss">&#10005;</button>
 				</div>
@@ -54,9 +59,8 @@ templ Notifications(notifications []NotificationView) {
 	</div>
 }
 
-script openNotifSession(sessionID string, sessionName string) {
-	window.websessions.openTab(sessionID, sessionName, "running");
-	window.websessions.toggleNotifications();
+script openNotifSession(sessionID string, sessionName string, eventType string) {
+	window.websessions.focusNotifSession(sessionID, sessionName, eventType);
 }
 
 script dismissNotifEvent(id int64) {

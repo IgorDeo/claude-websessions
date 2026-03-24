@@ -499,6 +499,16 @@ html, body {
 }
 .notif-item:hover .notif-item-dismiss { opacity: 1; }
 .notif-item-dismiss:hover { color: var(--text-primary); background: var(--bg-elevated); }
+.notif-panel-count { font-size: 0.6rem; color: var(--text-muted); background: var(--bg-input); padding: 0.1rem 0.35rem; border-radius: 8px; margin-right: auto; margin-left: 0.4rem; }
+.notif-item-meta { display: flex; align-items: center; gap: 0.35rem; margin-top: 0.25rem; flex-wrap: wrap; }
+.notif-item-path { font-size: 0.58rem; color: var(--text-muted); font-family: var(--font-mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.notif-item-state { font-size: 0.55rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; padding: 0.08rem 0.35rem; border-radius: var(--radius-sm); }
+.notif-state-completed { color: var(--green); background: var(--green-glow); }
+.notif-state-errored { color: var(--red); background: var(--red-glow); }
+.notif-state-waiting { color: var(--yellow); background: var(--yellow-glow); }
+.notif-state-killed { color: var(--red); background: var(--red-glow); }
+.notif-highlight { animation: notif-flash 2s ease-out; }
+@keyframes notif-flash { 0%, 30% { background: var(--accent-glow); } 100% { background: transparent; } }
 
 /* ============================================================
    Recent Projects & Directory Picker

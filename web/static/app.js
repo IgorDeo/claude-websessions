@@ -1025,6 +1025,49 @@ window.websessions = (function() {
     if (menu) menu.remove();
   }
 
+  // Focus a session from a notification click
+  function focusNotifSession(sessionID, sessionName, eventType) {
+    toggleNotifications(); // close the dropdown
+
+    // For active sessions (waiting), open the tab normally
+    if (eventType === 'waiting') {
+      openTab(sessionID, sessionName, eventType);
+      return;
+    }
+
+    // For finished sessions, check if it's still active
+    fetch('/api/sessions')
+      .then(function(r) { return r.json(); })
+      .then(function(sessions) {
+        var active = sessions && sessions.find(function(s) { return s.id === sessionID; });
+        if (active) {
+          // Still in active manager — open normally
+          openTab(sessionID, sessionName, active.state);
+        } else {
+          // Not active — switch to History tab and highlight
+          var historyBtn = document.querySelector('.sidebar-tab:nth-child(2)');
+          if (historyBtn) switchSidebarTab('history', historyBtn);
+          // Scroll to the session in history if visible
+          setTimeout(function() {
+            var items = document.querySelectorAll('.history-list .session-item');
+            items.forEach(function(item) {
+              // Flash highlight matching session
+              var nameEl = item.querySelector('.session-name');
+              if (nameEl && nameEl.textContent.trim() === sessionName) {
+                item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                item.classList.add('notif-highlight');
+                setTimeout(function() { item.classList.remove('notif-highlight'); }, 2000);
+              }
+            });
+          }, 200);
+        }
+      })
+      .catch(function() {
+        // Fallback — try opening anyway
+        openTab(sessionID, sessionName, eventType);
+      });
+  }
+
   // Notification panel
   var notifOpen = false;
   function toggleNotifications() {
@@ -1267,6 +1310,7 @@ window.websessions = (function() {
     killSession: killSession,
     startRename: startRename,
     dirAutocomplete: dirAutocomplete,
+    focusNotifSession: focusNotifSession,
     toggleNotifications: toggleNotifications,
     setNotifSoundsEnabled: setNotifSoundsEnabled,
     getNotifSoundsEnabled: getNotifSoundsEnabled,
