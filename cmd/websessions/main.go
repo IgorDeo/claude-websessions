@@ -77,6 +77,11 @@ func main() {
 	sink := notification.NewInAppSink(100)
 
 	mgr.OnStateChange(func(s *session.Session, from, to session.State) {
+		// Resolve claude session ID if not known yet (for future --resume)
+		if s.ClaudeID == "" && s.WorkDir != "" {
+			s.ClaudeID = discovery.ResolveClaudeSessionID(s.WorkDir)
+		}
+
 		// Skip notification for intentionally killed sessions
 		if s.Killed && to == session.StateErrored {
 			// Still save to DB but don't notify

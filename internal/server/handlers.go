@@ -365,9 +365,13 @@ func (s *Server) handleRestartSession(w http.ResponseWriter, r *http.Request, se
 					if name == "" {
 						name = sessionID
 					}
+					claudeID := rec.ClaudeID
+					if claudeID == "" {
+						claudeID = discovery.ResolveClaudeSessionID(rec.WorkDir)
+					}
 					args := []string{"--name", name}
-					if rec.ClaudeID != "" {
-						args = append(args, "--resume", rec.ClaudeID)
+					if claudeID != "" {
+						args = append(args, "--resume", claudeID)
 					}
 					newSess, err = s.mgr.Create(sessionID, rec.WorkDir, "claude", args)
 					if err == nil {

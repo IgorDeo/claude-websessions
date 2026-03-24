@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
+	"github.com/igor-deoalves/websessions/internal/discovery"
 )
 
 type StateChangeFunc func(s *Session, from, to State)
@@ -283,9 +284,14 @@ func (m *Manager) Restart(id string) (*Session, error) {
 	workDir := s.WorkDir
 	claudeID := s.ClaudeID
 
+	// Resolve claude session ID from project files if not known
+	if claudeID == "" && workDir != "" {
+		claudeID = discovery.ResolveClaudeSessionID(workDir)
+	}
+
 	m.Remove(id)
 
-	args := []string{}
+	args := []string{"--name", name}
 	if claudeID != "" {
 		args = append(args, "--resume", claudeID)
 	}
