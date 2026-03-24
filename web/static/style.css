@@ -22,9 +22,11 @@ html, body { height: 100%; background: var(--bg-primary); color: var(--text-prim
 .topbar { display: flex; align-items: center; justify-content: space-between; padding: 0.5rem 1rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border); height: 48px; }
 .topbar-title { font-size: 1rem; font-weight: 600; color: var(--accent); }
 .topbar-actions { display: flex; align-items: center; gap: 0.5rem; }
+.notification-wrapper { position: relative; }
 .notification-bell { background: none; border: none; color: var(--text-primary); cursor: pointer; position: relative; font-size: 1.2rem; padding: 0.25rem 0.5rem; }
-.badge { position: absolute; top: -4px; right: -4px; background: var(--red); color: white; font-size: 0.65rem; padding: 0.1rem 0.3rem; border-radius: 8px; }
-.dropdown { position: absolute; right: 0; top: 100%; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; min-width: 280px; z-index: 100; }
+.badge { position: absolute; top: -4px; right: -4px; background: var(--red); color: white; font-size: 0.65rem; padding: 0.1rem 0.3rem; border-radius: 8px; min-width: 16px; text-align: center; }
+.dropdown { position: absolute; right: 0; top: 100%; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 6px; width: 320px; z-index: 100; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+.dropdown-open { display: block; }
 
 .main { display: flex; flex: 1; overflow: hidden; }
 
@@ -117,13 +119,27 @@ html, body { height: 100%; background: var(--bg-primary); color: var(--text-prim
 .btn-cancel { background: none; border: 1px solid var(--border); color: var(--text-secondary); padding: 0.4rem 1rem; border-radius: 4px; cursor: pointer; }
 .btn-create { background: var(--accent); border: none; color: var(--bg-primary); padding: 0.4rem 1rem; border-radius: 4px; cursor: pointer; font-weight: 500; }
 
-.notification-list { padding: 0.5rem; }
-.notification-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.4rem 0.5rem; border-bottom: 1px solid var(--border); font-size: 0.8rem; }
-.notif-completed .notif-type { color: var(--green); }
-.notif-errored .notif-type { color: var(--red); }
-.notif-waiting .notif-type { color: var(--yellow); }
-.notif-dismiss { background: none; border: none; color: var(--text-muted); cursor: pointer; margin-left: auto; }
-.no-notifications { color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 1rem; }
+/* Notification panel */
+.notif-panel { max-height: 400px; display: flex; flex-direction: column; }
+.notif-panel-header { display: flex; justify-content: space-between; align-items: center; padding: 0.6rem 0.75rem; border-bottom: 1px solid var(--border); }
+.notif-panel-title { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); }
+.notif-clear-all { background: none; border: none; color: var(--accent); cursor: pointer; font-size: 0.75rem; font-family: inherit; }
+.notif-clear-all:hover { text-decoration: underline; }
+.notif-panel-body { overflow-y: auto; flex: 1; }
+.notif-empty { color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 1.5rem; }
+.notif-item { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.5rem 0.75rem; border-bottom: 1px solid var(--border); }
+.notif-item:last-child { border-bottom: none; }
+.notif-item:hover { background: var(--bg-tertiary); }
+.notif-item-icon { flex-shrink: 0; width: 1.2rem; text-align: center; font-size: 0.85rem; padding-top: 0.1rem; }
+.notif-icon-completed { color: var(--green); }
+.notif-icon-errored { color: var(--red); }
+.notif-icon-waiting { color: var(--yellow); }
+.notif-item-content { flex: 1; overflow: hidden; }
+.notif-item-title { display: block; font-size: 0.8rem; font-weight: 500; color: var(--text-primary); text-transform: capitalize; }
+.notif-item-session { display: block; font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notif-item-dismiss { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.75rem; padding: 0.1rem 0.3rem; flex-shrink: 0; opacity: 0; transition: opacity 0.15s; }
+.notif-item:hover .notif-item-dismiss { opacity: 1; }
+.notif-item-dismiss:hover { color: var(--text-primary); }
 
 /* Recent projects */
 .recent-projects { margin-bottom: 0.75rem; }

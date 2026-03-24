@@ -3,16 +3,43 @@ package templates
 import "fmt"
 
 templ Notifications(notifications []NotificationView) {
-	<div class="notification-list">
-		if len(notifications) == 0 {
-			<p class="no-notifications">No new notifications</p>
-		}
-		for _, n := range notifications {
-			<div class={ "notification-item", "notif-" + n.EventType }>
-				<span class="notif-type">{ n.EventType }</span>
-				<span class="notif-session">{ n.SessionID }</span>
-				<button class="notif-dismiss" hx-post={ fmt.Sprintf("/notifications/%d/read", n.ID) } hx-swap="outerHTML" hx-target="closest .notification-item">&times;</button>
-			</div>
-		}
+	<div class="notif-panel">
+		<div class="notif-panel-header">
+			<span class="notif-panel-title">Notifications</span>
+			if len(notifications) > 0 {
+				<button class="notif-clear-all" onclick="window.websessions.clearAllNotifications()">Clear all</button>
+			}
+		</div>
+		<div class="notif-panel-body">
+			if len(notifications) == 0 {
+				<div class="notif-empty">
+					<span>No notifications</span>
+				</div>
+			}
+			for _, n := range notifications {
+				<div class={ "notif-item", "notif-" + n.EventType } id={ fmt.Sprintf("notif-%d", n.ID) }>
+					<div class="notif-item-icon">
+						if n.EventType == "completed" {
+							<span class="notif-icon-completed">&#10003;</span>
+						}
+						if n.EventType == "errored" {
+							<span class="notif-icon-errored">&#10007;</span>
+						}
+						if n.EventType == "waiting" {
+							<span class="notif-icon-waiting">&#9888;</span>
+						}
+					</div>
+					<div class="notif-item-content">
+						<span class="notif-item-title">{ n.EventType }</span>
+						<span class="notif-item-session">{ n.SessionID }</span>
+					</div>
+					<button class="notif-item-dismiss" onclick={ dismissNotif(n.ID) } title="Dismiss">&#10005;</button>
+				</div>
+			}
+		</div>
 	</div>
+}
+
+script dismissNotif(id int64) {
+	window.websessions.dismissNotification(id);
 }

@@ -132,6 +132,11 @@ func (s *Store) MarkNotificationRead(id int64) error {
 	return err
 }
 
+func (s *Store) MarkAllNotificationsRead() error {
+	_, err := s.db.Exec(`UPDATE notifications SET read = TRUE WHERE read = FALSE`)
+	return err
+}
+
 // RecentDirs returns distinct working directories from recent sessions, most recent first.
 func (s *Store) RecentDirs(limit int) ([]string, error) {
 	rows, err := s.db.Query(

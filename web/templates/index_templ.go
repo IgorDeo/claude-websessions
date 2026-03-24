@@ -65,19 +65,19 @@ func Index(data PageData) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"app\"><header class=\"topbar\"><h1 class=\"topbar-title\">websessions</h1><div class=\"topbar-actions\"><a href=\"/settings\" class=\"settings-link\" title=\"Settings\">&#9881;</a> <button class=\"notification-bell\" hx-get=\"/notifications\" hx-target=\"#notification-dropdown\" hx-swap=\"innerHTML\"><span class=\"bell-icon\">&#128276;</span> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"app\"><header class=\"topbar\"><h1 class=\"topbar-title\">websessions</h1><div class=\"topbar-actions\"><a href=\"/settings\" class=\"settings-link\" title=\"Settings\">&#9881;</a><div class=\"notification-wrapper\"><button class=\"notification-bell\" onclick=\"window.websessions.toggleNotifications()\"><span class=\"bell-icon\">&#128276;</span> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if data.UnreadCount > 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<span class=\"badge\">")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<span class=\"badge\" id=\"notif-badge\">")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(data.UnreadCount))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/index.templ`, Line: 37, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/index.templ`, Line: 38, Col: 69}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -88,7 +88,7 @@ func Index(data PageData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</button><div id=\"notification-dropdown\" class=\"dropdown\"></div></div></header><div class=\"main\"><aside id=\"sidebar\" class=\"sidebar\" hx-get=\"/sidebar\" hx-trigger=\"every 30s\" hx-swap=\"innerHTML\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</button><div id=\"notification-dropdown\" class=\"dropdown\"></div></div></div></header><div class=\"main\"><aside id=\"sidebar\" class=\"sidebar\" hx-get=\"/sidebar\" hx-trigger=\"every 30s\" hx-swap=\"innerHTML\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

@@ -31,13 +31,15 @@ templ Index(data PageData) {
 				<h1 class="topbar-title">websessions</h1>
 				<div class="topbar-actions">
 					<a href="/settings" class="settings-link" title="Settings">&#9881;</a>
-					<button class="notification-bell" hx-get="/notifications" hx-target="#notification-dropdown" hx-swap="innerHTML">
-						<span class="bell-icon">&#128276;</span>
-						if data.UnreadCount > 0 {
-							<span class="badge">{ itoa(data.UnreadCount) }</span>
-						}
-					</button>
-					<div id="notification-dropdown" class="dropdown"></div>
+					<div class="notification-wrapper">
+						<button class="notification-bell" onclick="window.websessions.toggleNotifications()">
+							<span class="bell-icon">&#128276;</span>
+							if data.UnreadCount > 0 {
+								<span class="badge" id="notif-badge">{ itoa(data.UnreadCount) }</span>
+							}
+						</button>
+						<div id="notification-dropdown" class="dropdown"></div>
+					</div>
 				</div>
 			</header>
 			<div class="main">

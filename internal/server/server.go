@@ -89,6 +89,13 @@ func (s *Server) routes() http.Handler {
 	r.Get("/ws/{sessionID}", func(w http.ResponseWriter, r *http.Request) {
 		s.handleWS(w, r, chi.URLParam(r, "sessionID"), s.mgr)
 	})
+	r.Post("/notifications/clear", func(w http.ResponseWriter, r *http.Request) {
+		if s.store != nil {
+			s.store.MarkAllNotificationsRead()
+		}
+		s.sink.Clear()
+		w.WriteHeader(http.StatusOK)
+	})
 	r.Post("/notifications/{id}/read", func(w http.ResponseWriter, r *http.Request) {
 		idStr := chi.URLParam(r, "id")
 		id, err := strconv.ParseInt(idStr, 10, 64)

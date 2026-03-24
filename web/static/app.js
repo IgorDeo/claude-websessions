@@ -870,6 +870,81 @@ window.websessions = (function() {
     }, 200);
   }
 
+  // Notification panel
+  var notifOpen = false;
+  function toggleNotifications() {
+    var dropdown = document.getElementById('notification-dropdown');
+    if (!dropdown) return;
+    if (notifOpen) {
+      while (dropdown.firstChild) dropdown.removeChild(dropdown.firstChild);
+      dropdown.classList.remove('dropdown-open');
+      notifOpen = false;
+    } else {
+      dropdown.classList.add('dropdown-open');
+      notifOpen = true;
+      htmx.ajax('GET', '/notifications', { target: '#notification-dropdown', swap: 'innerHTML' });
+    }
+  }
+
+  function dismissNotification(id) {
+    fetch('/notifications/' + id + '/read', { method: 'POST' })
+      .then(function() {
+        var el = document.getElementById('notif-' + id);
+        if (el) el.remove();
+        updateBadgeCount(-1);
+        // If no more items, show empty state
+        var body = document.querySelector('.notif-panel-body');
+        if (body && !body.querySelector('.notif-item')) {
+          while (body.firstChild) body.removeChild(body.firstChild);
+          var empty = document.createElement('div');
+          empty.className = 'notif-empty';
+          var span = document.createElement('span');
+          span.textContent = 'No notifications';
+          empty.appendChild(span);
+          body.appendChild(empty);
+          // Hide clear all button
+          var clearBtn = document.querySelector('.notif-clear-all');
+          if (clearBtn) clearBtn.style.display = 'none';
+        }
+      });
+  }
+
+  function clearAllNotifications() {
+    fetch('/notifications/clear', { method: 'POST' })
+      .then(function() {
+        var dropdown = document.getElementById('notification-dropdown');
+        if (dropdown) {
+          htmx.ajax('GET', '/notifications', { target: '#notification-dropdown', swap: 'innerHTML' });
+        }
+        // Reset badge
+        var badge = document.getElementById('notif-badge');
+        if (badge) badge.remove();
+      });
+  }
+
+  function updateBadgeCount(delta) {
+    var badge = document.getElementById('notif-badge');
+    if (!badge) return;
+    var count = parseInt(badge.textContent || '0') + delta;
+    if (count <= 0) {
+      badge.remove();
+    } else {
+      badge.textContent = String(count);
+    }
+  }
+
+  // Close notification panel when clicking outside
+  document.addEventListener('click', function(e) {
+    if (notifOpen && !e.target.closest('.notification-wrapper')) {
+      var dropdown = document.getElementById('notification-dropdown');
+      if (dropdown) {
+        while (dropdown.firstChild) dropdown.removeChild(dropdown.firstChild);
+        dropdown.classList.remove('dropdown-open');
+      }
+      notifOpen = false;
+    }
+  });
+
   // Sidebar tab switching
   function switchSidebarTab(tabName, btn) {
     // Toggle tab buttons
@@ -1029,6 +1104,9 @@ window.websessions = (function() {
     killSession: killSession,
     startRename: startRename,
     dirAutocomplete: dirAutocomplete,
+    toggleNotifications: toggleNotifications,
+    dismissNotification: dismissNotification,
+    clearAllNotifications: clearAllNotifications,
     switchSidebarTab: switchSidebarTab,
     manageHooks: manageHooks,
     settingsDirAutocomplete: settingsDirAutocomplete,
