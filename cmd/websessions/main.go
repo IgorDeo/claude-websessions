@@ -190,12 +190,30 @@ func main() {
 		})
 	})
 
-	// Restore previous sessions from SQLite as offline
+	// Check tmux availability
+	if !session.TmuxIsAvailable() {
+		fmt.Fprintf(os.Stderr, "  %s%s✗ tmux is not installed. Please install tmux to use websessions.%s\n", colorRed, colorBold, colorReset)
+		fmt.Fprintf(os.Stderr, "  %s  Ubuntu/Debian: sudo apt install tmux%s\n", colorDim, colorReset)
+		fmt.Fprintf(os.Stderr, "  %s  macOS: brew install tmux%s\n\n", colorDim, colorReset)
+		os.Exit(1)
+	}
+
+	// Recover existing tmux sessions from a previous server run
+	recoveredCount := mgr.RecoverTmuxSessions()
+	if recoveredCount > 0 {
+		fmt.Fprintf(os.Stderr, "  %s%s● Reattached to %d tmux session(s)%s\n", colorGreen, colorBold, recoveredCount, colorReset)
+	}
+
+	// Restore previous sessions from SQLite as offline (only those not already recovered)
 	offlineCount := 0
 	prevSessions, err := st.ListSessions(50)
 	if err == nil {
 		for _, rec := range prevSessions {
 			if rec.Status == "running" || rec.Status == "waiting" || rec.Status == "created" || rec.Status == "discovered" {
+				// Skip if already recovered from tmux
+				if _, ok := mgr.Get(rec.ID); ok {
+					continue
+				}
 				name := rec.Name
 				if name == "" {
 					name = rec.ID

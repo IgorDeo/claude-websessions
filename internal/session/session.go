@@ -2,11 +2,8 @@ package session
 
 import (
 	"fmt"
-	"os"
 	"sync"
 	"time"
-
-	"github.com/creack/pty"
 )
 
 type State string
@@ -25,21 +22,20 @@ const (
 type Session struct {
 	mu sync.RWMutex
 
-	ID        string
-	ClaudeID  string
-	Name      string
-	WorkDir   string
-	State     State
-	PID       int
-	StartTime time.Time
-	EndTime   time.Time
-	ExitCode  int
-	Error     string
-	Owned     bool
-	Killed    bool // true if intentionally killed by user — suppresses error notification
+	ID           string
+	ClaudeID     string
+	Name         string
+	WorkDir      string
+	State        State
+	PID          int
+	StartTime    time.Time
+	EndTime      time.Time
+	ExitCode     int
+	Error        string
+	Owned        bool
+	Killed       bool   // true if intentionally killed by user
+	TmuxSession  string // tmux session name (e.g. "ws-myproject")
 
-	pty    *os.File
-	proc   *os.Process
 	output *RingBuf
 }
 
@@ -73,31 +69,16 @@ func (s *Session) GetState() State {
 	return s.State
 }
 
-func (s *Session) PTY() *os.File {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.pty
-}
-
 func (s *Session) Output() *RingBuf {
 	return s.output
 }
 
-func (s *Session) SetPTY(ptmx *os.File, proc *os.Process) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.pty = ptmx
-	s.proc = proc
-	if proc != nil {
-		s.PID = proc.Pid
-	}
-}
-
+// Resize resizes the tmux window for this session.
 func (s *Session) Resize(rows, cols uint16) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if s.pty == nil {
-		return fmt.Errorf("no PTY attached")
+	if s.TmuxSession == "" {
+		return fmt.Errorf("no tmux session attached")
 	}
-	return pty.Setsize(s.pty, &pty.Winsize{Rows: rows, Cols: cols})
+	return tmuxResizeWindow(s.TmuxSession, int(cols), int(rows))
 }

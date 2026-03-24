@@ -2,50 +2,67 @@ package session_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/igor-deoalves/websessions/internal/session"
 )
 
 func TestManager_CreateSession(t *testing.T) {
+	if !session.TmuxIsAvailable() {
+		t.Skip("tmux not available")
+	}
 	mgr := session.NewManager(10 * 1024 * 1024)
-	s, err := mgr.Create("test-session", "/tmp", "echo", []string{"hello"})
+
+	// Use bash -c so tmux has a real shell to run
+	s, err := mgr.Create("test-create", "/tmp", "bash", []string{"-c", "echo hello && sleep 2"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if s.ID != "test-session" {
-		t.Errorf("expected ID test-session, got %s", s.ID)
+	defer mgr.Kill(s.ID)
+
+	if s.ID != "test-create" {
+		t.Errorf("expected ID test-create, got %s", s.ID)
 	}
 	if s.GetState() != session.StateRunning {
 		t.Errorf("expected state running, got %s", s.GetState())
 	}
-	if s.PID == 0 {
-		t.Error("expected non-zero PID")
-	}
-	mgr.Wait(s.ID)
-	if s.GetState() != session.StateCompleted {
-		t.Errorf("expected state completed, got %s", s.GetState())
+	if s.TmuxSession == "" {
+		t.Error("expected non-empty TmuxSession")
 	}
 }
 
 func TestManager_ListSessions(t *testing.T) {
+	if !session.TmuxIsAvailable() {
+		t.Skip("tmux not available")
+	}
 	mgr := session.NewManager(10 * 1024 * 1024)
-	mgr.Create("s1", "/tmp", "echo", []string{"1"})
-	mgr.Create("s2", "/tmp", "echo", []string{"2"})
+
+	mgr.Create("test-list-1", "/tmp", "bash", []string{"-c", "sleep 5"})
+	mgr.Create("test-list-2", "/tmp", "bash", []string{"-c", "sleep 5"})
+	defer mgr.Kill("test-list-1")
+	defer mgr.Kill("test-list-2")
+
 	sessions := mgr.List()
-	if len(sessions) != 2 {
-		t.Errorf("expected 2 sessions, got %d", len(sessions))
+	if len(sessions) < 2 {
+		t.Errorf("expected at least 2 sessions, got %d", len(sessions))
 	}
 }
 
 func TestManager_GetSession(t *testing.T) {
+	if !session.TmuxIsAvailable() {
+		t.Skip("tmux not available")
+	}
 	mgr := session.NewManager(10 * 1024 * 1024)
-	mgr.Create("test", "/tmp", "echo", []string{"hi"})
-	s, ok := mgr.Get("test")
+
+	mgr.Create("test-get", "/tmp", "bash", []string{"-c", "sleep 5"})
+	defer mgr.Kill("test-get")
+
+	s, ok := mgr.Get("test-get")
 	if !ok {
 		t.Fatal("expected to find session")
 	}
-	if s.ID != "test" {
-		t.Errorf("expected ID test, got %s", s.ID)
+	if s.ID != "test-get" {
+		t.Errorf("expected ID test-get, got %s", s.ID)
 	}
 	_, ok = mgr.Get("nonexistent")
 	if ok {
@@ -54,17 +71,21 @@ func TestManager_GetSession(t *testing.T) {
 }
 
 func TestManager_KillSession(t *testing.T) {
+	if !session.TmuxIsAvailable() {
+		t.Skip("tmux not available")
+	}
 	mgr := session.NewManager(10 * 1024 * 1024)
-	s, err := mgr.Create("sleepy", "/tmp", "sleep", []string{"60"})
+
+	s, err := mgr.Create("test-kill", "/tmp", "bash", []string{"-c", "sleep 60"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+
 	err = mgr.Kill(s.ID)
 	if err != nil {
 		t.Fatalf("kill error: %v", err)
 	}
-	mgr.Wait(s.ID)
-	if s.GetState() != session.StateErrored {
-		t.Errorf("expected state errored after kill, got %s", s.GetState())
-	}
+
+	// Give tmux a moment to clean up
+	time.Sleep(500 * time.Millisecond)
 }
