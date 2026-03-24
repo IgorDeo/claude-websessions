@@ -4,6 +4,74 @@ window.websessions = (function() {
   var openTabs = []; // [{id, name, state}]
   var activeTabId = null;
 
+  // ── Notification Sounds (Web Audio API) ──────────────────
+  var audioCtx = null;
+  function getAudioCtx() {
+    if (!audioCtx) {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    return audioCtx;
+  }
+
+  function playTone(frequencies, durations, type, volume) {
+    try {
+      var ctx = getAudioCtx();
+      var startTime = ctx.currentTime;
+      for (var i = 0; i < frequencies.length; i++) {
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.type = type || 'sine';
+        osc.frequency.value = frequencies[i];
+        gain.gain.setValueAtTime(volume || 0.15, startTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + durations[i]);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + durations[i]);
+        startTime += durations[i] * 0.6; // overlap slightly
+      }
+    } catch(e) {}
+  }
+
+  var notifSounds = {
+    completed: function() {
+      // Ascending two-note chime — pleasant, success
+      playTone([523, 784], [0.15, 0.25], 'sine', 0.12);
+    },
+    waiting: function() {
+      // Three gentle pings — attention needed
+      playTone([660, 660, 880], [0.1, 0.1, 0.2], 'sine', 0.1);
+    },
+    errored: function() {
+      // Descending two-note — low, alert
+      playTone([440, 330], [0.18, 0.3], 'triangle', 0.14);
+    }
+  };
+
+  function playNotifSound(eventType) {
+    // Check if sounds are enabled (stored in localStorage)
+    try {
+      if (localStorage.getItem('ws-notif-sounds') === 'false') return;
+    } catch(e) {}
+    var fn = notifSounds[eventType];
+    if (fn) fn();
+  }
+
+  function setNotifSoundsEnabled(enabled) {
+    try { localStorage.setItem('ws-notif-sounds', enabled ? 'true' : 'false'); } catch(e) {}
+  }
+
+  function getNotifSoundsEnabled() {
+    try { return localStorage.getItem('ws-notif-sounds') !== 'false'; } catch(e) { return true; }
+  }
+
+  // Test sound for settings page
+  function testNotifSound(eventType) {
+    var fn = notifSounds[eventType];
+    if (fn) fn();
+  }
+  // ─────────────────────────────────────────────────────────
+
   function connectSession(sessionID, containerID) {
     const container = document.getElementById(containerID);
     if (!container) return;
@@ -1161,6 +1229,8 @@ window.websessions = (function() {
           if (badge) {
             badge.textContent = String(parseInt(badge.textContent || '0') + 1);
           }
+          // Play sound
+          playNotifSound(msg.event);
           // Desktop notification
           if ('Notification' in window && Notification.permission === 'granted') {
             new Notification('websessions: ' + msg.event, {
@@ -1192,6 +1262,9 @@ window.websessions = (function() {
     startRename: startRename,
     dirAutocomplete: dirAutocomplete,
     toggleNotifications: toggleNotifications,
+    setNotifSoundsEnabled: setNotifSoundsEnabled,
+    getNotifSoundsEnabled: getNotifSoundsEnabled,
+    testNotifSound: testNotifSound,
     dismissNotification: dismissNotification,
     clearAllNotifications: clearAllNotifications,
     switchSidebarTab: switchSidebarTab,

@@ -61,6 +61,24 @@ templ Settings(data SettingsData) {
 								Desktop Notifications
 							</label>
 						</div>
+					<div class="settings-row">
+							<label class="checkbox-label">
+								<input type="checkbox" id="notif-sounds-toggle" onchange="window.websessions.setNotifSoundsEnabled(this.checked)"/>
+								Notification Sounds
+							</label>
+							<div class="sound-test-btns">
+								<button type="button" class="btn-sound" onclick="window.websessions.testNotifSound('completed')" title="Test completed sound">&#9835; Completed</button>
+								<button type="button" class="btn-sound" onclick="window.websessions.testNotifSound('waiting')" title="Test waiting sound">&#9835; Waiting</button>
+								<button type="button" class="btn-sound" onclick="window.websessions.testNotifSound('errored')" title="Test error sound">&#9835; Error</button>
+							</div>
+						</div>
+						<script>
+							// Restore sound toggle state from localStorage
+							(function() {
+								var cb = document.getElementById('notif-sounds-toggle');
+								if (cb) cb.checked = window.websessions.getNotifSoundsEnabled();
+							})();
+						</script>
 						<div class="settings-row">
 							<span class="settings-sublabel">Notify on:</span>
 							<div class="checkbox-group">
