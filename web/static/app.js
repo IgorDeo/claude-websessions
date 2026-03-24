@@ -12,12 +12,12 @@ window.websessions = (function() {
       cursorBlink: true,
       scrollback: 10000,
       theme: {
-        background: '#1a1b26',
-        foreground: '#c0caf5',
-        cursor: '#c0caf5',
-        selectionBackground: '#33467c',
+        background: '#13141c',
+        foreground: '#d0d4f0',
+        cursor: '#6c8cff',
+        selectionBackground: 'rgba(108, 140, 255, 0.2)',
       },
-      fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+      fontFamily: "'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace",
       fontSize: 14,
     });
 
