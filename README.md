@@ -114,13 +114,13 @@ Open http://localhost:8080 — any running Claude Code sessions on your machine 
 curl -LsSf https://raw.githubusercontent.com/IgorDeo/claude-websessions/main/install.sh | sh
 ```
 
-Detects your OS/architecture, downloads the latest binary, and installs to `~/.local/bin` (or `/usr/local/bin` if writable).
+Detects your OS/architecture, downloads the latest binary, and installs to `~/.local/bin` (or `/usr/local/bin` if writable). If GUI libraries (WebKit2GTK) are detected on your system, the GUI-enabled binary is installed automatically.
 
 | Option | Description |
 |--------|-------------|
 | `WEBSESSIONS_VERSION=v0.7.0` | Pin a specific version |
 | `WEBSESSIONS_INSTALL_DIR=/opt/bin` | Custom install path |
-| `--gui` | Download GUI-enabled binary (see [GUI mode](#gui-mode-no-browser-needed)) |
+| `--no-gui` | Force standard binary even if GUI deps are available |
 
 ### Download binary manually
 
@@ -204,31 +204,33 @@ Click the **bell icon** to see notifications. Events: session completed, errored
 
 Run websessions in a native desktop window using the OS webview engine — lightweight and fast, no Chrome needed.
 
-### Install with GUI support
+The installer **auto-detects** GUI libraries on your system. If they're present, the GUI-enabled binary is installed automatically — no extra flags needed. Just install the libs and run the installer:
 
-```bash
-curl -LsSf https://raw.githubusercontent.com/IgorDeo/claude-websessions/main/install.sh | sh -s -- --gui
-```
-
-The install script checks for required system libraries and shows the exact install command if they're missing.
-
-### System dependencies
-
-| Platform | Command |
+| Platform | Install GUI libs, then re-run installer |
 |----------|---------|
 | Ubuntu/Debian | `sudo apt install libwebkit2gtk-4.1-0 libgtk-3-0` |
 | Fedora | `sudo dnf install webkit2gtk4.1 gtk3` |
 | Arch | `sudo pacman -S webkit2gtk-4.1 gtk3` |
 | macOS | No extra deps (WebKit is built-in) |
 
-### Build from source
-
 ```bash
-make build-gui
-./bin/websessions --gui
+# Install libs (example for Ubuntu), then install websessions
+sudo apt install libwebkit2gtk-4.1-0 libgtk-3-0
+curl -LsSf https://raw.githubusercontent.com/IgorDeo/claude-websessions/main/install.sh | sh
+
+# Run with native window
+websessions --gui
 ```
 
 Closing the window shuts down the server gracefully.
+
+### Build GUI from source
+
+```bash
+# Requires dev headers: sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev
+make build-gui
+./bin/websessions --gui
+```
 
 ---
 
