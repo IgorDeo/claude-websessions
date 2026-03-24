@@ -18,23 +18,20 @@ import (
 type SnoozeFunc func(sessionID string, minutes int)
 
 type Server struct {
-	cfg         *config.Config
-	mgr         *session.Manager
-	bus         *notification.Bus
-	sink        *notification.InAppSink
-	store       *store.Store
-	hub         *wsHub
-	handler     http.Handler
-	snoozeFn    SnoozeFunc
-	guiNotifyFn notification.GuiNotifyFunc
-	version     string
+	cfg       *config.Config
+	mgr       *session.Manager
+	bus       *notification.Bus
+	sink      *notification.InAppSink
+	store     *store.Store
+	hub       *wsHub
+	handler   http.Handler
+	snoozeFn  SnoozeFunc
+	version   string
 }
 
 func (s *Server) SetVersion(v string) { s.version = v }
 
 func (s *Server) SetSnoozeFunc(fn SnoozeFunc) { s.snoozeFn = fn }
-
-func (s *Server) SetGuiNotifyFunc(fn notification.GuiNotifyFunc) { s.guiNotifyFn = fn }
 
 func New(cfg *config.Config, mgr *session.Manager, bus *notification.Bus, sink *notification.InAppSink, st ...*store.Store) *Server {
 	s := &Server{cfg: cfg, mgr: mgr, bus: bus, sink: sink, hub: newWSHub()}
