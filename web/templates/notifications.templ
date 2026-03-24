@@ -52,7 +52,12 @@ templ Notifications(notifications []NotificationView) {
 							<span class={ "notif-item-state", "notif-state-" + n.EventType }>{ n.EventType }</span>
 						</div>
 					</div>
-					<button class="notif-item-dismiss" onclick={ dismissNotifEvent(n.ID) } title="Dismiss">&#10005;</button>
+					<div class="notif-item-actions">
+						if n.EventType == "waiting" {
+							<button class="notif-item-snooze" onclick={ snoozeNotifEvent(n.ID, n.SessionID) } title="Snooze 15 min">&#128340;</button>
+						}
+						<button class="notif-item-dismiss" onclick={ dismissNotifEvent(n.ID) } title="Dismiss">&#10005;</button>
+					</div>
 				</div>
 			}
 		</div>
@@ -66,4 +71,9 @@ script openNotifSession(sessionID string, sessionName string, eventType string) 
 script dismissNotifEvent(id int64) {
 	event.stopPropagation();
 	window.websessions.dismissNotification(id);
+}
+
+script snoozeNotifEvent(id int64, sessionID string) {
+	event.stopPropagation();
+	window.websessions.snoozeNotification(id, sessionID);
 }

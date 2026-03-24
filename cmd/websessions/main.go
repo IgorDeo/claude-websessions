@@ -275,7 +275,54 @@ func main() {
 		}()
 	}
 
+	// Waiting session reminder — re-notifies if a session stays in waiting state
+	snoozedSessions := make(map[string]time.Time) // session ID -> snooze until
+	if cfg.Notifications.ReminderMinutes > 0 {
+		reminderInterval := time.Duration(cfg.Notifications.ReminderMinutes) * time.Minute
+		go func() {
+			ticker := time.NewTicker(30 * time.Second) // check every 30s
+			defer ticker.Stop()
+			for range ticker.C {
+				for _, s := range mgr.List() {
+					if s.GetState() != session.StateWaiting {
+						// Clear snooze when session is no longer waiting
+						delete(snoozedSessions, s.ID)
+						continue
+					}
+					// Check if snoozed
+					if until, ok := snoozedSessions[s.ID]; ok && time.Now().Before(until) {
+						continue
+					}
+					// Check if waiting long enough
+					// Use last state change time approximation: if session is waiting
+					// and we haven't reminded recently, fire a reminder
+					snoozedSessions[s.ID] = time.Now().Add(reminderInterval)
+					event := notification.SessionEvent{
+						SessionID: s.ID,
+						Type:      notification.EventWaiting,
+						Timestamp: time.Now(),
+						Message:   s.Name + " is still waiting for your input",
+					}
+					bus.Publish(event)
+					if st != nil {
+						st.SaveNotification(store.NotificationRecord{
+							SessionID: s.ID,
+							EventType: "waiting",
+							Timestamp: time.Now(),
+						})
+					}
+				}
+			}
+		}()
+	}
+
 	srv := server.New(cfg, mgr, bus, sink, st)
+
+	// Expose snooze function to the server for the snooze API
+	srv.SetSnoozeFunc(func(sessionID string, minutes int) {
+		snoozedSessions[sessionID] = time.Now().Add(time.Duration(minutes) * time.Minute)
+	})
+
 	httpServer := &http.Server{Addr: srv.Addr(), Handler: srv.Handler()}
 
 	done := make(chan os.Signal, 1)

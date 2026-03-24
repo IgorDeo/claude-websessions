@@ -10,6 +10,7 @@ type SettingsData struct {
 	NotifCompleted   bool
 	NotifErrored     bool
 	NotifWaiting     bool
+	ReminderMinutes  int
 	HooksInstalled   bool
 	SystemdInstalled bool
 	SystemdActive    bool
@@ -104,6 +105,11 @@ templ Settings(data SettingsData) {
 									Waiting for Input
 								</label>
 							</div>
+						</div>
+						<div class="settings-row">
+							<label for="reminder_minutes">Reminder interval (minutes)</label>
+							<input type="number" id="reminder_minutes" name="reminder_minutes" value={ itoa(data.ReminderMinutes) } min="0" placeholder="5"/>
+							<span class="settings-hint">0 = disabled. Re-notifies if a session waits without action.</span>
 						</div>
 					</div>
 					<div class="settings-actions">

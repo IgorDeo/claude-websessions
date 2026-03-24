@@ -811,6 +811,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		OutputBufferSize: s.cfg.Sessions.OutputBufferRaw,
 		DefaultDir:       s.cfg.Sessions.DefaultDir,
 		DesktopNotifs:    s.cfg.Notifications.Desktop,
+		ReminderMinutes: s.cfg.Notifications.ReminderMinutes,
 	}
 	// Check which events are enabled
 	for _, e := range s.cfg.Notifications.Events {
@@ -863,6 +864,7 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		events = append(events, "waiting")
 	}
 	s.cfg.Notifications.Events = events
+	s.cfg.Notifications.ReminderMinutes, _ = strconv.Atoi(r.FormValue("reminder_minutes"))
 
 	// If port or host changed, uninstall hooks (they contain the old URL)
 	if s.cfg.Server.Port != oldPort || s.cfg.Server.Host != oldHost {

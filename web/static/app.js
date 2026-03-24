@@ -1117,6 +1117,17 @@ window.websessions = (function() {
     }
   }
 
+  function snoozeNotification(id, sessionID) {
+    fetch('/notifications/snooze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionID, minutes: 15 }),
+    }).then(function() {
+      // Dismiss the notification from the panel
+      dismissNotification(id);
+    });
+  }
+
   function dismissNotification(id) {
     fetch('/notifications/' + id + '/read', { method: 'POST' })
       .then(function() {
@@ -1349,6 +1360,7 @@ window.websessions = (function() {
     getNotifSoundsEnabled: getNotifSoundsEnabled,
     testNotifSound: testNotifSound,
     dismissNotification: dismissNotification,
+    snoozeNotification: snoozeNotification,
     clearAllNotifications: clearAllNotifications,
     switchSidebarTab: switchSidebarTab,
     manageHooks: manageHooks,

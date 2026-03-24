@@ -30,8 +30,9 @@ type SessionsConfig struct {
 }
 
 type NotificationsConfig struct {
-	Desktop bool     `yaml:"desktop"`
-	Events  []string `yaml:"events"`
+	Desktop         bool     `yaml:"desktop"`
+	Events          []string `yaml:"events"`
+	ReminderMinutes int      `yaml:"reminder_minutes"`
 }
 
 
@@ -43,7 +44,7 @@ func defaults() *Config {
 			OutputBufferSize: 10 * 1024 * 1024, OutputBufferRaw: "10MB",
 			DefaultDir: "~/projects",
 		},
-		Notifications: NotificationsConfig{Desktop: true, Events: []string{"completed", "errored", "waiting"}},
+		Notifications: NotificationsConfig{Desktop: true, Events: []string{"completed", "errored", "waiting"}, ReminderMinutes: 5},
 	}
 }
 

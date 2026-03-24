@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"net/http"
@@ -14,15 +15,20 @@ import (
 	"github.com/igor-deoalves/websessions/web"
 )
 
+type SnoozeFunc func(sessionID string, minutes int)
+
 type Server struct {
-	cfg     *config.Config
-	mgr     *session.Manager
-	bus     *notification.Bus
-	sink    *notification.InAppSink
-	store   *store.Store
-	hub     *wsHub
-	handler http.Handler
+	cfg       *config.Config
+	mgr       *session.Manager
+	bus       *notification.Bus
+	sink      *notification.InAppSink
+	store     *store.Store
+	hub       *wsHub
+	handler   http.Handler
+	snoozeFn  SnoozeFunc
 }
+
+func (s *Server) SetSnoozeFunc(fn SnoozeFunc) { s.snoozeFn = fn }
 
 func New(cfg *config.Config, mgr *session.Manager, bus *notification.Bus, sink *notification.InAppSink, st ...*store.Store) *Server {
 	s := &Server{cfg: cfg, mgr: mgr, bus: bus, sink: sink, hub: newWSHub()}
@@ -89,6 +95,24 @@ func (s *Server) routes() http.Handler {
 	r.Get("/ws/notifications", s.handleNotificationWS)
 	r.Get("/ws/{sessionID}", func(w http.ResponseWriter, r *http.Request) {
 		s.handleWS(w, r, chi.URLParam(r, "sessionID"), s.mgr)
+	})
+	r.Post("/notifications/snooze", func(w http.ResponseWriter, r *http.Request) {
+		var payload struct {
+			SessionID string `json:"session_id"`
+			Minutes   int    `json:"minutes"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+		if payload.Minutes <= 0 {
+			payload.Minutes = 15
+		}
+		if s.snoozeFn != nil {
+			s.snoozeFn(payload.SessionID, payload.Minutes)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"ok": true, "minutes": payload.Minutes})
 	})
 	r.Post("/notifications/clear", func(w http.ResponseWriter, r *http.Request) {
 		if s.store != nil {
