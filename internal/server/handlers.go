@@ -375,18 +375,9 @@ func (s *Server) handleKillSession(w http.ResponseWriter, r *http.Request, sessi
 		http.Error(w, "session not found", http.StatusNotFound)
 		return
 	}
-	state := sess.GetState()
 	sess.Killed = true
-	if state == session.StateRunning || state == session.StateWaiting || state == session.StateCreated {
-		if err := s.mgr.Kill(sessionID); err != nil {
-			slog.Error("kill failed", "session", sessionID, "error", err)
-			http.Error(w, "failed to kill session: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-		// Wait for process to finish
-		go s.mgr.Wait(sessionID)
-	}
-	// Save final state to SQLite before removing
+
+	// Save to SQLite as killed
 	if s.store != nil {
 		s.store.SaveSession(store.SessionRecord{
 			ID: sess.ID, Name: sess.Name, ClaudeID: sess.ClaudeID, WorkDir: sess.WorkDir,
@@ -394,8 +385,10 @@ func (s *Server) handleKillSession(w http.ResponseWriter, r *http.Request, sessi
 			ExitCode: -1, Status: "killed", PID: sess.PID,
 		})
 	}
-	// For offline/discovered, remove from active list
-	if state == session.StateOffline || state == session.StateDiscovered {
+
+	// Kill handles: stop reader, kill tmux, fire state change, remove from manager
+	if err := s.mgr.Kill(sessionID); err != nil {
+		// For sessions without tmux (offline/discovered), just remove
 		s.mgr.Remove(sessionID)
 	}
 	w.WriteHeader(http.StatusOK)

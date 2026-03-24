@@ -261,7 +261,7 @@ func statePriority(s State) int {
 	}
 }
 
-// Kill kills a session's tmux session.
+// Kill kills a session's tmux session and removes it from the manager.
 func (m *Manager) Kill(id string) error {
 	s, ok := m.Get(id)
 	if !ok {
@@ -269,9 +269,23 @@ func (m *Manager) Kill(id string) error {
 	}
 	m.stopReader(id)
 	if s.TmuxSession != "" {
-		return tmuxKillSession(s.TmuxSession)
+		tmuxKillSession(s.TmuxSession)
 	}
-	return fmt.Errorf("session %s has no tmux session", id)
+	// Set terminal state
+	from := s.GetState()
+	s.mu.Lock()
+	s.EndTime = time.Now()
+	if s.Killed {
+		s.State = StateErrored // will be saved as "killed" by the handler
+	} else {
+		s.State = StateErrored
+	}
+	s.mu.Unlock()
+	if m.onStateChange != nil {
+		m.onStateChange(s, from, s.GetState())
+	}
+	m.Remove(id)
+	return nil
 }
 
 func (m *Manager) AddDiscovered(id, claudeID, workDir string, pid int, startTime time.Time) *Session {
