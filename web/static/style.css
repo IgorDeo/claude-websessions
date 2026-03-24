@@ -8,6 +8,7 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
+  font-size: 210%;
   /* Palette — refined Tokyo Night with more depth */
   --bg-primary: #13141c;
   --bg-secondary: #1a1c27;
@@ -96,7 +97,6 @@ html, body {
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: var(--font-sans);
-  font-size: 210%;
   font-size: 13px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
