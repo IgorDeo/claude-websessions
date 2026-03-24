@@ -1206,7 +1206,13 @@ window.websessions = (function() {
   });
 
   // Also apply on initial page load
-  document.addEventListener('DOMContentLoaded', function() { applySessionOrder(); restoreSidebarTab(); });
+  document.addEventListener('DOMContentLoaded', function() {
+    applySessionOrder();
+    restoreSidebarTab();
+    // Restore notification sounds toggle on settings page
+    var cb = document.getElementById('notif-sounds-toggle');
+    if (cb) cb.checked = getNotifSoundsEnabled();
+  });
 
   // Global notification WebSocket
   var notifWs = null;

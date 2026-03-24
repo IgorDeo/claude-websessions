@@ -72,13 +72,6 @@ templ Settings(data SettingsData) {
 								<button type="button" class="btn-sound" onclick="window.websessions.testNotifSound('errored')" title="Test error sound">&#9835; Error</button>
 							</div>
 						</div>
-						<script>
-							// Restore sound toggle state from localStorage
-							(function() {
-								var cb = document.getElementById('notif-sounds-toggle');
-								if (cb) cb.checked = window.websessions.getNotifSoundsEnabled();
-							})();
-						</script>
 						<div class="settings-row">
 							<span class="settings-sublabel">Notify on:</span>
 							<div class="checkbox-group">
