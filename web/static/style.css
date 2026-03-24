@@ -8,7 +8,7 @@
 *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
 :root {
-  font-size: 210%;
+  font-size: 130%;
   /* Palette — refined Tokyo Night with more depth */
   --bg-primary: #13141c;
   --bg-secondary: #1a1c27;
