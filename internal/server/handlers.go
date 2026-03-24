@@ -29,7 +29,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		views[i] = sessionToView(sess)
 	}
 	data := templates.PageData{Sessions: views, UnreadCount: s.sink.UnreadCount()}
-	// History is loaded by sidebar via htmx, not needed for initial render
+	data.History = s.loadHistory(views)
 	templates.Index(data).Render(r.Context(), w)
 }
 
@@ -39,33 +39,35 @@ func (s *Server) handleSidebar(w http.ResponseWriter, r *http.Request) {
 	for i, sess := range sessions {
 		views[i] = sessionToView(sess)
 	}
+	templates.Sidebar(views, s.loadHistory(views)).Render(r.Context(), w)
+}
 
-	// Load history from SQLite (completed/errored sessions not in active list)
-	var history []templates.SessionView
-	if s.store != nil {
-		records, _ := s.store.ListSessions(20)
-		activeIDs := make(map[string]bool)
-		for _, v := range views {
-			activeIDs[v.ID] = true
-		}
-		for _, rec := range records {
-			if activeIDs[rec.ID] {
-				continue
-			}
-			name := rec.Name
-			if name == "" {
-				name = rec.ID
-			}
-			history = append(history, templates.SessionView{
-				ID:      rec.ID,
-				Name:    name,
-				WorkDir: rec.WorkDir,
-				State:   rec.Status,
-			})
-		}
+func (s *Server) loadHistory(activeViews []templates.SessionView) []templates.SessionView {
+	if s.store == nil {
+		return nil
 	}
-
-	templates.Sidebar(views, history).Render(r.Context(), w)
+	records, _ := s.store.ListSessions(20)
+	activeIDs := make(map[string]bool)
+	for _, v := range activeViews {
+		activeIDs[v.ID] = true
+	}
+	var history []templates.SessionView
+	for _, rec := range records {
+		if activeIDs[rec.ID] {
+			continue
+		}
+		name := rec.Name
+		if name == "" {
+			name = rec.ID
+		}
+		history = append(history, templates.SessionView{
+			ID:      rec.ID,
+			Name:    name,
+			WorkDir: rec.WorkDir,
+			State:   rec.Status,
+		})
+	}
+	return history
 }
 
 func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
