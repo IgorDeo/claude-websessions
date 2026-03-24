@@ -133,9 +133,11 @@ func Install(baseURL string) error {
 }
 
 func addHook(hooks map[string]interface{}, event, matcher, baseURL, eventType string) {
+	// Claude Code hooks receive JSON on stdin with session_id and cwd.
+	// We read stdin, extract fields with python, and POST to websessions.
 	cmd := fmt.Sprintf(
-		`curl -s -X POST %s/api/hook -H "Content-Type: application/json" -d '{"event":"%s","session_id":"'$CLAUDE_SESSION_ID'","project":"'$CLAUDE_PROJECT_DIR'"}' # %s`,
-		baseURL, eventType, hookMarker,
+		`python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps({'event':'%s','session_id':d.get('session_id',''),'project':d.get('cwd',d.get('project',''))}))" | curl -s -X POST %s/api/hook -H "Content-Type: application/json" -d @- # %s`,
+		eventType, baseURL, hookMarker,
 	)
 
 	entry := map[string]interface{}{
@@ -193,8 +195,8 @@ func (s *ClaudeSettings) updateHookURLs(baseURL string) {
 						eventType = "tool_use"
 					}
 					hMap["command"] = fmt.Sprintf(
-						`curl -s -X POST %s/api/hook -H "Content-Type: application/json" -d '{"event":"%s","session_id":"'$CLAUDE_SESSION_ID'","project":"'$CLAUDE_PROJECT_DIR'"}' # %s`,
-						baseURL, eventType, hookMarker,
+						`python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps({'event':'%s','session_id':d.get('session_id',''),'project':d.get('cwd',d.get('project',''))}))" | curl -s -X POST %s/api/hook -H "Content-Type: application/json" -d @- # %s`,
+						eventType, baseURL, hookMarker,
 					)
 				}
 			}

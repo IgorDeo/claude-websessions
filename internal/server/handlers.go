@@ -597,18 +597,31 @@ func (s *Server) handleHookCallback(w http.ResponseWriter, r *http.Request) {
 		eventType = notification.EventType(payload.Event)
 	}
 
+	// Map the hook's project path to a websessions session ID
+	// The hook sends Claude's internal UUID as session_id and the cwd as project.
+	// We need to find our session that matches the working directory.
+	resolvedSessionID := payload.SessionID
+	resolvedSessionName := filepath.Base(payload.Project)
+	for _, sess := range s.mgr.List() {
+		if sess.WorkDir == payload.Project {
+			resolvedSessionID = sess.ID
+			resolvedSessionName = sess.Name
+			break
+		}
+	}
+
 	event := notification.SessionEvent{
-		SessionID: payload.SessionID,
+		SessionID: resolvedSessionID,
 		Type:      eventType,
 		Timestamp: time.Now(),
-		Message:   "Hook: " + payload.Event + " in " + filepath.Base(payload.Project),
+		Message:   "Hook: " + payload.Event + " in " + resolvedSessionName,
 	}
 	s.bus.Publish(event)
 
-	// Also persist to store
+	// Persist to store
 	if s.store != nil {
 		s.store.SaveNotification(store.NotificationRecord{
-			SessionID: payload.SessionID,
+			SessionID: resolvedSessionID,
 			EventType: string(eventType),
 			Timestamp: time.Now(),
 		})
