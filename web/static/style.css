@@ -692,6 +692,28 @@ html, body {
 .update-release-link { font-size: 0.72rem; color: var(--accent); text-decoration: none; }
 .update-release-link:hover { text-decoration: underline; }
 
+/* Doctor / System Health */
+.doctor-section h3 { border-bottom-color: var(--accent) !important; }
+.doctor-grid { display: flex; flex-direction: column; gap: 0.35rem; }
+.doctor-item {
+  display: flex; align-items: flex-start; gap: 0.6rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-input);
+  border-left: 3px solid transparent;
+}
+.doctor-ok { border-left-color: var(--green); }
+.doctor-missing { border-left-color: var(--red); background: var(--red-glow); }
+.doctor-warning { border-left-color: var(--yellow); }
+.doctor-icon { font-size: 0.8rem; flex-shrink: 0; width: 1.1rem; text-align: center; padding-top: 0.05rem; }
+.doctor-ok .doctor-icon { color: var(--green); }
+.doctor-missing .doctor-icon { color: var(--red); }
+.doctor-warning .doctor-icon { color: var(--yellow); }
+.doctor-info { display: flex; flex-direction: column; gap: 0.05rem; overflow: hidden; }
+.doctor-name { font-family: var(--font-mono); font-size: 0.78rem; font-weight: 600; color: var(--text-primary); }
+.doctor-version { font-size: 0.68rem; color: var(--text-secondary); font-family: var(--font-mono); }
+.doctor-detail { font-size: 0.65rem; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* ============================================================
    Responsive
    ============================================================ */

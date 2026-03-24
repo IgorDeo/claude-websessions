@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/igor-deoalves/websessions/internal/doctor"
 	"github.com/igor-deoalves/websessions/internal/discovery"
 	"github.com/igor-deoalves/websessions/internal/hooks"
 	"github.com/igor-deoalves/websessions/internal/updater"
@@ -915,6 +916,13 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	data.SystemdActive = service.IsActive()
 	data.SystemdEnabled = service.IsEnabled()
 	data.SystemdStatus = service.Status()
+	// Run doctor checks
+	checks := doctor.RunChecks()
+	for _, c := range checks {
+		data.Doctor = append(data.Doctor, templates.DoctorCheck{
+			Name: c.Name, Status: c.Status, Version: c.Version, Detail: c.Detail,
+		})
+	}
 	templates.Settings(data).Render(r.Context(), w)
 }
 

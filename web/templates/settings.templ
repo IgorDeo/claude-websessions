@@ -17,6 +17,14 @@ type SettingsData struct {
 	SystemdEnabled   bool
 	SystemdStatus    string
 	Version          string
+	Doctor           []DoctorCheck
+}
+
+type DoctorCheck struct {
+	Name    string
+	Status  string // "ok", "missing", "warning"
+	Version string
+	Detail  string
 }
 
 templ Settings(data SettingsData) {
@@ -26,6 +34,35 @@ templ Settings(data SettingsData) {
 				<h1 class="topbar-title"><a href="/" class="topbar-link">websessions</a> / Settings</h1>
 			</header>
 			<div class="settings-page">
+				<div class="settings-section doctor-section">
+					<h3>System Health</h3>
+					<div class="doctor-grid">
+						for _, check := range data.Doctor {
+							<div class={ "doctor-item", "doctor-" + check.Status }>
+								<div class="doctor-icon">
+									if check.Status == "ok" {
+										<span>&#10003;</span>
+									}
+									if check.Status == "missing" {
+										<span>&#10007;</span>
+									}
+									if check.Status == "warning" {
+										<span>&#9888;</span>
+									}
+								</div>
+								<div class="doctor-info">
+									<span class="doctor-name">{ check.Name }</span>
+									if check.Version != "" {
+										<span class="doctor-version">{ check.Version }</span>
+									}
+									if check.Detail != "" {
+										<span class="doctor-detail">{ check.Detail }</span>
+									}
+								</div>
+							</div>
+						}
+					</div>
+				</div>
 				<form id="settings-form" method="POST" action="/settings">
 					<div class="settings-section">
 						<h3>Server</h3>
