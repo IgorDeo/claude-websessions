@@ -8,11 +8,11 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/igor-deoalves/websessions/internal/config"
-	"github.com/igor-deoalves/websessions/internal/notification"
-	"github.com/igor-deoalves/websessions/internal/session"
-	"github.com/igor-deoalves/websessions/internal/store"
-	"github.com/igor-deoalves/websessions/web"
+	"github.com/IgorDeo/claude-websessions/internal/config"
+	"github.com/IgorDeo/claude-websessions/internal/notification"
+	"github.com/IgorDeo/claude-websessions/internal/session"
+	"github.com/IgorDeo/claude-websessions/internal/store"
+	"github.com/IgorDeo/claude-websessions/web"
 )
 
 type SnoozeFunc func(sessionID string, minutes int)

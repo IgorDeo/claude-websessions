@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/igor-deoalves/websessions/internal/session"
+	"github.com/IgorDeo/claude-websessions/internal/session"
 )
 
 func TestManager_CreateSession(t *testing.T) {

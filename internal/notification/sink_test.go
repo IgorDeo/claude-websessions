@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/igor-deoalves/websessions/internal/notification"
+	"github.com/IgorDeo/claude-websessions/internal/notification"
 )
 
 func TestInAppSink_StoresEvents(t *testing.T) {

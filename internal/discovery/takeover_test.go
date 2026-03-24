@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/igor-deoalves/websessions/internal/discovery"
+	"github.com/IgorDeo/claude-websessions/internal/discovery"
 )
 
 func TestKillProcess(t *testing.T) {

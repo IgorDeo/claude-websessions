@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/igor-deoalves/websessions/internal/config"
-	"github.com/igor-deoalves/websessions/internal/notification"
-	"github.com/igor-deoalves/websessions/internal/server"
-	"github.com/igor-deoalves/websessions/internal/session"
+	"github.com/IgorDeo/claude-websessions/internal/config"
+	"github.com/IgorDeo/claude-websessions/internal/notification"
+	"github.com/IgorDeo/claude-websessions/internal/server"
+	"github.com/IgorDeo/claude-websessions/internal/session"
 )
 
 func TestIntegration_CreateSessionAndStream(t *testing.T) {

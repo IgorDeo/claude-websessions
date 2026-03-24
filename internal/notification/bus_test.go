@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/igor-deoalves/websessions/internal/notification"
+	"github.com/IgorDeo/claude-websessions/internal/notification"
 )
 
 func TestBus_SubscribeAndPublish(t *testing.T) {

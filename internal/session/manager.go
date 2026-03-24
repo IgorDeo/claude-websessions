@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/creack/pty"
-	"github.com/igor-deoalves/websessions/internal/discovery"
+	"github.com/IgorDeo/claude-websessions/internal/discovery"
 )
 
 type StateChangeFunc func(s *Session, from, to State)

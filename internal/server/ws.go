@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/igor-deoalves/websessions/internal/session"
+	"github.com/IgorDeo/claude-websessions/internal/session"
 )
 
 var upgrader = websocket.Upgrader{

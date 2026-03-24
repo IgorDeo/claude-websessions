@@ -14,15 +14,15 @@ import (
 	"strings"
 	"time"
 
-	"github.com/igor-deoalves/websessions/internal/doctor"
-	"github.com/igor-deoalves/websessions/internal/discovery"
-	"github.com/igor-deoalves/websessions/internal/hooks"
-	"github.com/igor-deoalves/websessions/internal/updater"
-	"github.com/igor-deoalves/websessions/internal/service"
-	"github.com/igor-deoalves/websessions/internal/notification"
-	"github.com/igor-deoalves/websessions/internal/session"
-	"github.com/igor-deoalves/websessions/internal/store"
-	"github.com/igor-deoalves/websessions/web/templates"
+	"github.com/IgorDeo/claude-websessions/internal/doctor"
+	"github.com/IgorDeo/claude-websessions/internal/discovery"
+	"github.com/IgorDeo/claude-websessions/internal/hooks"
+	"github.com/IgorDeo/claude-websessions/internal/updater"
+	"github.com/IgorDeo/claude-websessions/internal/service"
+	"github.com/IgorDeo/claude-websessions/internal/notification"
+	"github.com/IgorDeo/claude-websessions/internal/session"
+	"github.com/IgorDeo/claude-websessions/internal/store"
+	"github.com/IgorDeo/claude-websessions/web/templates"
 )
 
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {

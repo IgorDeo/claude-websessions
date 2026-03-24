@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/igor-deoalves/websessions/internal/config"
+	"github.com/IgorDeo/claude-websessions/internal/config"
 )
 
 func TestLoadDefaults(t *testing.T) {

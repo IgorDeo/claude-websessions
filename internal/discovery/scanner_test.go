@@ -3,7 +3,7 @@ package discovery_test
 import (
 	"testing"
 
-	"github.com/igor-deoalves/websessions/internal/discovery"
+	"github.com/IgorDeo/claude-websessions/internal/discovery"
 )
 
 func TestParseProcessInfo(t *testing.T) {

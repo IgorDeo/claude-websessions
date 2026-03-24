@@ -1,4 +1,4 @@
-module github.com/igor-deoalves/websessions
+module github.com/IgorDeo/claude-websessions
 
 go 1.26.1
 

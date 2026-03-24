@@ -10,12 +10,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/igor-deoalves/websessions/internal/config"
-	"github.com/igor-deoalves/websessions/internal/discovery"
-	"github.com/igor-deoalves/websessions/internal/notification"
-	"github.com/igor-deoalves/websessions/internal/server"
-	"github.com/igor-deoalves/websessions/internal/session"
-	"github.com/igor-deoalves/websessions/internal/store"
+	"github.com/IgorDeo/claude-websessions/internal/config"
+	"github.com/IgorDeo/claude-websessions/internal/discovery"
+	"github.com/IgorDeo/claude-websessions/internal/notification"
+	"github.com/IgorDeo/claude-websessions/internal/server"
+	"github.com/IgorDeo/claude-websessions/internal/session"
+	"github.com/IgorDeo/claude-websessions/internal/store"
 )
 
 

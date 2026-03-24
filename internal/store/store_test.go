@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/igor-deoalves/websessions/internal/store"
+	"github.com/IgorDeo/claude-websessions/internal/store"
 )
 
 func TestStore_SaveAndListSessions(t *testing.T) {

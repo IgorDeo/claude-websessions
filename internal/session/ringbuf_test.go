@@ -3,7 +3,7 @@ package session_test
 import (
 	"testing"
 
-	"github.com/igor-deoalves/websessions/internal/session"
+	"github.com/IgorDeo/claude-websessions/internal/session"
 )
 
 func TestRingBuf_WriteAndRead(t *testing.T) {
