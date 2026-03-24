@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -129,7 +130,11 @@ func (s *Server) handleCreateTerminal(w http.ResponseWriter, r *http.Request) {
 	// Use the user's default shell
 	shell := os.Getenv("SHELL")
 	if shell == "" {
-		shell = "bash"
+		if runtime.GOOS == "darwin" {
+			shell = "/bin/zsh"
+		} else {
+			shell = "/bin/bash"
+		}
 	}
 
 	sess, err := s.mgr.Create("term-"+name, workDir, shell, nil)
@@ -712,8 +717,8 @@ func (s *Server) handleHookCallback(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleSystemd manages the systemd user service.
-func (s *Server) handleSystemd(w http.ResponseWriter, r *http.Request) {
+// handleService manages the background service (systemd on Linux, launchd on macOS).
+func (s *Server) handleService(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
 		Action string `json:"action"`
 	}
@@ -753,7 +758,7 @@ func (s *Server) handleSystemd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		slog.Error("systemd action failed", "action", payload.Action, "error", err)
+		slog.Error("service action failed", "action", payload.Action, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -904,11 +909,12 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		data.HooksInstalled = claudeSettings.IsInstalled()
 	}
-	// Check systemd status
-	data.SystemdInstalled = service.IsInstalled()
-	data.SystemdActive = service.IsActive()
-	data.SystemdEnabled = service.IsEnabled()
-	data.SystemdStatus = service.Status()
+	// Check service status (systemd on Linux, launchd on macOS)
+	data.ServiceInstalled = service.IsInstalled()
+	data.ServiceActive = service.IsActive()
+	data.ServiceEnabled = service.IsEnabled()
+	data.ServiceStatus = service.Status()
+	data.ServiceName = service.Name()
 	// Run doctor checks
 	checks := doctor.RunChecks()
 	for _, c := range checks {

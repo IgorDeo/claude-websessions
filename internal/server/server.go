@@ -63,7 +63,7 @@ func (s *Server) routes() http.Handler {
 	r.Post("/settings/hooks", s.handleInstallHooks)
 	r.Get("/api/check-update", s.handleCheckUpdate)
 	r.Post("/api/self-update", s.handleSelfUpdate)
-	r.Post("/settings/systemd", s.handleSystemd)
+	r.Post("/settings/service", s.handleService)
 	r.Get("/sidebar", s.handleSidebar)
 	r.Get("/notifications", s.handleNotifications)
 

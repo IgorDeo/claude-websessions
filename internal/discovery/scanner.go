@@ -113,20 +113,45 @@ func scanLinux() ([]ProcessInfo, error) {
 }
 
 func scanDarwin() ([]ProcessInfo, error) {
-	out, err := exec.Command("ps", "aux").Output()
+	// Use stable two-field format to find candidate PIDs
+	out, err := exec.Command("ps", "-eo", "pid,comm").Output()
 	if err != nil { return nil, fmt.Errorf("running ps: %w", err) }
 	var results []ProcessInfo
 	lines := strings.Split(string(out), "\n")
 	for _, line := range lines[1:] {
 		fields := strings.Fields(line)
-		if len(fields) < 11 { continue }
-		pid, err := strconv.Atoi(fields[1])
+		if len(fields) < 2 { continue }
+		if !IsClaudeBinary(fields[1]) { continue }
+		pid, err := strconv.Atoi(fields[0])
 		if err != nil { continue }
-		command := strings.Join(fields[10:], " ")
-		info, err := ParseCmdline(command)
+
+		// Get full command line for this PID
+		cmdOut, err := exec.Command("ps", "-o", "command=", "-p", strconv.Itoa(pid)).Output()
+		if err != nil { continue }
+		cmdline := strings.TrimSpace(string(cmdOut))
+		info, err := ParseCmdline(cmdline)
 		if err != nil { continue }
 		info.PID = pid
+
+		// Get working directory via lsof (standard on macOS)
+		info.WorkDir = darwinCwd(pid)
+
+		if info.ClaudeID == "" && info.WorkDir != "" {
+			info.ClaudeID = ResolveClaudeSessionID(info.WorkDir)
+		}
 		results = append(results, *info)
 	}
 	return results, nil
+}
+
+// darwinCwd returns the current working directory of a process on macOS using lsof.
+func darwinCwd(pid int) string {
+	out, err := exec.Command("lsof", "-a", "-p", strconv.Itoa(pid), "-d", "cwd", "-Fn").Output()
+	if err != nil { return "" }
+	for _, line := range strings.Split(string(out), "\n") {
+		if strings.HasPrefix(line, "n") && len(line) > 1 {
+			return line[1:]
+		}
+	}
+	return ""
 }
