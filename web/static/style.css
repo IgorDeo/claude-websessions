@@ -181,7 +181,7 @@ html, body { height: 100%; background: var(--bg-primary); color: var(--text-prim
 .checkbox-group { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; }
 .settings-sublabel { font-size: 0.8rem; color: var(--text-secondary); min-width: 160px; flex-shrink: 0; }
 .settings-actions { display: flex; justify-content: flex-end; gap: 0.5rem; margin-top: 1rem; }
-.settings-note { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.75rem; text-align: right; }
+.settings-note { font-size: 0.75rem; color: var(--text-muted); margin-top: 0.75rem; margin-bottom: 1.5rem; text-align: right; }
 .hooks-description { font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem; line-height: 1.4; }
 .hooks-description code { background: var(--bg-primary); padding: 0.1rem 0.3rem; border-radius: 2px; font-size: 0.75rem; }
 .hooks-status { gap: 0.5rem; }
