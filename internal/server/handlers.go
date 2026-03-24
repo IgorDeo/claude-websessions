@@ -507,8 +507,6 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		OutputBufferSize: s.cfg.Sessions.OutputBufferRaw,
 		DefaultDir:       s.cfg.Sessions.DefaultDir,
 		DesktopNotifs:    s.cfg.Notifications.Desktop,
-		AuthEnabled:      s.cfg.Auth.Enabled,
-		AuthToken:        s.cfg.Auth.Token,
 	}
 	// Check which events are enabled
 	for _, e := range s.cfg.Notifications.Events {
@@ -553,11 +551,6 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 		events = append(events, "waiting")
 	}
 	s.cfg.Notifications.Events = events
-
-	s.cfg.Auth.Enabled = r.FormValue("auth_enabled") == "on"
-	if token := r.FormValue("auth_token"); token != "" {
-		s.cfg.Auth.Token = token
-	}
 
 	// Save config to disk
 	if err := s.cfg.Save(); err != nil {

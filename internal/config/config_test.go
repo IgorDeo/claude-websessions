@@ -57,21 +57,7 @@ auth:
 	if cfg.Server.Port != 9090 {
 		t.Errorf("expected port 9090, got %d", cfg.Server.Port)
 	}
-	if cfg.Auth.Token != "secret123" {
-		t.Errorf("expected token secret123, got %s", cfg.Auth.Token)
-	}
 	if cfg.Sessions.OutputBufferSize != 5*1024*1024 {
 		t.Errorf("expected buffer 5MB, got %d", cfg.Sessions.OutputBufferSize)
-	}
-}
-
-func TestLoadFromEnvOverride(t *testing.T) {
-	t.Setenv("WEBSESSIONS_AUTH_TOKEN", "envtoken")
-	cfg, err := config.Load("")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if cfg.Auth.Token != "envtoken" {
-		t.Errorf("expected token envtoken, got %s", cfg.Auth.Token)
 	}
 }

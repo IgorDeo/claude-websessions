@@ -43,61 +43,63 @@ func (s *Server) Addr() string {
 
 func (s *Server) routes() http.Handler {
 	r := chi.NewRouter()
-	// Static files (no auth)
+	// Static files
 	staticFS, _ := fs.Sub(web.Static, "static")
 	r.Handle("/static/*", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
-	// All other routes in auth group
-	r.Group(func(r chi.Router) {
-		if s.cfg.Auth.Enabled && s.cfg.Auth.Token != "" {
-			r.Use(authMiddleware(s.cfg.Auth.Token))
+
+	// Pages
+	r.Get("/", s.handleIndex)
+	r.Get("/settings", s.handleSettings)
+	r.Post("/settings", s.handleSaveSettings)
+	r.Post("/settings/hooks", s.handleInstallHooks)
+	r.Get("/sidebar", s.handleSidebar)
+	r.Get("/notifications", s.handleNotifications)
+
+	// APIs
+	r.Post("/api/hook", s.handleHookCallback)
+	r.Get("/api/dirs", s.handleListDirs)
+	r.Get("/api/recent", s.handleRecentProjects)
+	r.Get("/api/sessions", s.handleListSessions)
+	r.Get("/api/claude-sessions", s.handleClaudeSessions)
+
+	// Sessions
+	r.Get("/sessions/new", s.handleNewSessionModal)
+	r.Post("/sessions", s.handleCreateSession)
+	r.Post("/sessions/{sessionID}/open", func(w http.ResponseWriter, r *http.Request) {
+		s.handleOpenSession(w, r, chi.URLParam(r, "sessionID"))
+	})
+	r.Post("/sessions/{sessionID}/rename", func(w http.ResponseWriter, r *http.Request) {
+		s.handleRenameSession(w, r, chi.URLParam(r, "sessionID"))
+	})
+	r.Get("/sessions/{sessionID}/diff", func(w http.ResponseWriter, r *http.Request) {
+		s.handleGitDiff(w, r, chi.URLParam(r, "sessionID"))
+	})
+	r.Post("/sessions/{sessionID}/kill", func(w http.ResponseWriter, r *http.Request) {
+		s.handleKillSession(w, r, chi.URLParam(r, "sessionID"))
+	})
+	r.Post("/sessions/{sessionID}/restart", func(w http.ResponseWriter, r *http.Request) {
+		s.handleRestartSession(w, r, chi.URLParam(r, "sessionID"))
+	})
+	r.Post("/sessions/{sessionID}/takeover", func(w http.ResponseWriter, r *http.Request) {
+		s.handleTakeover(w, r, chi.URLParam(r, "sessionID"))
+	})
+
+	// WebSocket
+	r.Get("/ws/notifications", s.handleNotificationWS)
+	r.Get("/ws/{sessionID}", func(w http.ResponseWriter, r *http.Request) {
+		s.handleWS(w, r, chi.URLParam(r, "sessionID"), s.mgr)
+	})
+	r.Post("/notifications/{id}/read", func(w http.ResponseWriter, r *http.Request) {
+		idStr := chi.URLParam(r, "id")
+		id, err := strconv.ParseInt(idStr, 10, 64)
+		if err != nil {
+			http.Error(w, "invalid id", http.StatusBadRequest)
+			return
 		}
-		r.Get("/", s.handleIndex)
-		r.Get("/settings", s.handleSettings)
-		r.Post("/settings", s.handleSaveSettings)
-		r.Post("/settings/hooks", s.handleInstallHooks)
-		r.Post("/api/hook", s.handleHookCallback)
-		r.Get("/sidebar", s.handleSidebar)
-		r.Get("/notifications", s.handleNotifications)
-		r.Get("/api/dirs", s.handleListDirs)
-		r.Get("/api/recent", s.handleRecentProjects)
-		r.Get("/api/sessions", s.handleListSessions)
-		r.Get("/api/claude-sessions", s.handleClaudeSessions)
-		r.Get("/sessions/new", s.handleNewSessionModal)
-		r.Post("/sessions", s.handleCreateSession)
-		r.Post("/sessions/{sessionID}/open", func(w http.ResponseWriter, r *http.Request) {
-			s.handleOpenSession(w, r, chi.URLParam(r, "sessionID"))
-		})
-		r.Post("/sessions/{sessionID}/rename", func(w http.ResponseWriter, r *http.Request) {
-			s.handleRenameSession(w, r, chi.URLParam(r, "sessionID"))
-		})
-		r.Get("/sessions/{sessionID}/diff", func(w http.ResponseWriter, r *http.Request) {
-			s.handleGitDiff(w, r, chi.URLParam(r, "sessionID"))
-		})
-		r.Post("/sessions/{sessionID}/kill", func(w http.ResponseWriter, r *http.Request) {
-			s.handleKillSession(w, r, chi.URLParam(r, "sessionID"))
-		})
-		r.Post("/sessions/{sessionID}/restart", func(w http.ResponseWriter, r *http.Request) {
-			s.handleRestartSession(w, r, chi.URLParam(r, "sessionID"))
-		})
-		r.Post("/sessions/{sessionID}/takeover", func(w http.ResponseWriter, r *http.Request) {
-			s.handleTakeover(w, r, chi.URLParam(r, "sessionID"))
-		})
-		r.Get("/ws/notifications", s.handleNotificationWS)
-		r.Get("/ws/{sessionID}", func(w http.ResponseWriter, r *http.Request) {
-			s.handleWS(w, r, chi.URLParam(r, "sessionID"), s.mgr)
-		})
-		r.Post("/notifications/{id}/read", func(w http.ResponseWriter, r *http.Request) {
-			idStr := chi.URLParam(r, "id")
-			id, err := strconv.ParseInt(idStr, 10, 64)
-			if err != nil {
-				http.Error(w, "invalid id", http.StatusBadRequest)
-				return
-			}
-			if s.store != nil {
-				s.store.MarkNotificationRead(id)
-			}
-			w.WriteHeader(http.StatusOK)
-		})
+		if s.store != nil {
+			s.store.MarkNotificationRead(id)
+		}
+		w.WriteHeader(http.StatusOK)
 	})
 	return r
 }

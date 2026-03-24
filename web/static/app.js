@@ -758,6 +758,47 @@ window.websessions = (function() {
       });
   }
 
+  // Settings page directory picker
+  var settingsDirDebounce = null;
+  function settingsDirAutocomplete(input) {
+    clearTimeout(settingsDirDebounce);
+    settingsDirDebounce = setTimeout(function() {
+      var q = input.value;
+      if (!q) return;
+      fetch('/api/dirs?q=' + encodeURIComponent(q))
+        .then(function(r) { return r.json(); })
+        .then(function(dirs) {
+          var box = document.getElementById('settings-dir-suggestions');
+          if (!box) return;
+          while (box.firstChild) box.removeChild(box.firstChild);
+          if (!dirs || dirs.length === 0) return;
+          dirs.forEach(function(d) {
+            var div = document.createElement('div');
+            div.className = 'dir-suggestion';
+            var nameSpan = document.createElement('span');
+            nameSpan.className = 'dir-name';
+            nameSpan.textContent = d.split('/').pop();
+            var pathSpan = document.createElement('span');
+            pathSpan.className = 'dir-path';
+            pathSpan.textContent = d;
+            div.appendChild(nameSpan);
+            div.appendChild(pathSpan);
+            div.addEventListener('click', function(e) {
+              e.stopPropagation();
+              input.value = d;
+              while (box.firstChild) box.removeChild(box.firstChild);
+            });
+            div.addEventListener('dblclick', function(e) {
+              e.stopPropagation();
+              input.value = d + '/';
+              settingsDirAutocomplete(input);
+            });
+            box.appendChild(div);
+          });
+        });
+    }, 200);
+  }
+
   // Drag and drop reordering
   var draggedEl = null;
 
@@ -892,6 +933,7 @@ window.websessions = (function() {
     killSession: killSession,
     startRename: startRename,
     dirAutocomplete: dirAutocomplete,
+    settingsDirAutocomplete: settingsDirAutocomplete,
     loadClaudeSessions: loadClaudeSessions,
     selectDir: selectDir,
     quickSession: quickSession,

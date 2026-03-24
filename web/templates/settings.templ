@@ -10,8 +10,6 @@ type SettingsData struct {
 	NotifCompleted   bool
 	NotifErrored     bool
 	NotifWaiting     bool
-	AuthEnabled      bool
-	AuthToken        string
 	HooksInstalled   bool
 }
 
@@ -44,9 +42,11 @@ templ Settings(data SettingsData) {
 							<label for="output_buffer_size">Output Buffer Size</label>
 							<input type="text" id="output_buffer_size" name="output_buffer_size" value={ data.OutputBufferSize } placeholder="10MB"/>
 						</div>
-						<div class="settings-row">
+						<div class="settings-row" style="position:relative;">
 							<label for="default_dir">Default Working Directory</label>
-							<input type="text" id="default_dir" name="default_dir" value={ data.DefaultDir }/>
+							<input type="text" id="default_dir" name="default_dir" value={ data.DefaultDir }
+								autocomplete="off" oninput="window.websessions.settingsDirAutocomplete(this)"/>
+							<div id="settings-dir-suggestions" class="dir-suggestions"></div>
 						</div>
 					</div>
 					<div class="settings-section">
@@ -125,28 +125,11 @@ templ Settings(data SettingsData) {
 							</ul>
 						</div>
 					</div>
-					<div class="settings-section">
-						<h3>Authentication</h3>
-						<div class="settings-row">
-							<label class="checkbox-label">
-								if data.AuthEnabled {
-									<input type="checkbox" name="auth_enabled" checked/>
-								} else {
-									<input type="checkbox" name="auth_enabled"/>
-								}
-								Enable Token Authentication
-							</label>
-						</div>
-						<div class="settings-row">
-							<label for="auth_token">Auth Token</label>
-							<input type="password" id="auth_token" name="auth_token" value={ data.AuthToken } placeholder="Leave empty to keep current"/>
-						</div>
-					</div>
 					<div class="settings-actions">
 						<a href="/" class="btn-cancel">Cancel</a>
 						<button type="submit" class="btn-create">Save Settings</button>
 					</div>
-					<p class="settings-note">Some changes (port, host, auth) require a server restart to take effect.</p>
+					<p class="settings-note">Some changes (port, host) require a server restart to take effect.</p>
 				</form>
 			</div>
 		</div>

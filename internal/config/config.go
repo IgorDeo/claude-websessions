@@ -14,7 +14,6 @@ type Config struct {
 	Server        ServerConfig        `yaml:"server"`
 	Sessions      SessionsConfig      `yaml:"sessions"`
 	Notifications NotificationsConfig `yaml:"notifications"`
-	Auth          AuthConfig          `yaml:"auth"`
 }
 
 type ServerConfig struct {
@@ -35,10 +34,6 @@ type NotificationsConfig struct {
 	Events  []string `yaml:"events"`
 }
 
-type AuthConfig struct {
-	Enabled bool   `yaml:"enabled"`
-	Token   string `yaml:"token"`
-}
 
 func defaults() *Config {
 	return &Config{
@@ -49,7 +44,6 @@ func defaults() *Config {
 			DefaultDir: "~/projects",
 		},
 		Notifications: NotificationsConfig{Desktop: true, Events: []string{"completed", "errored", "waiting"}},
-		Auth:          AuthConfig{Enabled: false, Token: ""},
 	}
 }
 
@@ -90,9 +84,7 @@ func (c *Config) parseRawFields() error {
 }
 
 func (c *Config) applyEnvOverrides() {
-	if token := os.Getenv("WEBSESSIONS_AUTH_TOKEN"); token != "" {
-		c.Auth.Token = token
-	}
+	// Reserved for future env var overrides
 }
 
 func (c *Config) Save() error {

@@ -8,6 +8,3 @@ sessions:
 notifications:
   desktop: true
   events: [completed, errored, waiting]
-auth:
-  enabled: false
-  token: ""
