@@ -16,6 +16,7 @@ type SettingsData struct {
 	SystemdActive    bool
 	SystemdEnabled   bool
 	SystemdStatus    string
+	Version          string
 }
 
 templ Settings(data SettingsData) {
@@ -176,6 +177,17 @@ templ Settings(data SettingsData) {
 						}
 					</div>
 					<div id="systemd-feedback"></div>
+				</div>
+				<div class="settings-section" id="update-section">
+					<h3>Updates</h3>
+					<div class="settings-row">
+						<span class="settings-sublabel">Current version</span>
+						<span class="update-version">{ data.Version }</span>
+					</div>
+					<div class="settings-row" id="update-status">
+						<button type="button" class="btn-create btn-small" onclick="window.websessions.checkForUpdate()">Check for updates</button>
+					</div>
+					<div id="update-feedback"></div>
 				</div>
 			</div>
 		</div>

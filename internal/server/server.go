@@ -26,7 +26,10 @@ type Server struct {
 	hub       *wsHub
 	handler   http.Handler
 	snoozeFn  SnoozeFunc
+	version   string
 }
+
+func (s *Server) SetVersion(v string) { s.version = v }
 
 func (s *Server) SetSnoozeFunc(fn SnoozeFunc) { s.snoozeFn = fn }
 
@@ -58,6 +61,8 @@ func (s *Server) routes() http.Handler {
 	r.Get("/settings", s.handleSettings)
 	r.Post("/settings", s.handleSaveSettings)
 	r.Post("/settings/hooks", s.handleInstallHooks)
+	r.Get("/api/check-update", s.handleCheckUpdate)
+	r.Post("/api/self-update", s.handleSelfUpdate)
 	r.Post("/settings/systemd", s.handleSystemd)
 	r.Get("/sidebar", s.handleSidebar)
 	r.Get("/notifications", s.handleNotifications)

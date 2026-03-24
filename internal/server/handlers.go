@@ -16,6 +16,7 @@ import (
 
 	"github.com/igor-deoalves/websessions/internal/discovery"
 	"github.com/igor-deoalves/websessions/internal/hooks"
+	"github.com/igor-deoalves/websessions/internal/updater"
 	"github.com/igor-deoalves/websessions/internal/service"
 	"github.com/igor-deoalves/websessions/internal/notification"
 	"github.com/igor-deoalves/websessions/internal/session"
@@ -738,6 +739,47 @@ func (s *Server) handleSystemd(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// handleCheckUpdate checks for a newer version on GitHub.
+func (s *Server) handleCheckUpdate(w http.ResponseWriter, r *http.Request) {
+	info, err := updater.CheckForUpdate(s.version)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(info)
+}
+
+// handleSelfUpdate downloads and replaces the current binary.
+func (s *Server) handleSelfUpdate(w http.ResponseWriter, r *http.Request) {
+	info, err := updater.CheckForUpdate(s.version)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	if !info.UpdateAvail {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{"message": "already up to date"})
+		return
+	}
+	if err := updater.SelfUpdate(info.DownloadURL); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"ok":      true,
+		"version": info.LatestVersion,
+		"message": "Updated to " + info.LatestVersion + ". Restart the server to use the new version.",
+	})
+}
+
 // handleInstallHooks installs/uninstalls websessions hooks in Claude settings.
 func (s *Server) handleInstallHooks(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
@@ -812,6 +854,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		DefaultDir:       s.cfg.Sessions.DefaultDir,
 		DesktopNotifs:    s.cfg.Notifications.Desktop,
 		ReminderMinutes: s.cfg.Notifications.ReminderMinutes,
+		Version:         s.version,
 	}
 	// Check which events are enabled
 	for _, e := range s.cfg.Notifications.Events {

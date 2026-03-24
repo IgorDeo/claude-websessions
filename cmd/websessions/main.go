@@ -317,6 +317,7 @@ func main() {
 	}
 
 	srv := server.New(cfg, mgr, bus, sink, st)
+	srv.SetVersion(version)
 
 	// Expose snooze function to the server for the snooze API
 	srv.SetSnoozeFunc(func(sessionID string, minutes int) {

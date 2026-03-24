@@ -678,6 +678,10 @@ html, body {
 .systemd-actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
 .systemd-label { font-size: 0.7rem; color: var(--text-muted); font-style: italic; }
 .systemd-enable-btn { background: var(--accent); color: #fff; border: none; }
+.update-version { font-family: var(--font-mono); font-size: 0.8rem; color: var(--text-primary); }
+.update-available { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.update-release-link { font-size: 0.72rem; color: var(--accent); text-decoration: none; }
+.update-release-link:hover { text-decoration: underline; }
 
 /* ============================================================
    Responsive

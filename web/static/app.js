@@ -802,6 +802,78 @@ window.websessions = (function() {
     container.appendChild(pre);
   }
 
+  // Update check
+  function checkForUpdate() {
+    var feedback = document.getElementById('update-feedback');
+    var status = document.getElementById('update-status');
+    if (feedback) { feedback.textContent = 'Checking...'; feedback.className = 'hooks-feedback'; }
+
+    fetch('/api/check-update')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) {
+          if (feedback) { feedback.textContent = 'Error: ' + data.error; feedback.className = 'hooks-feedback hooks-feedback-err'; }
+          return;
+        }
+        if (!data.UpdateAvail) {
+          if (feedback) { feedback.textContent = 'You are on the latest version (' + data.LatestVersion + ')'; feedback.className = 'hooks-feedback hooks-feedback-ok'; }
+          return;
+        }
+        // Update available — show details and update button
+        if (feedback) { feedback.className = ''; }
+        if (status) {
+          while (status.firstChild) status.removeChild(status.firstChild);
+
+          var info = document.createElement('div');
+          info.className = 'update-available';
+
+          var badge = document.createElement('span');
+          badge.className = 'hooks-badge hooks-active';
+          badge.textContent = data.LatestVersion + ' available';
+          info.appendChild(badge);
+
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'btn-create btn-small';
+          btn.textContent = 'Update now';
+          btn.addEventListener('click', function() { selfUpdate(feedback); });
+          info.appendChild(btn);
+
+          var link = document.createElement('a');
+          link.href = data.ReleaseURL;
+          link.target = '_blank';
+          link.className = 'update-release-link';
+          link.textContent = 'Release notes';
+          info.appendChild(link);
+
+          status.appendChild(info);
+        }
+      })
+      .catch(function(err) {
+        if (feedback) { feedback.textContent = 'Error: ' + err.message; feedback.className = 'hooks-feedback hooks-feedback-err'; }
+      });
+  }
+
+  function selfUpdate(feedback) {
+    if (feedback) { feedback.textContent = 'Downloading update...'; feedback.className = 'hooks-feedback'; }
+
+    fetch('/api/self-update', { method: 'POST' })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.error) {
+          if (feedback) { feedback.textContent = 'Error: ' + data.error; feedback.className = 'hooks-feedback hooks-feedback-err'; }
+          return;
+        }
+        if (feedback) {
+          feedback.textContent = data.message;
+          feedback.className = 'hooks-feedback hooks-feedback-ok';
+        }
+      })
+      .catch(function(err) {
+        if (feedback) { feedback.textContent = 'Error: ' + err.message; feedback.className = 'hooks-feedback hooks-feedback-err'; }
+      });
+  }
+
   // Systemd service management
   function manageSystemd(action) {
     var feedback = document.getElementById('systemd-feedback');
@@ -1364,6 +1436,7 @@ window.websessions = (function() {
     clearAllNotifications: clearAllNotifications,
     switchSidebarTab: switchSidebarTab,
     manageHooks: manageHooks,
+    checkForUpdate: checkForUpdate,
     manageSystemd: manageSystemd,
     settingsDirAutocomplete: settingsDirAutocomplete,
     loadClaudeSessions: loadClaudeSessions,
