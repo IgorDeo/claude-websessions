@@ -19,6 +19,67 @@ import (
 )
 
 
+var version = "dev"
+
+const (
+	colorReset  = "\033[0m"
+	colorDim    = "\033[2m"
+	colorBold   = "\033[1m"
+	colorBlue   = "\033[38;5;111m"
+	colorGreen  = "\033[38;5;114m"
+	colorYellow = "\033[38;5;179m"
+	colorCyan   = "\033[38;5;116m"
+	colorRed    = "\033[38;5;174m"
+)
+
+func printBanner(_ string, host string, port int) {
+	url := fmt.Sprintf("http://localhost:%d", port)
+	if host != "0.0.0.0" && host != "" {
+		url = fmt.Sprintf("http://%s:%d", host, port)
+	}
+
+	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "%s%s", colorBlue, colorBold)
+	fmt.Fprintf(os.Stderr, "  ██╗    ██╗███████╗██████╗ ███████╗███████╗███████╗███████╗██╗ ██████╗ ███╗   ██╗███████╗\n")
+	fmt.Fprintf(os.Stderr, "  ██║    ██║██╔════╝██╔══██╗██╔════╝██╔════╝██╔════╝██╔════╝██║██╔═══██╗████╗  ██║██╔════╝\n")
+	fmt.Fprintf(os.Stderr, "  ██║ █╗ ██║█████╗  ██████╔╝███████╗█████╗  ███████╗███████╗██║██║   ██║██╔██╗ ██║███████╗\n")
+	fmt.Fprintf(os.Stderr, "  ██║███╗██║██╔══╝  ██╔══██╗╚════██║██╔══╝  ╚════██║╚════██║██║██║   ██║██║╚██╗██║╚════██║\n")
+	fmt.Fprintf(os.Stderr, "  ╚███╔███╔╝███████╗██████╔╝███████║███████╗███████║███████║██║╚██████╔╝██║ ╚████║███████║\n")
+	fmt.Fprintf(os.Stderr, "   ╚══╝╚══╝ ╚══════╝╚═════╝ ╚══════╝╚══════╝╚══════╝╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝╚══════╝\n")
+	fmt.Fprintf(os.Stderr, "%s", colorReset)
+	fmt.Fprintf(os.Stderr, "%s  Claude Code Session Manager%s\n", colorDim, colorReset)
+	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "  %s%s➜  Local:%s   %s%s%s\n", colorBold, colorGreen, colorReset, colorBold, url, colorReset)
+	if host == "0.0.0.0" {
+		fmt.Fprintf(os.Stderr, "  %s%s➜  Network:%s %shttp://%s:%d%s\n", colorBold, colorCyan, colorReset, colorDim, host, port, colorReset)
+	}
+	fmt.Fprintf(os.Stderr, "\n")
+	fmt.Fprintf(os.Stderr, "  %sversion %s  •  press %sCtrl+C%s%s to stop%s\n", colorDim, version, colorReset+colorYellow, colorReset+colorDim, "", colorReset)
+	fmt.Fprintf(os.Stderr, "\n")
+}
+
+func printDiscovery(count int) {
+	if count == 0 {
+		fmt.Fprintf(os.Stderr, "  %s○ No running Claude sessions found%s\n\n", colorDim, colorReset)
+	} else {
+		fmt.Fprintf(os.Stderr, "  %s%s● Discovered %d Claude session(s)%s\n\n", colorGreen, colorBold, count, colorReset)
+	}
+}
+
+func printOffline(count int) {
+	if count > 0 {
+		fmt.Fprintf(os.Stderr, "  %s◐ Restored %d offline session(s) from history%s\n", colorYellow, count, colorReset)
+	}
+}
+
+func printShutdown() {
+	fmt.Fprintf(os.Stderr, "\n  %s%s⏻ Shutting down gracefully...%s\n", colorYellow, colorBold, colorReset)
+}
+
+func printStopped() {
+	fmt.Fprintf(os.Stderr, "  %s%s✓ All sessions saved. Goodbye!%s\n\n", colorGreen, colorBold, colorReset)
+}
+
 func isProcessAlive(pid int) bool {
 	proc, err := os.FindProcess(pid)
 	if err != nil {
@@ -82,6 +143,9 @@ func main() {
 	}
 	defer st.Close()
 
+	// Print banner early
+	printBanner("", cfg.Server.Host, cfg.Server.Port)
+
 	mgr := session.NewManager(cfg.Sessions.OutputBufferSize)
 	bus := notification.NewBus()
 	sink := notification.NewInAppSink(100)
@@ -127,6 +191,7 @@ func main() {
 	})
 
 	// Restore previous sessions from SQLite as offline
+	offlineCount := 0
 	prevSessions, err := st.ListSessions(50)
 	if err == nil {
 		for _, rec := range prevSessions {
@@ -136,17 +201,16 @@ func main() {
 					name = rec.ID
 				}
 				mgr.AddOffline(rec.ID, name, rec.ClaudeID, rec.WorkDir)
-				slog.Info("restored offline session", "id", rec.ID, "name", name, "dir", rec.WorkDir)
+				offlineCount++
 			}
 		}
 	}
+	printOffline(offlineCount)
 
-	go func() {
-		processes, err := discovery.Scan()
-		if err != nil {
-			slog.Warn("initial discovery scan failed", "error", err)
-			return
-		}
+	// Initial discovery scan (synchronous so banner shows correct count)
+	discoveredCount := 0
+	processes, scanErr := discovery.Scan()
+	if scanErr == nil {
 		for _, p := range processes {
 			id := fmt.Sprintf("discovered-%d", p.PID)
 			s := mgr.AddDiscovered(id, p.ClaudeID, p.WorkDir, p.PID, p.StartTime)
@@ -154,9 +218,10 @@ func main() {
 				ID: id, Name: s.Name, ClaudeID: p.ClaudeID, WorkDir: p.WorkDir,
 				StartTime: p.StartTime, Status: "discovered", PID: p.PID,
 			})
-			slog.Info("discovered claude session", "pid", p.PID, "dir", p.WorkDir)
+			discoveredCount++
 		}
-	}()
+	}
+	printDiscovery(discoveredCount)
 
 	if cfg.Sessions.ScanInterval > 0 {
 		go func() {
@@ -217,15 +282,14 @@ func main() {
 	signal.Notify(done, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		slog.Info("websessions starting", "addr", httpServer.Addr)
 		if err := httpServer.ListenAndServe(); err != http.ErrServerClosed {
-			slog.Error("server error", "error", err)
+			fmt.Fprintf(os.Stderr, "\n  %s%s✗ Failed to start: %s%s\n\n", colorRed, colorBold, err, colorReset)
 			os.Exit(1)
 		}
 	}()
 
 	<-done
-	slog.Info("shutting down...")
+	printShutdown()
 
 	for _, s := range mgr.List() {
 		st.SaveSession(store.SessionRecord{
@@ -238,5 +302,5 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	httpServer.Shutdown(ctx)
-	slog.Info("websessions stopped")
+	printStopped()
 }
