@@ -105,17 +105,13 @@ window.websessions = (function() {
 
     ws.onmessage = function(event) {
       if (event.data instanceof ArrayBuffer) {
-        term.write(new Uint8Array(event.data), function() {
-          term.scrollToBottom();
-        });
+        term.write(new Uint8Array(event.data));
       } else {
         try {
           var msg = JSON.parse(event.data);
           if (msg.type === 'notification') { handleNotification(msg); }
         } catch(e) {
-          term.write(event.data, function() {
-            term.scrollToBottom();
-          });
+          term.write(event.data);
         }
       }
     };
