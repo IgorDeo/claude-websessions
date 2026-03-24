@@ -6,17 +6,32 @@ import (
 	"runtime"
 )
 
-// DesktopSink sends native OS desktop notifications.
-// Uses notify-send on Linux, osascript on macOS.
-type DesktopSink struct{}
+// GuiNotifyFunc is a function that sends native GUI notifications.
+// Set by the GUI layer when running in --gui mode.
+type GuiNotifyFunc func(title, body, id string)
 
-func NewDesktopSink() *DesktopSink { return &DesktopSink{} }
+// DesktopSink sends native OS desktop notifications.
+// When guiNotify is set, uses GTK/Cocoa notifications (click to focus).
+// Otherwise falls back to notify-send (Linux) or osascript (macOS).
+type DesktopSink struct {
+	guiNotify GuiNotifyFunc
+}
+
+func NewDesktopSink(guiNotify GuiNotifyFunc) *DesktopSink {
+	return &DesktopSink{guiNotify: guiNotify}
+}
 
 func (d *DesktopSink) Send(event SessionEvent) error {
 	title := "websessions"
 	body := fmt.Sprintf("%s: %s", event.SessionID, string(event.Type))
 	if event.Message != "" {
 		body = fmt.Sprintf("%s: %s", event.SessionID, event.Message)
+	}
+	id := "ws-" + event.SessionID + "-" + string(event.Type)
+
+	if d.guiNotify != nil {
+		d.guiNotify(title, body, id)
+		return nil
 	}
 
 	switch runtime.GOOS {

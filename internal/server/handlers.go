@@ -884,7 +884,7 @@ func (s *Server) handleInstallHooks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) setupNotificationBridge() {
-	desktopSink := notification.NewDesktopSink()
+	desktopSink := notification.NewDesktopSink(s.guiNotifyFn)
 	s.bus.Subscribe(func(e notification.SessionEvent) {
 		s.sink.Send(e)
 		desktopSink.Send(e)
