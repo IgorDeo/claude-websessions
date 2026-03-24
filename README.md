@@ -99,7 +99,9 @@ Any running Claude Code sessions on your machine will automatically appear in th
 
 ```bash
 make build          # Build binary to bin/websessions (runs templ generate)
+make build-gui      # Build with native GUI support (requires CGO + system libs)
 make run            # Build and run in one step
+make run-gui        # Build and run with native GUI window
 make test           # Run all tests
 make lint           # Run golangci-lint
 make clean          # Remove build artifacts
@@ -114,6 +116,31 @@ make clean          # Remove build artifacts
 # Debug logging
 ./bin/websessions --log-level debug
 ```
+
+### GUI mode (no browser needed)
+
+Run websessions in a native desktop window instead of opening a browser. Uses the OS webview engine (WebKit2GTK on Linux, WebKit on macOS) — lightweight and fast.
+
+**Install system dependencies:**
+
+```bash
+# Linux (Ubuntu/Debian)
+sudo apt install libwebkit2gtk-4.1-dev
+
+# Linux (Fedora)
+sudo dnf install webkit2gtk4.1-devel
+
+# macOS — no extra deps needed (WebKit is built-in)
+```
+
+**Build and run:**
+
+```bash
+make build-gui
+./bin/websessions --gui
+```
+
+Closing the window shuts down the server gracefully. The `--gui` flag requires the GUI-enabled build (`make build-gui`). The standard `make build` binary will show an error if `--gui` is used.
 
 ### Docker
 
