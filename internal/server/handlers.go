@@ -278,6 +278,7 @@ func (s *Server) handleKillSession(w http.ResponseWriter, r *http.Request, sessi
 		return
 	}
 	state := sess.GetState()
+	sess.Killed = true
 	if state == session.StateRunning || state == session.StateWaiting || state == session.StateCreated {
 		if err := s.mgr.Kill(sessionID); err != nil {
 			slog.Error("kill failed", "session", sessionID, "error", err)

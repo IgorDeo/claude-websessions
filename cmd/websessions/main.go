@@ -77,6 +77,17 @@ func main() {
 	sink := notification.NewInAppSink(100)
 
 	mgr.OnStateChange(func(s *session.Session, from, to session.State) {
+		// Skip notification for intentionally killed sessions
+		if s.Killed && to == session.StateErrored {
+			// Still save to DB but don't notify
+			st.SaveSession(store.SessionRecord{
+				ID: s.ID, Name: s.Name, ClaudeID: s.ClaudeID, WorkDir: s.WorkDir,
+				StartTime: s.StartTime, EndTime: s.EndTime,
+				ExitCode: s.ExitCode, Status: "killed", PID: s.PID,
+			})
+			return
+		}
+
 		var eventType notification.EventType
 		switch to {
 		case session.StateCompleted:

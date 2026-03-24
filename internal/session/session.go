@@ -36,6 +36,7 @@ type Session struct {
 	ExitCode  int
 	Error     string
 	Owned     bool
+	Killed    bool // true if intentionally killed by user — suppresses error notification
 
 	pty    *os.File
 	proc   *os.Process
