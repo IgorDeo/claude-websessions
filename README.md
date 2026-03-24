@@ -39,12 +39,35 @@ go install github.com/a-h/templ/cmd/templ@latest
 # https://golangci-lint.run/usage/install/
 ```
 
-## Quick Start
+## Installation
+
+### Download binary (recommended)
+
+Download the latest release for your platform from [GitHub Releases](https://github.com/IgorDeo/claude-websessions/releases):
+
+```bash
+# Linux (amd64)
+curl -L https://github.com/IgorDeo/claude-websessions/releases/latest/download/websessions-linux-amd64 -o websessions
+chmod +x websessions
+./websessions
+
+# macOS (Apple Silicon)
+curl -L https://github.com/IgorDeo/claude-websessions/releases/latest/download/websessions-darwin-arm64 -o websessions
+chmod +x websessions
+./websessions
+
+# macOS (Intel)
+curl -L https://github.com/IgorDeo/claude-websessions/releases/latest/download/websessions-darwin-amd64 -o websessions
+chmod +x websessions
+./websessions
+```
+
+### Build from source
 
 ```bash
 # Clone the repository
-git clone https://github.com/igor-deoalves/websessions.git
-cd websessions
+git clone https://github.com/IgorDeo/claude-websessions.git
+cd claude-websessions
 
 # Build
 make build
