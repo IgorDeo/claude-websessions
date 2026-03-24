@@ -597,24 +597,78 @@ func (s *Server) handleHookCallback(w http.ResponseWriter, r *http.Request) {
 		eventType = notification.EventType(payload.Event)
 	}
 
-	// Map the hook's project path to a websessions session ID
+	// Map the hook's project path to a websessions session ID.
 	// The hook sends Claude's internal UUID as session_id and the cwd as project.
-	// We need to find our session that matches the working directory.
-	resolvedSessionID := payload.SessionID
-	resolvedSessionName := filepath.Base(payload.Project)
+	var resolvedSessionID string
+	var resolvedSessionName string
+	var managed bool
+
+	// First, try to find an active session matching the working directory
 	for _, sess := range s.mgr.List() {
 		if sess.WorkDir == payload.Project {
 			resolvedSessionID = sess.ID
 			resolvedSessionName = sess.Name
+			managed = true
 			break
 		}
+	}
+
+	// If not managed, auto-discover: scan for the process and add it
+	if !managed && payload.Project != "" {
+		processes, err := discovery.Scan()
+		if err == nil {
+			for _, p := range processes {
+				if p.WorkDir == payload.Project {
+					// Check it's not already tracked
+					alreadyTracked := false
+					for _, sess := range s.mgr.List() {
+						if sess.PID == p.PID {
+							alreadyTracked = true
+							resolvedSessionID = sess.ID
+							resolvedSessionName = sess.Name
+							managed = true
+							break
+						}
+					}
+					if !alreadyTracked {
+						id := fmt.Sprintf("discovered-%d", p.PID)
+						claudeID := p.ClaudeID
+						if claudeID == "" {
+							claudeID = payload.SessionID
+						}
+						sess := s.mgr.AddDiscovered(id, claudeID, p.WorkDir, p.PID, p.StartTime)
+						if s.store != nil {
+							s.store.SaveSession(store.SessionRecord{
+								ID: id, Name: sess.Name, ClaudeID: claudeID, WorkDir: p.WorkDir,
+								StartTime: p.StartTime, Status: "discovered", PID: p.PID,
+							})
+						}
+						resolvedSessionID = id
+						resolvedSessionName = sess.Name
+						managed = true
+						slog.Info("auto-discovered session from hook", "id", id, "dir", p.WorkDir)
+					}
+					break
+				}
+			}
+		}
+
+		// If still not found (process might have exited), use project name
+		if !managed {
+			resolvedSessionID = "external-" + filepath.Base(payload.Project)
+			resolvedSessionName = filepath.Base(payload.Project)
+		}
+	}
+
+	if resolvedSessionName == "" {
+		resolvedSessionName = filepath.Base(payload.Project)
 	}
 
 	event := notification.SessionEvent{
 		SessionID: resolvedSessionID,
 		Type:      eventType,
 		Timestamp: time.Now(),
-		Message:   "Hook: " + payload.Event + " in " + resolvedSessionName,
+		Message:   resolvedSessionName + ": " + eventMessage(string(eventType)),
 	}
 	s.bus.Publish(event)
 
