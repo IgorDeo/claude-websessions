@@ -1,8 +1,48 @@
+// ── Theme (runs immediately before app init) ──────────────
+(function() {
+  var saved = null;
+  try { saved = localStorage.getItem('ws-theme'); } catch(e) {}
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+})();
+
 window.websessions = (function() {
   const terminals = {};
   const splitInstances = [];
   var openTabs = []; // [{id, name, state}]
   var activeTabId = null;
+
+  var darkTermTheme = {
+    background: '#13141c', foreground: '#d0d4f0',
+    cursor: '#6c8cff', selectionBackground: 'rgba(108, 140, 255, 0.2)',
+  };
+  var lightTermTheme = {
+    background: '#f5f6fa', foreground: '#1a1c2b',
+    cursor: '#4a6de5', selectionBackground: 'rgba(74, 109, 229, 0.15)',
+  };
+
+  function currentTheme() {
+    return document.documentElement.getAttribute('data-theme') || 'dark';
+  }
+
+  function updateThemeIcon() {
+    var btn = document.getElementById('theme-toggle-btn');
+    if (btn) btn.textContent = currentTheme() === 'light' ? '\u2600' : '\u263E';
+  }
+
+  function toggleTheme() {
+    var next = currentTheme() === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('ws-theme', next); } catch(e) {}
+    updateThemeIcon();
+    // Update all open xterm instances
+    var theme = next === 'light' ? lightTermTheme : darkTermTheme;
+    Object.keys(terminals).forEach(function(id) {
+      if (terminals[id]) terminals[id].options.theme = theme;
+    });
+  }
+
+  // Set icon on load
+  setTimeout(updateThemeIcon, 0);
 
   // ── Notification Sounds (Web Audio API) ──────────────────
   var audioCtx = null;
@@ -82,12 +122,7 @@ window.websessions = (function() {
     const term = new Terminal({
       cursorBlink: true,
       scrollback: 10000,
-      theme: {
-        background: '#13141c',
-        foreground: '#d0d4f0',
-        cursor: '#6c8cff',
-        selectionBackground: 'rgba(108, 140, 255, 0.2)',
-      },
+      theme: currentTheme() === 'light' ? lightTermTheme : darkTermTheme,
       fontFamily: "'Maple Mono Normal NF', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace",
       fontSize: 14,
     });
@@ -1549,6 +1584,7 @@ window.websessions = (function() {
     unsplitPane: unsplitPane,
     splitPane: splitPane,
     openTerminal: openTerminal,
+    toggleTheme: toggleTheme,
     killSession: killSession,
     startRename: startRename,
     dirAutocomplete: dirAutocomplete,

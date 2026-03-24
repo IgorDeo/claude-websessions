@@ -52,6 +52,45 @@
   --transition-slow: 350ms ease;
 }
 
+/* ── Light theme ── */
+[data-theme="light"] {
+  --bg-primary: #f5f6fa;
+  --bg-secondary: #edeef3;
+  --bg-tertiary: #e4e5ec;
+  --bg-elevated: #ffffff;
+  --bg-input: #ffffff;
+
+  --text-primary: #1a1c2b;
+  --text-secondary: #4a4e6a;
+  --text-muted: #6d7290;
+
+  --accent: #4a6de5;
+  --accent-glow: rgba(74, 109, 229, 0.1);
+  --accent-hover: #3a5cd4;
+
+  --green: #2d9a2d;
+  --green-glow: rgba(45, 154, 45, 0.08);
+  --red: #d04040;
+  --red-glow: rgba(208, 64, 64, 0.08);
+  --yellow: #b8860b;
+  --yellow-glow: rgba(184, 134, 11, 0.08);
+  --blue: #2878b5;
+
+  --border: #d0d2de;
+  --border-subtle: #dcdee8;
+  --border-accent: #b0b4c8;
+
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.08);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.1);
+  --shadow-glow: 0 0 20px rgba(74, 109, 229, 0.06);
+}
+[data-theme="light"] .type-claude { background: rgba(74, 109, 229, 0.12); color: #3a5cd4; }
+[data-theme="light"] .type-terminal { background: rgba(45, 154, 45, 0.12); color: #2d9a2d; }
+[data-theme="light"] .type-discovered { background: rgba(184, 134, 11, 0.12); color: #96700a; }
+[data-theme="light"] .toast { background: var(--bg-elevated); border-color: var(--border); }
+[data-theme="light"] .update-banner { background: rgba(74, 109, 229, 0.08); border-bottom-color: rgba(74, 109, 229, 0.2); }
+
 html, body {
   height: 100%;
   background: var(--bg-primary);
@@ -97,6 +136,13 @@ html, body {
   transition: color var(--transition-fast), background var(--transition-fast);
 }
 .settings-link:hover { color: var(--text-primary); background: var(--bg-tertiary); }
+
+.theme-toggle {
+  background: none; border: none; color: var(--text-muted); cursor: pointer;
+  font-size: 1rem; padding: 0.3rem 0.4rem; border-radius: var(--radius-sm);
+  transition: color var(--transition-fast), background var(--transition-fast);
+}
+.theme-toggle:hover { color: var(--text-primary); background: var(--bg-tertiary); }
 
 /* Notification Bell */
 .notification-wrapper { position: relative; }
