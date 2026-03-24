@@ -10,6 +10,7 @@ window.websessions = (function() {
 
     const term = new Terminal({
       cursorBlink: true,
+      scrollback: 10000,
       theme: {
         background: '#1a1b26',
         foreground: '#c0caf5',
@@ -36,13 +37,17 @@ window.websessions = (function() {
 
     ws.onmessage = function(event) {
       if (event.data instanceof ArrayBuffer) {
-        term.write(new Uint8Array(event.data));
+        term.write(new Uint8Array(event.data), function() {
+          term.scrollToBottom();
+        });
       } else {
         try {
           var msg = JSON.parse(event.data);
           if (msg.type === 'notification') { handleNotification(msg); }
         } catch(e) {
-          term.write(event.data);
+          term.write(event.data, function() {
+            term.scrollToBottom();
+          });
         }
       }
     };
