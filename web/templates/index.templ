@@ -52,6 +52,7 @@ templ Index(data PageData) {
 				<aside id="sidebar" class="sidebar" hx-get="/sidebar" hx-trigger="every 30s" hx-swap="innerHTML">
 					@Sidebar(data.Sessions, data.History)
 				</aside>
+				<div class="sidebar-resize-handle" id="sidebar-resize-handle"></div>
 				<div class="content">
 					<div id="tab-bar" class="tab-bar">
 						@Tabs(nil, "")

@@ -101,7 +101,7 @@ func Index(data PageData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</aside><div class=\"content\"><div id=\"tab-bar\" class=\"tab-bar\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</aside><div class=\"sidebar-resize-handle\" id=\"sidebar-resize-handle\"></div><div class=\"content\"><div id=\"tab-bar\" class=\"tab-bar\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

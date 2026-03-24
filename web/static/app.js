@@ -1575,6 +1575,46 @@ window.websessions = (function() {
   setTimeout(backgroundUpdateCheck, 10000);
   setInterval(backgroundUpdateCheck, 30 * 60 * 1000);
 
+  // ── Sidebar resize drag ────────────────────────────────────
+  (function() {
+    var handle = document.getElementById('sidebar-resize-handle');
+    var sidebar = document.getElementById('sidebar');
+    if (!handle || !sidebar) return;
+
+    var dragging = false;
+
+    handle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      dragging = true;
+      handle.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', function(e) {
+      if (!dragging) return;
+      var newWidth = e.clientX;
+      if (newWidth < 130) newWidth = 130;
+      if (newWidth > 600) newWidth = 600;
+      sidebar.style.width = newWidth + 'px';
+    });
+
+    document.addEventListener('mouseup', function() {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      try { localStorage.setItem('ws-sidebar-width', sidebar.style.width); } catch(e) {}
+    });
+
+    // Restore saved width
+    try {
+      var saved = localStorage.getItem('ws-sidebar-width');
+      if (saved) sidebar.style.width = saved;
+    } catch(e) {}
+  })();
+
   return {
     connectSession: connectSession,
     disconnectSession: disconnectSession,
