@@ -17,7 +17,7 @@
 
   --text-primary: #d0d4f0;
   --text-secondary: #8d93b0;
-  --text-muted: #4e5370;
+  --text-muted: #6b7194;
 
   --accent: #6c8cff;
   --accent-glow: rgba(108, 140, 255, 0.15);
@@ -31,8 +31,8 @@
   --yellow-glow: rgba(212, 168, 67, 0.12);
   --blue: #5eb5e0;
 
-  --border: #2a2d3d;
-  --border-subtle: #22242f;
+  --border: #323548;
+  --border-subtle: #282b3a;
   --border-accent: #3d4260;
 
   --radius-sm: 4px;
