@@ -11,10 +11,14 @@ type SessionView struct {
 }
 
 type NotificationView struct {
-	ID        int64
-	SessionID string
-	EventType string
-	Message   string
+	ID          int64
+	SessionID   string
+	SessionName string
+	WorkDir     string
+	EventType   string
+	Message     string
+	Timestamp   string
+	TimeAgo     string
 }
 
 type PageData struct {

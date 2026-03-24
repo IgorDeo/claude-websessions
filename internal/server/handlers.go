@@ -154,24 +154,72 @@ func (s *Server) handleRecentProjects(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 	var views []templates.NotificationView
 	if s.store != nil {
-		records, _ := s.store.ListNotifications(20, false)
+		records, _ := s.store.ListNotifications(30, false)
 		for _, rec := range records {
-			views = append(views, templates.NotificationView{
+			v := templates.NotificationView{
 				ID:        rec.ID,
 				SessionID: rec.SessionID,
 				EventType: rec.EventType,
-			})
-		}
-	} else {
-		events := s.sink.Pending()
-		for _, e := range events {
-			views = append(views, templates.NotificationView{
-				SessionID: e.SessionID,
-				EventType: string(e.Type),
-			})
+				Timestamp: rec.Timestamp.Format("15:04:05"),
+				TimeAgo:   timeAgo(rec.Timestamp),
+				Message:   eventMessage(rec.EventType),
+			}
+			// Enrich with session details
+			if sess, ok := s.mgr.Get(rec.SessionID); ok {
+				v.SessionName = sess.Name
+				v.WorkDir = sess.WorkDir
+			} else if sessRec, err := s.store.GetSession(rec.SessionID); err == nil {
+				v.SessionName = sessRec.Name
+				v.WorkDir = sessRec.WorkDir
+			}
+			if v.SessionName == "" {
+				v.SessionName = rec.SessionID
+			}
+			views = append(views, v)
 		}
 	}
 	templates.Notifications(views).Render(r.Context(), w)
+}
+
+func timeAgo(t time.Time) string {
+	d := time.Since(t)
+	switch {
+	case d < time.Minute:
+		return "just now"
+	case d < time.Hour:
+		m := int(d.Minutes())
+		if m == 1 {
+			return "1 min ago"
+		}
+		return fmt.Sprintf("%d min ago", m)
+	case d < 24*time.Hour:
+		h := int(d.Hours())
+		if h == 1 {
+			return "1 hour ago"
+		}
+		return fmt.Sprintf("%d hours ago", h)
+	default:
+		days := int(d.Hours() / 24)
+		if days == 1 {
+			return "yesterday"
+		}
+		return fmt.Sprintf("%d days ago", days)
+	}
+}
+
+func eventMessage(eventType string) string {
+	switch eventType {
+	case "completed":
+		return "Session finished successfully"
+	case "errored":
+		return "Session exited with an error"
+	case "waiting":
+		return "Waiting for your input (tool approval)"
+	case "killed":
+		return "Session was terminated"
+	default:
+		return eventType
+	}
 }
 
 func sessionToView(s *session.Session) templates.SessionView {

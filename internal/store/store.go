@@ -127,6 +127,17 @@ func (s *Store) ListNotifications(limit int, includeRead bool) ([]NotificationRe
 	return records, rows.Err()
 }
 
+func (s *Store) GetSession(id string) (*SessionRecord, error) {
+	var r SessionRecord
+	err := s.db.QueryRow(
+		`SELECT id, COALESCE(name, ''), claude_id, work_dir, start_time, end_time, exit_code, status, pid FROM sessions WHERE id = ?`, id,
+	).Scan(&r.ID, &r.Name, &r.ClaudeID, &r.WorkDir, &r.StartTime, &r.EndTime, &r.ExitCode, &r.Status, &r.PID)
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
 func (s *Store) MarkNotificationRead(id int64) error {
 	_, err := s.db.Exec(`UPDATE notifications SET read = TRUE WHERE id = ?`, id)
 	return err

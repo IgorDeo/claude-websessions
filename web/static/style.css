@@ -134,8 +134,13 @@ html, body { height: 100%; background: var(--bg-primary); color: var(--text-prim
 .notif-icon-completed { color: var(--green); }
 .notif-icon-errored { color: var(--red); }
 .notif-icon-waiting { color: var(--yellow); }
+.notif-item { cursor: pointer; }
 .notif-item-content { flex: 1; overflow: hidden; }
-.notif-item-title { display: block; font-size: 0.8rem; font-weight: 500; color: var(--text-primary); text-transform: capitalize; }
+.notif-item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+.notif-item-title { font-size: 0.8rem; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notif-item-time { font-size: 0.65rem; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+.notif-item-message { display: block; font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.1rem; }
+.notif-item-dir { display: inline-block; font-size: 0.65rem; color: var(--text-muted); background: var(--bg-primary); padding: 0.05rem 0.3rem; border-radius: 2px; margin-top: 0.2rem; }
 .notif-item-session { display: block; font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .notif-item-dismiss { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.75rem; padding: 0.1rem 0.3rem; flex-shrink: 0; opacity: 0; transition: opacity 0.15s; }
 .notif-item:hover .notif-item-dismiss { opacity: 1; }

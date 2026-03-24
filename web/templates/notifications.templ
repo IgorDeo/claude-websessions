@@ -1,6 +1,7 @@
 package templates
 
 import "fmt"
+import "path/filepath"
 
 templ Notifications(notifications []NotificationView) {
 	<div class="notif-panel">
@@ -17,7 +18,11 @@ templ Notifications(notifications []NotificationView) {
 				</div>
 			}
 			for _, n := range notifications {
-				<div class={ "notif-item", "notif-" + n.EventType } id={ fmt.Sprintf("notif-%d", n.ID) }>
+				<div
+					class={ "notif-item", "notif-" + n.EventType }
+					id={ fmt.Sprintf("notif-%d", n.ID) }
+					onclick={ openNotifSession(n.SessionID, n.SessionName) }
+				>
 					<div class="notif-item-icon">
 						if n.EventType == "completed" {
 							<span class="notif-icon-completed">&#10003;</span>
@@ -28,18 +33,33 @@ templ Notifications(notifications []NotificationView) {
 						if n.EventType == "waiting" {
 							<span class="notif-icon-waiting">&#9888;</span>
 						}
+						if n.EventType == "killed" {
+							<span class="notif-icon-errored">&#9632;</span>
+						}
 					</div>
 					<div class="notif-item-content">
-						<span class="notif-item-title">{ n.EventType }</span>
-						<span class="notif-item-session">{ n.SessionID }</span>
+						<div class="notif-item-top">
+							<span class="notif-item-title">{ n.SessionName }</span>
+							<span class="notif-item-time">{ n.TimeAgo }</span>
+						</div>
+						<span class="notif-item-message">{ n.Message }</span>
+						if n.WorkDir != "" {
+							<span class="notif-item-dir">{ filepath.Base(n.WorkDir) }</span>
+						}
 					</div>
-					<button class="notif-item-dismiss" onclick={ dismissNotif(n.ID) } title="Dismiss">&#10005;</button>
+					<button class="notif-item-dismiss" onclick={ dismissNotifEvent(n.ID) } title="Dismiss">&#10005;</button>
 				</div>
 			}
 		</div>
 	</div>
 }
 
-script dismissNotif(id int64) {
+script openNotifSession(sessionID string, sessionName string) {
+	window.websessions.openTab(sessionID, sessionName, "running");
+	window.websessions.toggleNotifications();
+}
+
+script dismissNotifEvent(id int64) {
+	event.stopPropagation();
 	window.websessions.dismissNotification(id);
 }
