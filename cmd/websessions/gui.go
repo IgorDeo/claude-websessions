@@ -86,11 +86,19 @@ static void run_webview(const char* title, const char* url, int w, int h,
 import "C"
 import (
 	_ "embed"
+	"os"
 	"unsafe"
 )
 
 //go:embed icon.png
 var iconPNG []byte
+
+func init() {
+	// WebKit's JavaScriptCore uses SIGUSR1 (signal 10) for GC by default,
+	// which conflicts with Go's runtime signal handling and causes crashes.
+	// Redirect JSC to use SIGUSR2 (signal 12) instead.
+	os.Setenv("JSC_SIGNAL_FOR_GC", "12")
+}
 
 func openGUI(url string) error {
 	title := C.CString("websessions")
