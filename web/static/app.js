@@ -657,6 +657,23 @@ window.websessions = (function() {
     }
   });
 
+  // Quick terminal creation
+  function openTerminal() {
+    var form = new FormData();
+    form.append('name', 'terminal-' + Date.now().toString(36));
+    form.append('work_dir', '~');
+    fetch('/sessions/terminal', { method: 'POST', body: form })
+      .then(function(r) {
+        var sid = r.headers.get('X-Session-ID');
+        var sname = r.headers.get('X-Session-Name');
+        if (sid) {
+          openTab(sid, sname || 'terminal', 'running');
+        }
+        htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+        return r.text(); // consume body
+      });
+  }
+
   function killSession(sessionID) {
     if (!confirm('Kill session "' + sessionID + '"?')) return;
     fetch('/sessions/' + encodeURIComponent(sessionID) + '/kill', { method: 'POST' })
@@ -1423,6 +1440,7 @@ window.websessions = (function() {
     showDiff: showDiff,
     unsplitPane: unsplitPane,
     splitPane: splitPane,
+    openTerminal: openTerminal,
     killSession: killSession,
     startRename: startRename,
     dirAutocomplete: dirAutocomplete,

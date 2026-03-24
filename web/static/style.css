@@ -378,6 +378,15 @@ html, body {
   transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
 }
 .new-session-btn:hover { color: var(--text-primary); border-color: var(--text-muted); background: var(--bg-tertiary); }
+.new-terminal-btn {
+  background: none; border: 1px solid var(--border);
+  color: var(--text-muted); padding: 0.25rem 0.65rem;
+  border-radius: var(--radius-sm); cursor: pointer;
+  font-family: var(--font-mono); font-size: 0.72rem; font-weight: 500;
+  margin-left: 0.4rem;
+  transition: color var(--transition-fast), border-color var(--transition-fast), background var(--transition-fast);
+}
+.new-terminal-btn:hover { color: var(--green); border-color: var(--green); background: var(--green-glow); }
 
 /* ============================================================
    Modal

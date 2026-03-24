@@ -77,6 +77,7 @@ func (s *Server) routes() http.Handler {
 	// Sessions
 	r.Get("/sessions/new", s.handleNewSessionModal)
 	r.Post("/sessions", s.handleCreateSession)
+	r.Post("/sessions/terminal", s.handleCreateTerminal)
 	r.Post("/sessions/{sessionID}/open", func(w http.ResponseWriter, r *http.Request) {
 		s.handleOpenSession(w, r, chi.URLParam(r, "sessionID"))
 	})

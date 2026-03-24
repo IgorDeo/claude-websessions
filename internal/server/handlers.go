@@ -111,6 +111,44 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	s.handleSidebar(w, r)
 }
 
+func (s *Server) handleCreateTerminal(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "invalid form", http.StatusBadRequest)
+		return
+	}
+	name := r.FormValue("name")
+	workDir := r.FormValue("work_dir")
+	if workDir == "" {
+		workDir = s.cfg.Sessions.DefaultDir
+	}
+	if name == "" {
+		name = "terminal"
+	}
+
+	// Use the user's default shell
+	shell := os.Getenv("SHELL")
+	if shell == "" {
+		shell = "bash"
+	}
+
+	sess, err := s.mgr.Create("term-"+name, workDir, shell, nil)
+	if err != nil {
+		slog.Error("failed to create terminal", "error", err)
+		http.Error(w, "failed to create terminal: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	sess.Name = name
+	if s.store != nil {
+		s.store.SaveSession(store.SessionRecord{
+			ID: sess.ID, Name: sess.Name, WorkDir: sess.WorkDir,
+			StartTime: sess.StartTime, Status: "running",
+		})
+	}
+	w.Header().Set("X-Session-ID", sess.ID)
+	w.Header().Set("X-Session-Name", sess.Name)
+	s.handleSidebar(w, r)
+}
+
 func (s *Server) handleOpenSession(w http.ResponseWriter, r *http.Request, sessionID string) {
 	sess, ok := s.mgr.Get(sessionID)
 	if ok {
