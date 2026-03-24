@@ -344,6 +344,16 @@ web/static/                Vendored JS + CSS, embedded via go:embed
 
 ---
 
+## Uninstall
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/IgorDeo/claude-websessions/main/uninstall.sh | sh
+```
+
+Removes the binary, stops and removes any background service (systemd/launchd), and prompts before deleting your data (`~/.websessions/`).
+
+---
+
 ## Development
 
 ```bash
