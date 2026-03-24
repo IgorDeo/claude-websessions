@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- Terminal window frame -->
+  <rect x="4" y="8" width="56" height="48" rx="6" fill="#1a1c27" stroke="#6c8cff" stroke-width="2.5"/>
+
+  <!-- Title bar -->
+  <rect x="4" y="8" width="56" height="12" rx="6" fill="#272937"/>
+  <rect x="4" y="14" width="56" height="6" fill="#272937"/>
+
+  <!-- Window dots -->
+  <circle cx="14" cy="14" r="2.5" fill="#e87070"/>
+  <circle cx="22" cy="14" r="2.5" fill="#d4a843"/>
+  <circle cx="30" cy="14" r="2.5" fill="#7ec87e"/>
+
+  <!-- Terminal prompt lines -->
+  <text x="12" y="32" font-family="monospace" font-size="10" font-weight="bold" fill="#6c8cff">$</text>
+  <rect x="22" y="27" width="28" height="3" rx="1.5" fill="#8d93b0" opacity="0.6"/>
+
+  <!-- Second line with green accent -->
+  <text x="12" y="44" font-family="monospace" font-size="10" font-weight="bold" fill="#7ec87e">></text>
+  <rect x="22" y="39" width="20" height="3" rx="1.5" fill="#8d93b0" opacity="0.4"/>
+
+  <!-- Cursor blink -->
+  <rect x="44" y="38" width="2" height="8" rx="1" fill="#6c8cff" opacity="0.9">
+    <animate attributeName="opacity" values="0.9;0.2;0.9" dur="1.2s" repeatCount="indefinite"/>
+  </rect>
+
+  <!-- Network/session indicator dots (bottom right) -->
+  <circle cx="48" cy="50" r="2" fill="#7ec87e"/>
+  <circle cx="54" cy="50" r="2" fill="#6c8cff"/>
+</svg>
