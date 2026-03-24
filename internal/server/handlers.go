@@ -52,10 +52,6 @@ func (s *Server) handleSidebar(w http.ResponseWriter, r *http.Request) {
 			if activeIDs[rec.ID] {
 				continue
 			}
-			// Only show finished sessions in history
-			if rec.Status != "completed" && rec.Status != "errored" && rec.Status != "killed" {
-				continue
-			}
 			name := rec.Name
 			if name == "" {
 				name = rec.ID

@@ -74,6 +74,14 @@ html, body { height: 100%; background: var(--bg-primary); color: var(--text-prim
 .tab-close { margin-left: 0.5rem; opacity: 0.5; }
 .tab-close:hover { opacity: 1; }
 .tab-new { color: var(--text-muted); border-right: none; }
+/* Tab context menu */
+.tab-context-menu { position: fixed; background: var(--bg-secondary); border: 1px solid var(--border); border-radius: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.4); z-index: 300; min-width: 180px; padding: 0.25rem 0; }
+.ctx-item { padding: 0.4rem 0.75rem; font-size: 0.8rem; color: var(--text-secondary); cursor: pointer; }
+.ctx-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
+.ctx-danger { color: var(--red); }
+.ctx-danger:hover { background: rgba(247, 118, 142, 0.15); color: var(--red); }
+.ctx-separator { height: 1px; background: var(--border); margin: 0.25rem 0; }
+
 .tab.dragging { opacity: 0.4; }
 .tab[draggable] { cursor: grab; }
 .tab[draggable]:active { cursor: grabbing; }

@@ -455,8 +455,15 @@ window.websessions = (function() {
       var closeSpan = document.createElement('span');
       closeSpan.className = 'tab-close';
       closeSpan.textContent = '\u00d7';
+      closeSpan.title = 'Close tab (session keeps running)';
       closeSpan.addEventListener('click', function(e) { closeTab(tab.id, e); });
       btn.appendChild(closeSpan);
+
+      // Right-click context menu
+      btn.addEventListener('contextmenu', function(e) {
+        e.preventDefault();
+        showTabContextMenu(e, tab.id, tab.name);
+      });
 
       bar.appendChild(btn);
     });
@@ -873,6 +880,78 @@ window.websessions = (function() {
           });
         });
     }, 200);
+  }
+
+  // Tab context menu
+  function showTabContextMenu(e, tabId, tabName) {
+    closeTabContextMenu();
+    var menu = document.createElement('div');
+    menu.id = 'tab-context-menu';
+    menu.className = 'tab-context-menu';
+    menu.style.left = e.clientX + 'px';
+    menu.style.top = e.clientY + 'px';
+
+    var items = [
+      { label: 'Close tab', action: function() { closeTab(tabId); } },
+      { label: 'Close & stop session', cls: 'ctx-danger', action: function() { killSession(tabId); } },
+      { type: 'separator' },
+      { label: 'Close other tabs', action: function() {
+        var keep = openTabs.filter(function(t) { return t.id === tabId; });
+        openTabs.forEach(function(t) { if (t.id !== tabId && terminals[t.id]) disconnectSession(t.id); });
+        openTabs = keep;
+        activeTabId = tabId;
+        saveTabState();
+        renderTabs();
+        openTab(tabId, tabName, 'running');
+      }},
+      { label: 'Close all tabs', action: function() {
+        openTabs.forEach(function(t) { if (terminals[t.id]) disconnectSession(t.id); });
+        openTabs = [];
+        activeTabId = null;
+        saveTabState();
+        renderTabs();
+        var area = document.getElementById('terminal-area');
+        if (area) {
+          while (area.firstChild) area.removeChild(area.firstChild);
+          var empty = document.createElement('div');
+          empty.className = 'empty-state';
+          var p = document.createElement('p');
+          p.textContent = 'Select a session from the sidebar or create a new one';
+          empty.appendChild(p);
+          area.appendChild(empty);
+        }
+      }},
+    ];
+
+    items.forEach(function(item) {
+      if (item.type === 'separator') {
+        var sep = document.createElement('div');
+        sep.className = 'ctx-separator';
+        menu.appendChild(sep);
+        return;
+      }
+      var el = document.createElement('div');
+      el.className = 'ctx-item' + (item.cls ? ' ' + item.cls : '');
+      el.textContent = item.label;
+      el.addEventListener('click', function(ev) {
+        ev.stopPropagation();
+        closeTabContextMenu();
+        item.action();
+      });
+      menu.appendChild(el);
+    });
+
+    document.body.appendChild(menu);
+
+    // Close on next click anywhere
+    setTimeout(function() {
+      document.addEventListener('click', closeTabContextMenu, { once: true });
+    }, 0);
+  }
+
+  function closeTabContextMenu() {
+    var menu = document.getElementById('tab-context-menu');
+    if (menu) menu.remove();
   }
 
   // Notification panel
