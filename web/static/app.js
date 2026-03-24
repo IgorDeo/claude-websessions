@@ -891,12 +891,12 @@ window.websessions = (function() {
       });
   }
 
-  // Systemd service management
-  function manageSystemd(action) {
-    var feedback = document.getElementById('systemd-feedback');
+  // Background service management (systemd on Linux, launchd on macOS)
+  function manageService(action) {
+    var feedback = document.getElementById('service-feedback');
     if (feedback) { feedback.textContent = 'Processing...'; feedback.className = 'hooks-feedback'; }
 
-    fetch('/settings/systemd', {
+    fetch('/settings/service', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: action }),
@@ -1455,7 +1455,7 @@ window.websessions = (function() {
     switchSidebarTab: switchSidebarTab,
     manageHooks: manageHooks,
     checkForUpdate: checkForUpdate,
-    manageSystemd: manageSystemd,
+    manageService: manageService,
     settingsDirAutocomplete: settingsDirAutocomplete,
     loadClaudeSessions: loadClaudeSessions,
     selectDir: selectDir,

@@ -12,10 +12,11 @@ type SettingsData struct {
 	NotifWaiting     bool
 	ReminderMinutes  int
 	HooksInstalled   bool
-	SystemdInstalled bool
-	SystemdActive    bool
-	SystemdEnabled   bool
-	SystemdStatus    string
+	ServiceInstalled bool
+	ServiceActive    bool
+	ServiceEnabled   bool
+	ServiceStatus    string
+	ServiceName      string
 	Version          string
 	Doctor           []DoctorCheck
 }
@@ -179,41 +180,41 @@ templ Settings(data SettingsData) {
 						</ul>
 					</div>
 				</div>
-				<div class="settings-section" id="systemd-section">
+				<div class="settings-section" id="service-section">
 					<h3>Background Service</h3>
 					<p class="hooks-description">
-						Run websessions as a systemd user service so it starts automatically
+						Run websessions as a { data.ServiceName } service so it starts automatically
 						on login and stays running in the background.
 					</p>
-					<div class="settings-row hooks-status" id="systemd-status">
-						if data.SystemdInstalled {
-							if data.SystemdActive {
+					<div class="settings-row hooks-status" id="service-status">
+						if data.ServiceInstalled {
+							if data.ServiceActive {
 								<span class="hooks-badge hooks-active">Running</span>
 							} else {
 								<span class="hooks-badge hooks-inactive">Stopped</span>
 							}
-							if data.SystemdEnabled {
-								<span class="systemd-label">starts on login</span>
+							if data.ServiceEnabled {
+								<span class="service-label">starts on login</span>
 							}
-							<div class="systemd-actions">
-								if data.SystemdActive {
-									<button type="button" class="btn-cancel btn-small" onclick="window.websessions.manageSystemd('stop')">Stop</button>
+							<div class="service-actions">
+								if data.ServiceActive {
+									<button type="button" class="btn-cancel btn-small" onclick="window.websessions.manageService('stop')">Stop</button>
 								} else {
-									<button type="button" class="btn-create btn-small" onclick="window.websessions.manageSystemd('start')">Start</button>
+									<button type="button" class="btn-create btn-small" onclick="window.websessions.manageService('start')">Start</button>
 								}
-								if data.SystemdEnabled {
-									<button type="button" class="btn-cancel btn-small" onclick="window.websessions.manageSystemd('disable')">Disable autostart</button>
+								if data.ServiceEnabled {
+									<button type="button" class="btn-cancel btn-small" onclick="window.websessions.manageService('disable')">Disable autostart</button>
 								} else {
-									<button type="button" class="btn-small systemd-enable-btn" onclick="window.websessions.manageSystemd('enable')">Enable autostart</button>
+									<button type="button" class="btn-small service-enable-btn" onclick="window.websessions.manageService('enable')">Enable autostart</button>
 								}
-								<button type="button" class="btn-cancel btn-small" onclick="window.websessions.manageSystemd('uninstall')">Uninstall</button>
+								<button type="button" class="btn-cancel btn-small" onclick="window.websessions.manageService('uninstall')">Uninstall</button>
 							</div>
 						} else {
 							<span class="hooks-badge hooks-inactive">Not installed</span>
-							<button type="button" class="btn-create btn-small" onclick="window.websessions.manageSystemd('install')">Install Service</button>
+							<button type="button" class="btn-create btn-small" onclick="window.websessions.manageService('install')">Install Service</button>
 						}
 					</div>
-					<div id="systemd-feedback"></div>
+					<div id="service-feedback"></div>
 				</div>
 				<div class="settings-section" id="update-section">
 					<h3>Updates</h3>
