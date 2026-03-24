@@ -456,15 +456,21 @@ func (s *Server) handleHookCallback(w http.ResponseWriter, r *http.Request) {
 
 // handleInstallHooks installs/uninstalls websessions hooks in Claude settings.
 func (s *Server) handleInstallHooks(w http.ResponseWriter, r *http.Request) {
-	action := r.FormValue("action")
+	var payload struct {
+		Action string `json:"action"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
 	baseURL := fmt.Sprintf("http://%s:%d", s.cfg.Server.Host, s.cfg.Server.Port)
-	// Use localhost if host is 0.0.0.0
 	if s.cfg.Server.Host == "0.0.0.0" {
 		baseURL = fmt.Sprintf("http://localhost:%d", s.cfg.Server.Port)
 	}
 
 	var err error
-	switch action {
+	switch payload.Action {
 	case "install":
 		err = hooks.Install(baseURL)
 	case "uninstall":
@@ -475,12 +481,26 @@ func (s *Server) handleInstallHooks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		slog.Error("hook action failed", "action", action, "error", err)
-		http.Error(w, "failed: "+err.Error(), http.StatusInternalServerError)
+		slog.Error("hook action failed", "action", payload.Action, "error", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 
-	http.Redirect(w, r, "/settings?hooks="+action+"d", http.StatusSeeOther)
+	// Check new status
+	installed := false
+	claudeSettings, loadErr := hooks.Load()
+	if loadErr == nil {
+		installed = claudeSettings.IsInstalled()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"ok":        true,
+		"action":    payload.Action,
+		"installed": installed,
+	})
 }
 
 func (s *Server) setupNotificationBridge() {

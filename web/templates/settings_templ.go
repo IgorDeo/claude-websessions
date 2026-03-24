@@ -179,22 +179,22 @@ func Settings(data SettingsData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "Waiting for Input</label></div></div></div><div class=\"settings-section\"><h3>Claude Code Hooks</h3><p class=\"hooks-description\">Hooks let Claude Code notify websessions when sessions need attention (tool approvals, completions). This adds entries to <code>~/.claude/settings.json</code>.</p><div class=\"settings-row hooks-status\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "Waiting for Input</label></div></div></div><div class=\"settings-actions\"><a href=\"/\" class=\"btn-cancel\">Cancel</a> <button type=\"submit\" class=\"btn-create\">Save Settings</button></div><p class=\"settings-note\">Some changes (port, host) require a server restart to take effect.</p></form><div class=\"settings-section\" id=\"hooks-section\"><h3>Claude Code Hooks</h3><p class=\"hooks-description\">Hooks let Claude Code notify websessions when sessions need attention (tool approvals, completions). This adds entries to <code>~/.claude/settings.json</code>.</p><div class=\"settings-row hooks-status\" id=\"hooks-status\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if data.HooksInstalled {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<span class=\"hooks-badge hooks-active\">Installed</span><form method=\"POST\" action=\"/settings/hooks\" style=\"display:inline;\"><input type=\"hidden\" name=\"action\" value=\"uninstall\"> <button type=\"submit\" class=\"btn-cancel btn-small\">Uninstall Hooks</button></form><form method=\"POST\" action=\"/settings/hooks\" style=\"display:inline;\"><input type=\"hidden\" name=\"action\" value=\"install\"> <button type=\"submit\" class=\"btn-small\" style=\"background:var(--accent);color:var(--bg-primary);border:none;border-radius:3px;padding:0.3rem 0.6rem;cursor:pointer;font-size:0.8rem;\">Update URL</button></form>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<span class=\"hooks-badge hooks-active\">Installed</span> <button type=\"button\" class=\"btn-cancel btn-small\" onclick=\"window.websessions.manageHooks('uninstall')\">Uninstall</button> <button type=\"button\" class=\"btn-small\" style=\"background:var(--accent);color:var(--bg-primary);border:none;border-radius:3px;padding:0.3rem 0.6rem;cursor:pointer;font-size:0.8rem;\" onclick=\"window.websessions.manageHooks('install')\">Update URL</button>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			} else {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<span class=\"hooks-badge hooks-inactive\">Not installed</span><form method=\"POST\" action=\"/settings/hooks\" style=\"display:inline;\"><input type=\"hidden\" name=\"action\" value=\"install\"> <button type=\"submit\" class=\"btn-create btn-small\">Install Hooks</button></form>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<span class=\"hooks-badge hooks-inactive\">Not installed</span> <button type=\"button\" class=\"btn-create btn-small\" onclick=\"window.websessions.manageHooks('install')\">Install Hooks</button>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div><div class=\"hooks-events\"><span class=\"settings-sublabel\">Hook events:</span><ul class=\"hooks-event-list\"><li><strong>Notification</strong> (permission_prompt) — when Claude needs tool approval</li><li><strong>Stop</strong> — when Claude finishes its turn</li><li><strong>PreToolUse</strong> — before each tool execution</li></ul></div></div><div class=\"settings-actions\"><a href=\"/\" class=\"btn-cancel\">Cancel</a> <button type=\"submit\" class=\"btn-create\">Save Settings</button></div><p class=\"settings-note\">Some changes (port, host) require a server restart to take effect.</p></form></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div><div id=\"hooks-feedback\"></div><div class=\"hooks-events\"><span class=\"settings-sublabel\">Hook events:</span><ul class=\"hooks-event-list\"><li><strong>Notification</strong> (permission_prompt) — when Claude needs tool approval</li><li><strong>Stop</strong> — when Claude finishes its turn</li><li><strong>PreToolUse</strong> — before each tool execution</li></ul></div></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

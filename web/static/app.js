@@ -758,6 +758,75 @@ window.websessions = (function() {
       });
   }
 
+  // Hooks management
+  function manageHooks(action) {
+    var feedback = document.getElementById('hooks-feedback');
+    if (feedback) { feedback.textContent = action === 'install' ? 'Installing...' : 'Uninstalling...'; feedback.className = 'hooks-feedback'; }
+
+    fetch('/settings/hooks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: action }),
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(result) {
+      var status = document.getElementById('hooks-status');
+      if (!status) return;
+      while (status.firstChild) status.removeChild(status.firstChild);
+
+      if (result.ok && result.data.installed) {
+        var badge = document.createElement('span');
+        badge.className = 'hooks-badge hooks-active';
+        badge.textContent = 'Installed';
+        status.appendChild(badge);
+
+        var uninstBtn = document.createElement('button');
+        uninstBtn.type = 'button';
+        uninstBtn.className = 'btn-cancel btn-small';
+        uninstBtn.textContent = 'Uninstall';
+        uninstBtn.addEventListener('click', function() { manageHooks('uninstall'); });
+        status.appendChild(uninstBtn);
+
+        var updateBtn = document.createElement('button');
+        updateBtn.type = 'button';
+        updateBtn.className = 'btn-small';
+        updateBtn.style.cssText = 'background:var(--accent);color:var(--bg-primary);border:none;border-radius:3px;padding:0.3rem 0.6rem;cursor:pointer;font-size:0.8rem;';
+        updateBtn.textContent = 'Update URL';
+        updateBtn.addEventListener('click', function() { manageHooks('install'); });
+        status.appendChild(updateBtn);
+      } else {
+        var badge2 = document.createElement('span');
+        badge2.className = 'hooks-badge hooks-inactive';
+        badge2.textContent = 'Not installed';
+        status.appendChild(badge2);
+
+        var instBtn = document.createElement('button');
+        instBtn.type = 'button';
+        instBtn.className = 'btn-create btn-small';
+        instBtn.textContent = 'Install Hooks';
+        instBtn.addEventListener('click', function() { manageHooks('install'); });
+        status.appendChild(instBtn);
+      }
+
+      if (feedback) {
+        if (result.ok) {
+          feedback.textContent = action === 'install' ? 'Hooks installed successfully' : 'Hooks removed successfully';
+          feedback.className = 'hooks-feedback hooks-feedback-ok';
+        } else {
+          feedback.textContent = 'Error: ' + (result.data.error || 'Unknown error');
+          feedback.className = 'hooks-feedback hooks-feedback-err';
+        }
+        setTimeout(function() { feedback.textContent = ''; feedback.className = ''; }, 4000);
+      }
+    })
+    .catch(function(err) {
+      if (feedback) {
+        feedback.textContent = 'Error: ' + err.message;
+        feedback.className = 'hooks-feedback hooks-feedback-err';
+      }
+    });
+  }
+
   // Settings page directory picker
   var settingsDirDebounce = null;
   function settingsDirAutocomplete(input) {
@@ -933,6 +1002,7 @@ window.websessions = (function() {
     killSession: killSession,
     startRename: startRename,
     dirAutocomplete: dirAutocomplete,
+    manageHooks: manageHooks,
     settingsDirAutocomplete: settingsDirAutocomplete,
     loadClaudeSessions: loadClaudeSessions,
     selectDir: selectDir,
