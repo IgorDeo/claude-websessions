@@ -22,6 +22,7 @@ type Server struct {
 	mgr       *session.Manager
 	bus       *notification.Bus
 	sink      *notification.InAppSink
+	sound     *notification.SoundSink
 	store     *store.Store
 	hub       *wsHub
 	handler   http.Handler
@@ -34,7 +35,8 @@ func (s *Server) SetVersion(v string) { s.version = v }
 func (s *Server) SetSnoozeFunc(fn SnoozeFunc) { s.snoozeFn = fn }
 
 func New(cfg *config.Config, mgr *session.Manager, bus *notification.Bus, sink *notification.InAppSink, st ...*store.Store) *Server {
-	s := &Server{cfg: cfg, mgr: mgr, bus: bus, sink: sink, hub: newWSHub()}
+	soundSink := notification.NewSoundSink(cfg.Notifications.Sound, cfg.Notifications.AudioDevice)
+	s := &Server{cfg: cfg, mgr: mgr, bus: bus, sink: sink, sound: soundSink, hub: newWSHub()}
 	if len(st) > 0 {
 		s.store = st[0]
 	}
@@ -63,6 +65,9 @@ func (s *Server) routes() http.Handler {
 	r.Post("/settings/hooks", s.handleInstallHooks)
 	r.Get("/api/check-update", s.handleCheckUpdate)
 	r.Post("/api/self-update", s.handleSelfUpdate)
+	r.Get("/api/audio-devices", s.handleAudioDevices)
+	r.Post("/api/audio-device", s.handleSetAudioDevice)
+	r.Post("/api/test-sound", s.handleTestSound)
 	r.Post("/settings/service", s.handleService)
 	r.Get("/sidebar", s.handleSidebar)
 	r.Get("/notifications", s.handleNotifications)

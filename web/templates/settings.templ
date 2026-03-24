@@ -1,5 +1,10 @@
 package templates
 
+type AudioDeviceView struct {
+	Name        string
+	Description string
+}
+
 type SettingsData struct {
 	Port             int
 	Host             string
@@ -11,6 +16,9 @@ type SettingsData struct {
 	NotifErrored     bool
 	NotifWaiting     bool
 	ReminderMinutes  int
+	SoundEnabled     bool
+	AudioDevice      string
+	AudioDevices     []AudioDeviceView
 	HooksInstalled   bool
 	ServiceInstalled bool
 	ServiceActive    bool
@@ -107,14 +115,31 @@ templ Settings(data SettingsData) {
 						</div>
 					<div class="settings-row">
 							<label class="checkbox-label">
-								<input type="checkbox" id="notif-sounds-toggle" onchange="window.websessions.setNotifSoundsEnabled(this.checked)"/>
-								Notification Sounds
+								if data.SoundEnabled {
+									<input type="checkbox" name="sound_enabled" checked/>
+								} else {
+									<input type="checkbox" name="sound_enabled"/>
+								}
+								Notification Sounds (server-side)
 							</label>
 							<div class="sound-test-btns">
 								<button type="button" class="btn-sound" onclick="window.websessions.testNotifSound('completed')" title="Test completed sound">&#9835; Completed</button>
 								<button type="button" class="btn-sound" onclick="window.websessions.testNotifSound('waiting')" title="Test waiting sound">&#9835; Waiting</button>
 								<button type="button" class="btn-sound" onclick="window.websessions.testNotifSound('errored')" title="Test error sound">&#9835; Error</button>
 							</div>
+						</div>
+						<div class="settings-row">
+							<span class="settings-sublabel">Audio output device</span>
+							<select name="audio_device" class="settings-input" id="audio-device-select">
+								<option value="">System default</option>
+								for _, dev := range data.AudioDevices {
+									if dev.Name == data.AudioDevice {
+										<option value={ dev.Name } selected>{ dev.Description }</option>
+									} else {
+										<option value={ dev.Name }>{ dev.Description }</option>
+									}
+								}
+							</select>
 						</div>
 						<div class="settings-row">
 							<span class="settings-sublabel">Notify on:</span>

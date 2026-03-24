@@ -888,6 +888,7 @@ func (s *Server) setupNotificationBridge() {
 	s.bus.Subscribe(func(e notification.SessionEvent) {
 		s.sink.Send(e)
 		desktopSink.Send(e)
+		s.sound.Send(e)
 		// Push to all connected notification WebSocket clients
 		msg, _ := json.Marshal(map[string]string{
 			"type":      "notification",
@@ -900,6 +901,37 @@ func (s *Server) setupNotificationBridge() {
 	})
 }
 
+func (s *Server) handleAudioDevices(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(notification.ListAudioDevices())
+}
+
+func (s *Server) handleSetAudioDevice(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Device string `json:"device"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	s.sound.SetAudioDevice(payload.Device)
+	s.cfg.Notifications.AudioDevice = payload.Device
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"ok": "true", "device": payload.Device})
+}
+
+func (s *Server) handleTestSound(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Event string `json:"event"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	s.sound.Send(notification.SessionEvent{Type: notification.EventType(payload.Event)})
+	w.WriteHeader(http.StatusOK)
+}
+
 // handleListDirs returns a JSON list of directories for the file finder autocomplete.
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	data := templates.SettingsData{
@@ -910,7 +942,13 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		DefaultDir:       s.cfg.Sessions.DefaultDir,
 		DesktopNotifs:    s.cfg.Notifications.Desktop,
 		ReminderMinutes: s.cfg.Notifications.ReminderMinutes,
+		SoundEnabled:    s.cfg.Notifications.Sound,
+		AudioDevice:     s.cfg.Notifications.AudioDevice,
 		Version:         s.version,
+	}
+	// Populate audio devices
+	for _, d := range notification.ListAudioDevices() {
+		data.AudioDevices = append(data.AudioDevices, templates.AudioDeviceView{Name: d.Name, Description: d.Description})
 	}
 	// Check which events are enabled
 	for _, e := range s.cfg.Notifications.Events {
@@ -972,6 +1010,10 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	s.cfg.Notifications.Events = events
 	s.cfg.Notifications.ReminderMinutes, _ = strconv.Atoi(r.FormValue("reminder_minutes"))
+	s.cfg.Notifications.Sound = r.FormValue("sound_enabled") == "on"
+	s.cfg.Notifications.AudioDevice = r.FormValue("audio_device")
+	s.sound.SetEnabled(s.cfg.Notifications.Sound)
+	s.sound.SetAudioDevice(s.cfg.Notifications.AudioDevice)
 
 	// If port or host changed, uninstall hooks (they contain the old URL)
 	if s.cfg.Server.Port != oldPort || s.cfg.Server.Host != oldHost {

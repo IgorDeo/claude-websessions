@@ -65,10 +65,13 @@ window.websessions = (function() {
     try { return localStorage.getItem('ws-notif-sounds') !== 'false'; } catch(e) { return true; }
   }
 
-  // Test sound for settings page
+  // Test sound — plays server-side via paplay/afplay
   function testNotifSound(eventType) {
-    var fn = notifSounds[eventType];
-    if (fn) fn();
+    fetch('/api/test-sound', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: eventType }),
+    });
   }
   // ─────────────────────────────────────────────────────────
 
