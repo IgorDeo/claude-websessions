@@ -85,7 +85,7 @@ window.websessions = (function() {
         cursor: '#6c8cff',
         selectionBackground: 'rgba(108, 140, 255, 0.2)',
       },
-      fontFamily: "'Maple Mono', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace",
+      fontFamily: "'Maple Mono Normal NF', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace",
       fontSize: 14,
     });
 
