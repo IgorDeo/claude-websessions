@@ -51,7 +51,15 @@ func tmuxCreateSession(name, workDir, command string, args []string) error {
 	tmuxArgs = append(tmuxArgs, fullCmd)
 
 	_, err := tmuxRun(tmuxArgs...)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Disable tmux status bar and visual clutter for this session
+	tmuxRun("set-option", "-t", name, "status", "off")
+	tmuxRun("set-option", "-t", name, "mouse", "off")
+
+	return nil
 }
 
 // tmuxKillSession kills a tmux session.
