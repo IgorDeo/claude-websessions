@@ -111,8 +111,8 @@ templ Settings(data SettingsData) {
 				<div class="settings-section" id="hooks-section">
 					<h3>Claude Code Hooks</h3>
 					<p class="hooks-description">
-						Hooks let Claude Code notify websessions when sessions need attention
-						(tool approvals, completions). This adds entries to <code>~/.claude/settings.json</code>.
+						Hooks notify websessions when Claude needs your input (tool approval prompts).
+						This adds an entry to <code>~/.claude/settings.json</code>.
 					</p>
 					<div class="settings-row hooks-status" id="hooks-status">
 						if data.HooksInstalled {
@@ -127,9 +127,7 @@ templ Settings(data SettingsData) {
 					<div class="hooks-events">
 						<span class="settings-sublabel">Hook events:</span>
 						<ul class="hooks-event-list">
-							<li><strong>Notification</strong> (permission_prompt) — when Claude needs tool approval</li>
-							<li><strong>Stop</strong> — when Claude finishes its turn</li>
-							<li><strong>PreToolUse</strong> — before each tool execution</li>
+							<li><strong>Notification</strong> (permission_prompt) — fires when Claude needs you to approve a tool use</li>
 						</ul>
 					</div>
 				</div>

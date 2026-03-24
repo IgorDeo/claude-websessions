@@ -124,10 +124,9 @@ func Install(baseURL string) error {
 		settings.raw["hooks"] = hooks
 	}
 
-	// Add hooks for each event type
+	// Only hook into permission prompts — the only event that truly needs attention.
+	// Stop fires after every turn (too noisy), PreToolUse is informational.
 	addHook(hooks, "Notification", "permission_prompt", baseURL, "waiting")
-	addHook(hooks, "Stop", "", baseURL, "completed")
-	addHook(hooks, "PreToolUse", "", baseURL, "tool_use")
 
 	return settings.Save()
 }

@@ -79,11 +79,13 @@ func (m *Manager) Create(id, workDir, command string, args []string) (*Session, 
 	return s, nil
 }
 
+// Patterns that indicate Claude is waiting for user input.
+// These are intentionally specific to avoid false positives.
 var waitingPatterns = []string{
-	"Allow", "Deny",
-	"Do you want to",
+	"Do you want to proceed?",
 	"[Y/n]", "[y/N]",
 	"? (y/n)",
+	"(yes/no)",
 }
 
 func (m *Manager) checkWaitingState(s *Session, data []byte) {

@@ -179,7 +179,7 @@ func Settings(data SettingsData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "Waiting for Input</label></div></div></div><div class=\"settings-actions\"><a href=\"/\" class=\"btn-cancel\">Cancel</a> <button type=\"submit\" class=\"btn-create\">Save Settings</button></div><p class=\"settings-note\">Some changes (port, host) require a server restart to take effect.</p></form><div class=\"settings-section\" id=\"hooks-section\"><h3>Claude Code Hooks</h3><p class=\"hooks-description\">Hooks let Claude Code notify websessions when sessions need attention (tool approvals, completions). This adds entries to <code>~/.claude/settings.json</code>.</p><div class=\"settings-row hooks-status\" id=\"hooks-status\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "Waiting for Input</label></div></div></div><div class=\"settings-actions\"><a href=\"/\" class=\"btn-cancel\">Cancel</a> <button type=\"submit\" class=\"btn-create\">Save Settings</button></div><p class=\"settings-note\">Some changes (port, host) require a server restart to take effect.</p></form><div class=\"settings-section\" id=\"hooks-section\"><h3>Claude Code Hooks</h3><p class=\"hooks-description\">Hooks notify websessions when Claude needs your input (tool approval prompts). This adds an entry to <code>~/.claude/settings.json</code>.</p><div class=\"settings-row hooks-status\" id=\"hooks-status\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -194,7 +194,7 @@ func Settings(data SettingsData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div><div id=\"hooks-feedback\"></div><div class=\"hooks-events\"><span class=\"settings-sublabel\">Hook events:</span><ul class=\"hooks-event-list\"><li><strong>Notification</strong> (permission_prompt) — when Claude needs tool approval</li><li><strong>Stop</strong> — when Claude finishes its turn</li><li><strong>PreToolUse</strong> — before each tool execution</li></ul></div></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "</div><div id=\"hooks-feedback\"></div><div class=\"hooks-events\"><span class=\"settings-sublabel\">Hook events:</span><ul class=\"hooks-event-list\"><li><strong>Notification</strong> (permission_prompt) — fires when Claude needs you to approve a tool use</li></ul></div></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

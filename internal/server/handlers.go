@@ -583,19 +583,13 @@ func (s *Server) handleHookCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var eventType notification.EventType
-	switch payload.Event {
-	case "waiting":
-		eventType = notification.EventWaiting
-	case "completed":
-		eventType = notification.EventCompleted
-	case "tool_use":
-		// tool_use is informational, not a notification event
+	// Only process "waiting" (permission prompts). Ignore everything else —
+	// "completed" fires too often (every turn), "tool_use" is informational.
+	if payload.Event != "waiting" {
 		w.WriteHeader(http.StatusOK)
 		return
-	default:
-		eventType = notification.EventType(payload.Event)
 	}
+	var eventType notification.EventType = notification.EventWaiting
 
 	// Map the hook's project path to a websessions session ID.
 	// The hook sends Claude's internal UUID as session_id and the cwd as project.
