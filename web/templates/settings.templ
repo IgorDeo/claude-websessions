@@ -11,6 +11,10 @@ type SettingsData struct {
 	NotifErrored     bool
 	NotifWaiting     bool
 	HooksInstalled   bool
+	SystemdInstalled bool
+	SystemdActive    bool
+	SystemdEnabled   bool
+	SystemdStatus    string
 }
 
 templ Settings(data SettingsData) {
@@ -130,6 +134,42 @@ templ Settings(data SettingsData) {
 							<li><strong>Notification</strong> (permission_prompt) — fires when Claude needs you to approve a tool use</li>
 						</ul>
 					</div>
+				</div>
+				<div class="settings-section" id="systemd-section">
+					<h3>Background Service</h3>
+					<p class="hooks-description">
+						Run websessions as a systemd user service so it starts automatically
+						on login and stays running in the background.
+					</p>
+					<div class="settings-row hooks-status" id="systemd-status">
+						if data.SystemdInstalled {
+							if data.SystemdActive {
+								<span class="hooks-badge hooks-active">Running</span>
+							} else {
+								<span class="hooks-badge hooks-inactive">Stopped</span>
+							}
+							if data.SystemdEnabled {
+								<span class="systemd-label">starts on login</span>
+							}
+							<div class="systemd-actions">
+								if data.SystemdActive {
+									<button type="button" class="btn-cancel btn-small" onclick="window.websessions.manageSystemd('stop')">Stop</button>
+								} else {
+									<button type="button" class="btn-create btn-small" onclick="window.websessions.manageSystemd('start')">Start</button>
+								}
+								if data.SystemdEnabled {
+									<button type="button" class="btn-cancel btn-small" onclick="window.websessions.manageSystemd('disable')">Disable autostart</button>
+								} else {
+									<button type="button" class="btn-small systemd-enable-btn" onclick="window.websessions.manageSystemd('enable')">Enable autostart</button>
+								}
+								<button type="button" class="btn-cancel btn-small" onclick="window.websessions.manageSystemd('uninstall')">Uninstall</button>
+							</div>
+						} else {
+							<span class="hooks-badge hooks-inactive">Not installed</span>
+							<button type="button" class="btn-create btn-small" onclick="window.websessions.manageSystemd('install')">Install Service</button>
+						}
+					</div>
+					<div id="systemd-feedback"></div>
 				</div>
 			</div>
 		</div>

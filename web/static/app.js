@@ -802,6 +802,39 @@ window.websessions = (function() {
     container.appendChild(pre);
   }
 
+  // Systemd service management
+  function manageSystemd(action) {
+    var feedback = document.getElementById('systemd-feedback');
+    if (feedback) { feedback.textContent = 'Processing...'; feedback.className = 'hooks-feedback'; }
+
+    fetch('/settings/systemd', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: action }),
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(result) {
+      if (feedback) {
+        if (result.ok) {
+          feedback.textContent = 'Done: ' + result.data.status;
+          feedback.className = 'hooks-feedback hooks-feedback-ok';
+        } else {
+          feedback.textContent = 'Error: ' + (result.data.error || 'Unknown');
+          feedback.className = 'hooks-feedback hooks-feedback-err';
+        }
+        setTimeout(function() { feedback.textContent = ''; feedback.className = ''; }, 4000);
+      }
+      // Reload settings page to update buttons
+      setTimeout(function() { window.location.reload(); }, 500);
+    })
+    .catch(function(err) {
+      if (feedback) {
+        feedback.textContent = 'Error: ' + err.message;
+        feedback.className = 'hooks-feedback hooks-feedback-err';
+      }
+    });
+  }
+
   // Load claude sessions for a directory
   function loadClaudeSessions(dir) {
     if (!dir) return;
@@ -1319,6 +1352,7 @@ window.websessions = (function() {
     clearAllNotifications: clearAllNotifications,
     switchSidebarTab: switchSidebarTab,
     manageHooks: manageHooks,
+    manageSystemd: manageSystemd,
     settingsDirAutocomplete: settingsDirAutocomplete,
     loadClaudeSessions: loadClaudeSessions,
     selectDir: selectDir,

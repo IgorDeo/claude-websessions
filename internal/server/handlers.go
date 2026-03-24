@@ -16,6 +16,7 @@ import (
 
 	"github.com/igor-deoalves/websessions/internal/discovery"
 	"github.com/igor-deoalves/websessions/internal/hooks"
+	"github.com/igor-deoalves/websessions/internal/service"
 	"github.com/igor-deoalves/websessions/internal/notification"
 	"github.com/igor-deoalves/websessions/internal/session"
 	"github.com/igor-deoalves/websessions/internal/store"
@@ -678,6 +679,65 @@ func (s *Server) handleHookCallback(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// handleSystemd manages the systemd user service.
+func (s *Server) handleSystemd(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Action string `json:"action"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	var err error
+	switch payload.Action {
+	case "install":
+		err = service.Install()
+		if err == nil {
+			err = service.Enable()
+		}
+	case "uninstall":
+		err = service.Uninstall()
+	case "start":
+		if !service.IsInstalled() {
+			err = service.Install()
+			if err == nil {
+				err = service.Enable()
+			}
+		}
+		if err == nil {
+			err = service.Start()
+		}
+	case "stop":
+		err = service.Stop()
+	case "enable":
+		err = service.Enable()
+	case "disable":
+		err = service.Disable()
+	default:
+		http.Error(w, "unknown action", http.StatusBadRequest)
+		return
+	}
+
+	if err != nil {
+		slog.Error("systemd action failed", "action", payload.Action, "error", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"ok":        true,
+		"action":    payload.Action,
+		"status":    service.Status(),
+		"installed": service.IsInstalled(),
+		"active":    service.IsActive(),
+		"enabled":   service.IsEnabled(),
+	})
+}
+
 // handleInstallHooks installs/uninstalls websessions hooks in Claude settings.
 func (s *Server) handleInstallHooks(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
@@ -768,6 +828,11 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		data.HooksInstalled = claudeSettings.IsInstalled()
 	}
+	// Check systemd status
+	data.SystemdInstalled = service.IsInstalled()
+	data.SystemdActive = service.IsActive()
+	data.SystemdEnabled = service.IsEnabled()
+	data.SystemdStatus = service.Status()
 	templates.Settings(data).Render(r.Context(), w)
 }
 

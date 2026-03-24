@@ -666,6 +666,9 @@ html, body {
 .hooks-feedback { font-size: 0.75rem; padding: 0.4rem 0; }
 .hooks-feedback-ok { color: var(--green); }
 .hooks-feedback-err { color: var(--red); }
+.systemd-actions { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.systemd-label { font-size: 0.7rem; color: var(--text-muted); font-style: italic; }
+.systemd-enable-btn { background: var(--accent); color: #fff; border: none; }
 
 /* ============================================================
    Responsive
