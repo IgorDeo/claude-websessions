@@ -22,16 +22,23 @@ A web-based command center for managing multiple [Claude Code](https://claude.ai
 
 ## Requirements
 
-- **Go 1.22+**
+- **tmux** — required at runtime for session management
 - **Claude Code CLI** — installed and available in your PATH (`claude` command)
+
+### Build from source only
+
+- **Go 1.26+**
 - **templ** — Go HTML template engine CLI
 
 ### Install dependencies
 
 ```bash
-# Install Go (if not already installed)
-# https://go.dev/dl/
+# Install tmux (required)
+# Ubuntu/Debian: sudo apt install tmux
+# macOS: brew install tmux
 
+# For building from source:
+# Install Go — https://go.dev/dl/
 # Install templ CLI
 go install github.com/a-h/templ/cmd/templ@latest
 
@@ -41,7 +48,15 @@ go install github.com/a-h/templ/cmd/templ@latest
 
 ## Installation
 
-### Download binary (recommended)
+### Quick install (recommended)
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/IgorDeo/claude-websessions/main/install.sh | sh
+```
+
+This detects your OS/architecture, downloads the latest binary, and installs it to `~/.local/bin` (or `/usr/local/bin` if writable). Override with `WEBSESSIONS_INSTALL_DIR` or pin a version with `WEBSESSIONS_VERSION=v0.5.0`.
+
+### Download binary manually
 
 Download the latest release for your platform from [GitHub Releases](https://github.com/IgorDeo/claude-websessions/releases):
 
