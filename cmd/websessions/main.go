@@ -92,6 +92,7 @@ func isProcessAlive(pid int) bool {
 func main() {
 	configPath := ""
 	logLevel := "info"
+	guiMode := false
 	for i, arg := range os.Args[1:] {
 		switch arg {
 		case "--config":
@@ -102,6 +103,8 @@ func main() {
 			if i+1 < len(os.Args)-1 {
 				logLevel = os.Args[i+2]
 			}
+		case "--gui":
+			guiMode = true
 		}
 	}
 
@@ -353,6 +356,17 @@ func main() {
 			os.Exit(1)
 		}
 	}()
+
+	if guiMode {
+		go func() {
+			url := fmt.Sprintf("http://localhost:%d", cfg.Server.Port)
+			if err := openGUI(url); err != nil {
+				fmt.Fprintf(os.Stderr, "\n  %s%s✗ GUI error: %s%s\n\n", colorRed, colorBold, err, colorReset)
+			}
+			// Window closed — trigger shutdown
+			done <- syscall.SIGTERM
+		}()
+	}
 
 	<-done
 	printShutdown()
