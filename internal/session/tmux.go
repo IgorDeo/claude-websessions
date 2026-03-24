@@ -58,6 +58,8 @@ func tmuxCreateSession(name, workDir, command string, args []string) error {
 	// Disable tmux status bar and visual clutter for this session
 	tmuxRun("set-option", "-t", name, "status", "off")
 	tmuxRun("set-option", "-t", name, "mouse", "off")
+	// Use the largest client size (not smallest) so the window expands to fill
+	tmuxRun("set-window-option", "-t", name, "aggressive-resize", "on")
 
 	return nil
 }

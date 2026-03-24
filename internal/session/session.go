@@ -2,8 +2,11 @@ package session
 
 import (
 	"fmt"
+	"os"
 	"sync"
 	"time"
+
+	"github.com/creack/pty"
 )
 
 type State string
@@ -36,7 +39,8 @@ type Session struct {
 	Killed       bool   // true if intentionally killed by user
 	TmuxSession  string // tmux session name (e.g. "ws-myproject")
 
-	output *RingBuf
+	readerPTY *os.File // PTY for the tmux attach reader (for resize)
+	output    *RingBuf
 }
 
 var validTransitions = map[State][]State{
@@ -73,12 +77,24 @@ func (s *Session) Output() *RingBuf {
 	return s.output
 }
 
-// Resize resizes the tmux window for this session.
+// Resize resizes the tmux window and the reader PTY for this session.
 func (s *Session) Resize(rows, cols uint16) error {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if s.TmuxSession == "" {
 		return fmt.Errorf("no tmux session attached")
 	}
+	// Resize the reader PTY first (so tmux sees the new client size)
+	if s.readerPTY != nil {
+		pty.Setsize(s.readerPTY, &pty.Winsize{Rows: rows, Cols: cols})
+	}
+	// Then resize the tmux window
 	return tmuxResizeWindow(s.TmuxSession, int(cols), int(rows))
+}
+
+// SetReaderPTY stores the reader PTY file for resize operations.
+func (s *Session) SetReaderPTY(f *os.File) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.readerPTY = f
 }

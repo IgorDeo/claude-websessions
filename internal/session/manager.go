@@ -103,16 +103,20 @@ func (m *Manager) startReader(s *Session) {
 	m.mu.Unlock()
 
 	go func() {
-		// Use a PTY to attach to the tmux session in read-only mode.
-		// This gives us a live stream of the terminal output.
+		// Attach to the tmux session in read-only mode.
+		// Set a large initial PTY so tmux doesn't constrain the window.
 		cmd := exec.Command("tmux", "attach-session", "-t", s.TmuxSession, "-r")
-		ptmx, err := pty.Start(cmd)
+		ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: 50, Cols: 200})
 		if err != nil {
 			slog.Error("failed to attach to tmux session", "session", s.ID, "error", err)
 			return
 		}
-		defer ptmx.Close()
-		defer cmd.Process.Kill()
+		s.SetReaderPTY(ptmx)
+		defer func() {
+			s.SetReaderPTY(nil)
+			ptmx.Close()
+			cmd.Process.Kill()
+		}()
 
 		buf := make([]byte, 4096)
 		for {
