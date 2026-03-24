@@ -153,13 +153,25 @@ func (s *Server) handleTakeover(w http.ResponseWriter, r *http.Request, sessionI
 	claudeID := sess.ClaudeID
 	workDir := sess.WorkDir
 	pid := sess.PID
+	name := sess.Name
+
+	// Try to resolve session ID if not already known
+	if claudeID == "" {
+		claudeID = discovery.ResolveClaudeSessionID(workDir)
+	}
+
 	if err := discovery.KillProcess(pid, 5*time.Second); err != nil {
 		slog.Error("takeover kill failed", "session", sessionID, "error", err)
 		http.Error(w, "failed to kill process: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	s.mgr.Remove(sessionID)
-	args := []string{"--resume", claudeID}
+
+	args := []string{"--name", name}
+	if claudeID != "" {
+		args = append(args, "--resume", claudeID)
+		slog.Info("takeover resuming session", "session", sessionID, "claude_id", claudeID)
+	}
 	newSess, err := s.mgr.Create(sessionID, workDir, "claude", args)
 	if err != nil {
 		slog.Error("takeover resume failed", "session", sessionID, "error", err)

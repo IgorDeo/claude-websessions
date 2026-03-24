@@ -40,6 +40,44 @@ func ParseCmdline(cmdline string) (*ProcessInfo, error) {
 	return info, nil
 }
 
+// ResolveClaudeSessionID finds the active Claude session ID for a working directory
+// by looking at the most recently modified .jsonl file in ~/.claude/projects/<project>/
+func ResolveClaudeSessionID(workDir string) string {
+	if workDir == "" {
+		return ""
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	// Convert path to claude's project folder: /home/user.name/foo -> -home-user-name-foo
+	projectName := strings.ReplaceAll(workDir, "/", "-")
+	projectName = strings.ReplaceAll(projectName, ".", "-")
+	projectDir := filepath.Join(home, ".claude", "projects", projectName)
+
+	entries, err := os.ReadDir(projectDir)
+	if err != nil {
+		return ""
+	}
+
+	var bestID string
+	var bestTime time.Time
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".jsonl") {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			continue
+		}
+		if info.ModTime().After(bestTime) {
+			bestTime = info.ModTime()
+			bestID = strings.TrimSuffix(entry.Name(), ".jsonl")
+		}
+	}
+	return bestID
+}
+
 func Scan() ([]ProcessInfo, error) {
 	switch runtime.GOOS {
 	case "linux": return scanLinux()
@@ -65,6 +103,10 @@ func scanLinux() ([]ProcessInfo, error) {
 		info.PID = pid
 		cwd, err := os.Readlink(filepath.Join("/proc", entry.Name(), "cwd"))
 		if err == nil { info.WorkDir = cwd }
+		// Resolve session ID from project files if not in args
+		if info.ClaudeID == "" && info.WorkDir != "" {
+			info.ClaudeID = ResolveClaudeSessionID(info.WorkDir)
+		}
 		results = append(results, *info)
 	}
 	return results, nil
