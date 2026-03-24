@@ -104,10 +104,8 @@ func (m *Manager) startReader(s *Session) {
 
 	go func() {
 		// Attach to the tmux session in read-only mode.
-		// Set TERM=screen to avoid terminal capability queries that produce
-		// visible garbage like ">0;276;0c" in the session output.
 		cmd := exec.Command("tmux", "attach-session", "-t", s.TmuxSession, "-r")
-		cmd.Env = append(os.Environ(), "TERM=screen")
+		cmd.Env = append(os.Environ(), "TERM=xterm-256color")
 		ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: 50, Cols: 200})
 		if err != nil {
 			slog.Error("failed to attach to tmux session", "session", s.ID, "error", err)
@@ -388,6 +386,36 @@ func (m *Manager) Remove(id string) {
 	delete(m.sessions, id)
 }
 
+// isTerminalResponse checks if data is a terminal response sequence
+// that should be filtered out (e.g., DA responses from xterm.js).
+func isTerminalResponse(data []byte) bool {
+	s := string(data)
+	// DA1 response: ESC [ ? ... c
+	if strings.HasPrefix(s, "\033[?") && strings.HasSuffix(s, "c") {
+		return true
+	}
+	// DA2 response: ESC [ > ... c
+	if strings.HasPrefix(s, "\033[>") && strings.HasSuffix(s, "c") {
+		return true
+	}
+	// Raw DA response without ESC (sometimes sent as plain text)
+	if strings.HasPrefix(s, ">0;") && strings.HasSuffix(s, "c") {
+		return true
+	}
+	// DSR response: ESC [ ... R (cursor position report)
+	if strings.HasPrefix(s, "\033[") && strings.HasSuffix(s, "R") {
+		// Check it's digits and semicolons between
+		inner := s[2 : len(s)-1]
+		for _, ch := range inner {
+			if ch != ';' && (ch < '0' || ch > '9') {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
 // WriteInput sends input to the session's tmux pane.
 func (m *Manager) WriteInput(id string, data []byte) error {
 	s, ok := m.Get(id)
@@ -396,6 +424,10 @@ func (m *Manager) WriteInput(id string, data []byte) error {
 	}
 	if s.TmuxSession == "" {
 		return fmt.Errorf("session %s has no tmux session", id)
+	}
+	// Filter out terminal capability responses from xterm.js
+	if isTerminalResponse(data) {
+		return nil
 	}
 	return tmuxSendKeys(s.TmuxSession, string(data))
 }
