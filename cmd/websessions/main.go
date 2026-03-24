@@ -18,6 +18,16 @@ import (
 	"github.com/igor-deoalves/websessions/internal/store"
 )
 
+
+func isProcessAlive(pid int) bool {
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	err = proc.Signal(syscall.Signal(0))
+	return err == nil
+}
+
 func main() {
 	configPath := ""
 	logLevel := "info"
@@ -153,29 +163,48 @@ func main() {
 			ticker := time.NewTicker(cfg.Sessions.ScanInterval)
 			defer ticker.Stop()
 			for range ticker.C {
+				// Health check: remove discovered sessions whose process died
+				for _, s := range mgr.List() {
+					if s.GetState() != session.StateDiscovered {
+						continue
+					}
+					if s.PID > 0 && !isProcessAlive(s.PID) {
+						slog.Info("discovered session process died, removing", "id", s.ID, "pid", s.PID)
+						st.SaveSession(store.SessionRecord{
+							ID: s.ID, Name: s.Name, ClaudeID: s.ClaudeID, WorkDir: s.WorkDir,
+							StartTime: s.StartTime, EndTime: time.Now(),
+							Status: "completed", PID: s.PID,
+						})
+						mgr.Remove(s.ID)
+					}
+				}
+
+				// Discover new claude processes
 				processes, err := discovery.Scan()
 				if err != nil {
 					slog.Debug("discovery scan error", "error", err)
 					continue
 				}
+
+				// Build set of PIDs already tracked
+				existingPIDs := make(map[int]bool)
+				for _, s := range mgr.List() {
+					if s.PID > 0 {
+						existingPIDs[s.PID] = true
+					}
+				}
+
 				for _, p := range processes {
-					existing := mgr.List()
-					found := false
-					for _, s := range existing {
-						if s.PID == p.PID {
-							found = true
-							break
-						}
+					if existingPIDs[p.PID] {
+						continue
 					}
-					if !found {
-						id := fmt.Sprintf("discovered-%d", p.PID)
-						s := mgr.AddDiscovered(id, p.ClaudeID, p.WorkDir, p.PID, p.StartTime)
-						st.SaveSession(store.SessionRecord{
-							ID: id, Name: s.Name, ClaudeID: p.ClaudeID, WorkDir: p.WorkDir,
-							StartTime: p.StartTime, Status: "discovered", PID: p.PID,
-						})
-						slog.Info("discovered new claude session", "pid", p.PID)
-					}
+					id := fmt.Sprintf("discovered-%d", p.PID)
+					s := mgr.AddDiscovered(id, p.ClaudeID, p.WorkDir, p.PID, p.StartTime)
+					st.SaveSession(store.SessionRecord{
+						ID: id, Name: s.Name, ClaudeID: p.ClaudeID, WorkDir: p.WorkDir,
+						StartTime: p.StartTime, Status: "discovered", PID: p.PID,
+					})
+					slog.Info("discovered new claude session", "pid", p.PID)
 				}
 			}
 		}()
