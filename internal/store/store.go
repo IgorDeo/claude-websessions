@@ -12,6 +12,7 @@ type Store struct{ db *sql.DB }
 
 type SessionRecord struct {
 	ID        string
+	Name      string
 	ClaudeID  string
 	WorkDir   string
 	StartTime time.Time
@@ -46,7 +47,7 @@ func (s *Store) Close() error { return s.db.Close() }
 func migrate(db *sql.DB) error {
 	schema := `
 	CREATE TABLE IF NOT EXISTS sessions (
-		id TEXT PRIMARY KEY, claude_id TEXT, work_dir TEXT,
+		id TEXT PRIMARY KEY, name TEXT, claude_id TEXT, work_dir TEXT,
 		start_time DATETIME, end_time DATETIME,
 		exit_code INTEGER, status TEXT, pid INTEGER
 	);
@@ -60,20 +61,25 @@ func migrate(db *sql.DB) error {
 		action TEXT, session_id TEXT, client_ip TEXT, timestamp DATETIME
 	);`
 	_, err := db.Exec(schema)
-	return err
+	if err != nil {
+		return err
+	}
+	// Migration: add name column if it doesn't exist (for existing DBs)
+	db.Exec("ALTER TABLE sessions ADD COLUMN name TEXT DEFAULT ''")
+	return nil
 }
 
 func (s *Store) SaveSession(r SessionRecord) error {
 	_, err := s.db.Exec(
-		`INSERT OR REPLACE INTO sessions (id, claude_id, work_dir, start_time, end_time, exit_code, status, pid) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.ID, r.ClaudeID, r.WorkDir, r.StartTime, r.EndTime, r.ExitCode, r.Status, r.PID,
+		`INSERT OR REPLACE INTO sessions (id, name, claude_id, work_dir, start_time, end_time, exit_code, status, pid) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID, r.Name, r.ClaudeID, r.WorkDir, r.StartTime, r.EndTime, r.ExitCode, r.Status, r.PID,
 	)
 	return err
 }
 
 func (s *Store) ListSessions(limit int) ([]SessionRecord, error) {
 	rows, err := s.db.Query(
-		`SELECT id, claude_id, work_dir, start_time, end_time, exit_code, status, pid FROM sessions ORDER BY start_time DESC LIMIT ?`,
+		`SELECT id, COALESCE(name, ''), claude_id, work_dir, start_time, end_time, exit_code, status, pid FROM sessions ORDER BY start_time DESC LIMIT ?`,
 		limit,
 	)
 	if err != nil {
@@ -83,7 +89,7 @@ func (s *Store) ListSessions(limit int) ([]SessionRecord, error) {
 	var records []SessionRecord
 	for rows.Next() {
 		var r SessionRecord
-		if err := rows.Scan(&r.ID, &r.ClaudeID, &r.WorkDir, &r.StartTime, &r.EndTime, &r.ExitCode, &r.Status, &r.PID); err != nil {
+		if err := rows.Scan(&r.ID, &r.Name, &r.ClaudeID, &r.WorkDir, &r.StartTime, &r.EndTime, &r.ExitCode, &r.Status, &r.PID); err != nil {
 			return nil, err
 		}
 		records = append(records, r)

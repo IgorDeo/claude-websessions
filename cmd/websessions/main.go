@@ -91,7 +91,7 @@ func main() {
 		event := notification.SessionEvent{SessionID: s.ID, Type: eventType, Timestamp: time.Now()}
 		bus.Publish(event)
 		st.SaveSession(store.SessionRecord{
-			ID: s.ID, ClaudeID: s.ClaudeID, WorkDir: s.WorkDir,
+			ID: s.ID, Name: s.Name, ClaudeID: s.ClaudeID, WorkDir: s.WorkDir,
 			StartTime: s.StartTime, EndTime: s.EndTime,
 			ExitCode: s.ExitCode, Status: string(to), PID: s.PID,
 		})
@@ -105,8 +105,12 @@ func main() {
 	if err == nil {
 		for _, rec := range prevSessions {
 			if rec.Status == "running" || rec.Status == "waiting" || rec.Status == "created" {
-				mgr.AddOffline(rec.ID, rec.ID, rec.ClaudeID, rec.WorkDir)
-				slog.Info("restored offline session", "id", rec.ID, "dir", rec.WorkDir)
+				name := rec.Name
+				if name == "" {
+					name = rec.ID
+				}
+				mgr.AddOffline(rec.ID, name, rec.ClaudeID, rec.WorkDir)
+				slog.Info("restored offline session", "id", rec.ID, "name", name, "dir", rec.WorkDir)
 			}
 		}
 	}
@@ -172,7 +176,7 @@ func main() {
 
 	for _, s := range mgr.List() {
 		st.SaveSession(store.SessionRecord{
-			ID: s.ID, ClaudeID: s.ClaudeID, WorkDir: s.WorkDir,
+			ID: s.ID, Name: s.Name, ClaudeID: s.ClaudeID, WorkDir: s.WorkDir,
 			StartTime: s.StartTime, EndTime: s.EndTime,
 			ExitCode: s.ExitCode, Status: string(s.GetState()), PID: s.PID,
 		})

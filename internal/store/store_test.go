@@ -14,7 +14,7 @@ func TestStore_SaveAndListSessions(t *testing.T) {
 	}
 	defer s.Close()
 	rec := store.SessionRecord{
-		ID: "s1", ClaudeID: "claude-abc", WorkDir: "/home/user/project",
+		ID: "s1", Name: "my-session", ClaudeID: "claude-abc", WorkDir: "/home/user/project",
 		StartTime: time.Now().Add(-5 * time.Minute), EndTime: time.Now(),
 		ExitCode: 0, Status: "completed",
 	}

@@ -61,11 +61,18 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	if prompt != "" {
 		args = append(args, "-p", prompt)
 	}
-	_, err := s.mgr.Create(name, workDir, "claude", args)
+	sess, err := s.mgr.Create(name, workDir, "claude", args)
 	if err != nil {
 		slog.Error("failed to create session", "error", err)
 		http.Error(w, "failed to create session: "+err.Error(), http.StatusInternalServerError)
 		return
+	}
+	// Persist to SQLite immediately so it survives restarts
+	if s.store != nil {
+		s.store.SaveSession(store.SessionRecord{
+			ID: sess.ID, Name: sess.Name, ClaudeID: sess.ClaudeID, WorkDir: sess.WorkDir,
+			StartTime: sess.StartTime, Status: "running", PID: sess.PID,
+		})
 	}
 	s.handleSidebar(w, r)
 }
@@ -219,6 +226,14 @@ func (s *Server) handleRenameSession(w http.ResponseWriter, r *http.Request, ses
 		return
 	}
 	sess.Name = name
+	// Persist rename to SQLite
+	if s.store != nil {
+		s.store.SaveSession(store.SessionRecord{
+			ID: sess.ID, Name: name, ClaudeID: sess.ClaudeID, WorkDir: sess.WorkDir,
+			StartTime: sess.StartTime, EndTime: sess.EndTime,
+			ExitCode: sess.ExitCode, Status: string(sess.GetState()), PID: sess.PID,
+		})
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
