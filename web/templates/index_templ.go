@@ -27,6 +27,7 @@ type NotificationView struct {
 
 type PageData struct {
 	Sessions      []SessionView
+	History       []SessionView
 	Notifications []NotificationView
 	UnreadCount   int
 }
@@ -76,7 +77,7 @@ func Index(data PageData) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(data.UnreadCount))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/index.templ`, Line: 36, Col: 51}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/index.templ`, Line: 37, Col: 51}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -91,7 +92,7 @@ func Index(data PageData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = Sidebar(data.Sessions).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = Sidebar(data.Sessions, data.History).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

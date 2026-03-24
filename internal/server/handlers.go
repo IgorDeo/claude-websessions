@@ -29,6 +29,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		views[i] = sessionToView(sess)
 	}
 	data := templates.PageData{Sessions: views, UnreadCount: s.sink.UnreadCount()}
+	// History is loaded by sidebar via htmx, not needed for initial render
 	templates.Index(data).Render(r.Context(), w)
 }
 
@@ -38,7 +39,33 @@ func (s *Server) handleSidebar(w http.ResponseWriter, r *http.Request) {
 	for i, sess := range sessions {
 		views[i] = sessionToView(sess)
 	}
-	templates.Sidebar(views).Render(r.Context(), w)
+
+	// Load history from SQLite (completed/errored sessions not in active list)
+	var history []templates.SessionView
+	if s.store != nil {
+		records, _ := s.store.ListSessions(20)
+		activeIDs := make(map[string]bool)
+		for _, v := range views {
+			activeIDs[v.ID] = true
+		}
+		for _, rec := range records {
+			if activeIDs[rec.ID] {
+				continue
+			}
+			name := rec.Name
+			if name == "" {
+				name = rec.ID
+			}
+			history = append(history, templates.SessionView{
+				ID:      rec.ID,
+				Name:    name,
+				WorkDir: rec.WorkDir,
+				State:   rec.Status,
+			})
+		}
+	}
+
+	templates.Sidebar(views, history).Render(r.Context(), w)
 }
 
 func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
@@ -261,11 +288,43 @@ func (s *Server) handleKillSession(w http.ResponseWriter, r *http.Request, sessi
 }
 
 func (s *Server) handleRestartSession(w http.ResponseWriter, r *http.Request, sessionID string) {
+	// Try in-memory first (for offline sessions)
 	newSess, err := s.mgr.Restart(sessionID)
 	if err != nil {
-		slog.Error("restart failed", "session", sessionID, "error", err)
-		http.Error(w, "failed to restart session: "+err.Error(), http.StatusInternalServerError)
-		return
+		// Not in memory — try loading from SQLite history
+		if s.store != nil {
+			records, _ := s.store.ListSessions(100)
+			for _, rec := range records {
+				if rec.ID == sessionID {
+					// Create directly from history record
+					name := rec.Name
+					if name == "" {
+						name = sessionID
+					}
+					args := []string{"--name", name}
+					if rec.ClaudeID != "" {
+						args = append(args, "--resume", rec.ClaudeID)
+					}
+					newSess, err = s.mgr.Create(sessionID, rec.WorkDir, "claude", args)
+					if err == nil {
+						newSess.Name = name
+					}
+					break
+				}
+			}
+		}
+		if err != nil || newSess == nil {
+			slog.Error("restart failed", "session", sessionID, "error", err)
+			http.Error(w, "failed to restart session: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+	// Save to DB
+	if s.store != nil {
+		s.store.SaveSession(store.SessionRecord{
+			ID: newSess.ID, Name: newSess.Name, ClaudeID: newSess.ClaudeID, WorkDir: newSess.WorkDir,
+			StartTime: newSess.StartTime, Status: "running", PID: newSess.PID,
+		})
 	}
 	v := sessionToView(newSess)
 	templates.Terminal(v.ID, v.Name, v.WorkDir, v.State).Render(r.Context(), w)

@@ -1,6 +1,6 @@
 package templates
 
-templ Sidebar(sessions []SessionView) {
+templ Sidebar(sessions []SessionView, history []SessionView) {
 	<div class="session-list" id="session-list">
 		for _, s := range sessions {
 			<div
@@ -42,6 +42,32 @@ templ Sidebar(sessions []SessionView) {
 			</div>
 		}
 	</div>
+	if len(history) > 0 {
+		<div class="history-section">
+			<div class="history-header">
+				<span class="history-title">History</span>
+			</div>
+			<div class="history-list">
+				for _, s := range history {
+					<div class={ "session-item session-item-history", stateClass(s.State) }>
+						<div class="session-clickable">
+							<span class="status-dot"></span>
+							<div class="session-info">
+								<span class="session-name">{ s.Name }</span>
+								<span class="session-dir">{ s.WorkDir }</span>
+							</div>
+						</div>
+						<button
+							class="restart-btn"
+							hx-post={ "/sessions/" + s.ID + "/restart" }
+							hx-target="#terminal-area"
+							hx-swap="innerHTML"
+						>Restart</button>
+					</div>
+				}
+			</div>
+		</div>
+	}
 }
 
 script openSession(id string, name string, state string) {
