@@ -104,7 +104,7 @@ func main() {
 	prevSessions, err := st.ListSessions(50)
 	if err == nil {
 		for _, rec := range prevSessions {
-			if rec.Status == "running" || rec.Status == "waiting" || rec.Status == "created" {
+			if rec.Status == "running" || rec.Status == "waiting" || rec.Status == "created" || rec.Status == "discovered" {
 				name := rec.Name
 				if name == "" {
 					name = rec.ID
@@ -123,7 +123,11 @@ func main() {
 		}
 		for _, p := range processes {
 			id := fmt.Sprintf("discovered-%d", p.PID)
-			mgr.AddDiscovered(id, p.ClaudeID, p.WorkDir, p.PID, p.StartTime)
+			s := mgr.AddDiscovered(id, p.ClaudeID, p.WorkDir, p.PID, p.StartTime)
+			st.SaveSession(store.SessionRecord{
+				ID: id, Name: s.Name, ClaudeID: p.ClaudeID, WorkDir: p.WorkDir,
+				StartTime: p.StartTime, Status: "discovered", PID: p.PID,
+			})
 			slog.Info("discovered claude session", "pid", p.PID, "dir", p.WorkDir)
 		}
 	}()
@@ -149,7 +153,11 @@ func main() {
 					}
 					if !found {
 						id := fmt.Sprintf("discovered-%d", p.PID)
-						mgr.AddDiscovered(id, p.ClaudeID, p.WorkDir, p.PID, p.StartTime)
+						s := mgr.AddDiscovered(id, p.ClaudeID, p.WorkDir, p.PID, p.StartTime)
+						st.SaveSession(store.SessionRecord{
+							ID: id, Name: s.Name, ClaudeID: p.ClaudeID, WorkDir: p.WorkDir,
+							StartTime: p.StartTime, Status: "discovered", PID: p.PID,
+						})
 						slog.Info("discovered new claude session", "pid", p.PID)
 					}
 				}
