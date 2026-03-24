@@ -105,6 +105,9 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 			StartTime: sess.StartTime, Status: "running", PID: sess.PID,
 		})
 	}
+	// Tell the client to auto-open this session
+	w.Header().Set("X-Session-ID", sess.ID)
+	w.Header().Set("X-Session-Name", sess.Name)
 	s.handleSidebar(w, r)
 }
 

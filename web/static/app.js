@@ -240,6 +240,15 @@ window.websessions = (function() {
     if (form && form.id === 'new-session-form' && event.detail.successful) {
       var modal = form.closest('.modal-overlay');
       if (modal) modal.remove();
+      // Auto-open the newly created session
+      var xhr = event.detail.xhr;
+      if (xhr) {
+        var sessionID = xhr.getResponseHeader('X-Session-ID');
+        var sessionName = xhr.getResponseHeader('X-Session-Name');
+        if (sessionID) {
+          openTab(sessionID, sessionName || sessionID, 'running');
+        }
+      }
     }
   });
 
