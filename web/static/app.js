@@ -1464,6 +1464,83 @@ window.websessions = (function() {
   }
   connectNotifications();
 
+  // ── Periodic update check (every 30 minutes) ──────────────
+  var updateBannerShown = false;
+  function backgroundUpdateCheck() {
+    if (updateBannerShown) return;
+    fetch('/api/check-update')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.UpdateAvail && !updateBannerShown) {
+          updateBannerShown = true;
+          showUpdateBanner(data.LatestVersion, data.ReleaseURL);
+        }
+      })
+      .catch(function() {}); // silently ignore errors
+  }
+
+  function showUpdateBanner(version, url) {
+    var existing = document.getElementById('update-banner');
+    if (existing) return;
+
+    var banner = document.createElement('div');
+    banner.id = 'update-banner';
+    banner.className = 'update-banner';
+
+    var text = document.createElement('span');
+    text.className = 'update-banner-text';
+    text.textContent = 'A new version of websessions is available: ' + version;
+
+    var actions = document.createElement('span');
+    actions.className = 'update-banner-actions';
+
+    var viewBtn = document.createElement('a');
+    viewBtn.className = 'update-banner-btn';
+    viewBtn.textContent = 'View release';
+    viewBtn.href = url || 'https://github.com/IgorDeo/claude-websessions/releases/latest';
+    viewBtn.target = '_blank';
+    viewBtn.rel = 'noopener';
+
+    var updateBtn = document.createElement('button');
+    updateBtn.className = 'update-banner-btn update-banner-btn-primary';
+    updateBtn.textContent = 'Update now';
+    updateBtn.onclick = function() {
+      updateBtn.textContent = 'Updating...';
+      updateBtn.disabled = true;
+      fetch('/api/self-update', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) {
+            updateBtn.textContent = 'Failed: ' + data.error;
+          } else {
+            text.textContent = 'Updated to ' + version + '. Restart websessions to apply.';
+            updateBtn.remove();
+            viewBtn.remove();
+          }
+        })
+        .catch(function(err) {
+          updateBtn.textContent = 'Failed';
+        });
+    };
+
+    var dismiss = document.createElement('button');
+    dismiss.className = 'update-banner-dismiss';
+    dismiss.textContent = '\u00d7';
+    dismiss.title = 'Dismiss';
+    dismiss.onclick = function() { banner.remove(); };
+
+    actions.appendChild(viewBtn);
+    actions.appendChild(updateBtn);
+    banner.appendChild(text);
+    banner.appendChild(actions);
+    banner.appendChild(dismiss);
+    document.body.insertBefore(banner, document.body.firstChild);
+  }
+
+  // Check on startup (after 10s delay) then every 30 minutes
+  setTimeout(backgroundUpdateCheck, 10000);
+  setInterval(backgroundUpdateCheck, 30 * 60 * 1000);
+
   return {
     connectSession: connectSession,
     disconnectSession: disconnectSession,
