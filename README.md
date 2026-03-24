@@ -151,8 +151,11 @@ make build
 |-----------|----------|-------|
 | **tmux** | Yes | Session management runtime |
 | **Claude Code CLI** | Yes | `claude` command in PATH |
+| **[Maple Mono Normal NF](https://github.com/subframe7536/maple-font)** | Recommended | Monospace font with ligatures and Nerd Font icons |
 | **Go 1.26+** | Build only | Not needed for binary installs |
 | **templ** | Build only | `go install github.com/a-h/templ/cmd/templ@latest` |
+
+> **Font**: websessions uses [Maple Mono Normal NF](https://github.com/subframe7536/maple-font) as its preferred terminal font — a monospace font with round corners, ligatures, and Nerd Font icons. If not installed, it falls back to IBM Plex Mono, JetBrains Mono, Fira Code, or the system monospace font.
 
 ---
 
