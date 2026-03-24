@@ -660,7 +660,6 @@ window.websessions = (function() {
   // Quick terminal creation
   function openTerminal() {
     var form = new FormData();
-    form.append('name', 'terminal-' + Date.now().toString(36));
     form.append('work_dir', '~');
     fetch('/sessions/terminal', { method: 'POST', body: form })
       .then(function(r) {

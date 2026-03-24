@@ -30,7 +30,10 @@ templ Sidebar(sessions []SessionView, history []SessionView) {
 						>
 							<span class="status-dot"></span>
 							<div class="session-info">
-								<span class="session-name">{ s.Name }</span>
+								<div class="session-name-row">
+									<span class="session-name">{ s.Name }</span>
+									<span class={ "session-type-badge", "type-" + s.Type }>{ s.Type }</span>
+								</div>
 								<span class="session-dir">{ s.WorkDir }</span>
 							</div>
 						</div>
@@ -38,7 +41,10 @@ templ Sidebar(sessions []SessionView, history []SessionView) {
 						<div class="session-clickable">
 							<span class="status-dot"></span>
 							<div class="session-info">
-								<span class="session-name">{ s.Name }</span>
+								<div class="session-name-row">
+									<span class="session-name">{ s.Name }</span>
+									<span class={ "session-type-badge", "type-" + s.Type }>{ s.Type }</span>
+								</div>
 								<span class="session-dir">{ s.WorkDir }</span>
 							</div>
 						</div>

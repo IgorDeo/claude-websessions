@@ -209,10 +209,19 @@ html, body {
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
 .session-info { display: flex; flex-direction: column; overflow: hidden; gap: 0.05rem; }
+.session-name-row { display: flex; align-items: center; gap: 0.35rem; overflow: hidden; }
 .session-name {
   font-family: var(--font-mono); font-size: 0.78rem; font-weight: 500;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
+.session-type-badge {
+  font-size: 0.55rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em;
+  padding: 0.05rem 0.3rem; border-radius: 3px; flex-shrink: 0;
+  opacity: 0.85;
+}
+.type-claude { background: rgba(108, 140, 255, 0.2); color: #8aa8ff; }
+.type-terminal { background: rgba(126, 200, 126, 0.2); color: #7ec87e; }
+.type-discovered { background: rgba(212, 168, 67, 0.2); color: #d4a843; }
 .session-dir {
   font-size: 0.65rem; color: var(--text-muted);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;

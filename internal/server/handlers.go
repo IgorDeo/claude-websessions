@@ -69,6 +69,7 @@ func (s *Server) loadHistory(activeViews []templates.SessionView) []templates.Se
 			Name:    name,
 			WorkDir: rec.WorkDir,
 			State:   rec.Status,
+			Type:    sessionType(rec.ID),
 		})
 	}
 	return history
@@ -118,14 +119,20 @@ func (s *Server) handleCreateTerminal(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid form", http.StatusBadRequest)
 		return
 	}
-	name := r.FormValue("name")
 	workDir := r.FormValue("work_dir")
 	if workDir == "" {
 		workDir = s.cfg.Sessions.DefaultDir
 	}
-	if name == "" {
-		name = "terminal"
+
+	// Count existing terminals to generate a friendly name
+	termCount := 0
+	for _, sess := range s.mgr.List() {
+		if strings.HasPrefix(sess.ID, "term-") {
+			termCount++
+		}
 	}
+	name := fmt.Sprintf("Terminal %d", termCount+1)
+	id := fmt.Sprintf("term-%d", time.Now().UnixMilli())
 
 	// Use the user's default shell
 	shell := os.Getenv("SHELL")
@@ -137,7 +144,7 @@ func (s *Server) handleCreateTerminal(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	sess, err := s.mgr.Create("term-"+name, workDir, shell, nil)
+	sess, err := s.mgr.Create(id, workDir, shell, nil)
 	if err != nil {
 		slog.Error("failed to create terminal", "error", err)
 		http.Error(w, "failed to create terminal: "+err.Error(), http.StatusInternalServerError)
@@ -277,10 +284,20 @@ func eventMessage(eventType string) string {
 	}
 }
 
+func sessionType(id string) string {
+	if strings.HasPrefix(id, "term-") {
+		return "terminal"
+	}
+	if strings.HasPrefix(id, "discovered-") {
+		return "discovered"
+	}
+	return "claude"
+}
+
 func sessionToView(s *session.Session) templates.SessionView {
 	return templates.SessionView{
 		ID: s.ID, Name: s.Name, WorkDir: s.WorkDir,
-		State: string(s.GetState()), Owned: s.Owned,
+		State: string(s.GetState()), Type: sessionType(s.ID), Owned: s.Owned,
 	}
 }
 
