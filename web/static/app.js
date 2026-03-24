@@ -595,7 +595,10 @@ window.websessions = (function() {
       .then(function(r) {
         if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
         closeTab(sessionID);
-        htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+        // Small delay to let mgr.Wait() finish removing from active list
+        setTimeout(function() {
+          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+        }, 500);
       })
       .catch(function(err) { console.error('kill failed:', err); });
   }

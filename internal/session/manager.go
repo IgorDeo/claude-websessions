@@ -177,6 +177,8 @@ func (m *Manager) Wait(id string) {
 	if p := s.PTY(); p != nil {
 		p.Close()
 	}
+	// Remove from active sessions — it's now in SQLite history
+	m.Remove(id)
 }
 
 func (m *Manager) Get(id string) (*Session, bool) {
