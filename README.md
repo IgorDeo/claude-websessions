@@ -1,162 +1,240 @@
-# websessions
+<p align="center">
+  <img src="web/static/favicon.svg" width="80" height="80" alt="websessions logo">
+</p>
 
-A web-based command center for managing multiple [Claude Code](https://claude.ai/code) CLI sessions from a single browser window. Launch, discover, monitor, and interact with all your Claude sessions in one place.
+<h1 align="center">websessions</h1>
+
+<p align="center">
+  <strong>A command center for managing multiple Claude Code CLI sessions.</strong><br>
+  Launch, discover, monitor, and interact with all your sessions from one place.
+</p>
+
+<p align="center">
+  <a href="https://github.com/IgorDeo/claude-websessions/releases/latest"><img src="https://img.shields.io/github/v/release/IgorDeo/claude-websessions?style=flat-square&color=6c8cff" alt="Release"></a>
+  <a href="https://github.com/IgorDeo/claude-websessions/blob/main/LICENSE"><img src="https://img.shields.io/github/license/IgorDeo/claude-websessions?style=flat-square&color=7ec87e" alt="License"></a>
+  <a href="https://github.com/IgorDeo/claude-websessions/releases"><img src="https://img.shields.io/github/downloads/IgorDeo/claude-websessions/total?style=flat-square&color=d4a843" alt="Downloads"></a>
+</p>
+
+<p align="center">
+  <code>curl -LsSf https://raw.githubusercontent.com/IgorDeo/claude-websessions/main/install.sh | sh</code>
+</p>
+
+---
+
+<!-- Screenshot placeholders — replace with actual screenshots -->
+<!--
+<p align="center">
+  <img src="docs/screenshots/main.png" width="800" alt="Main interface with split panes">
+</p>
+-->
 
 ## Features
 
-- **Full interactive terminals** — xterm.js-powered web terminals with real-time PTY streaming via WebSocket
-- **Session discovery** — automatically finds running Claude Code sessions on your machine and lets you take them over
-- **Session takeover** — kills a discovered session and resumes it with `--resume` so the conversation continues seamlessly
-- **Split panes** — Terminator-style horizontal/vertical splits, drag tabs to edges to create splits
-- **Tab management** — open multiple sessions as tabs, drag to reorder, right-click context menu (close, close & stop, close others)
-- **Session history** — SQLite-backed history of all past sessions with one-click restart
-- **Notifications** — real-time push notifications via WebSocket when sessions complete, error, or need input (tool approvals)
-- **Claude Code hooks** — optional hooks in `~/.claude/settings.json` that notify websessions on permission prompts, completions, and tool use
-- **Git diff viewer** — see `git diff` and `git status` for any session's working directory
-- **Session rename** — double-click the session name in the pane header to rename
-- **Directory autocomplete** — file picker with autocomplete when creating sessions or in settings
-- **Resume previous sessions** — when creating a session, see and resume past Claude sessions from `~/.claude/projects/`
-- **Dark theme** — Tokyo Night color scheme, monospace fonts
-- **Single binary** — all assets (htmx, xterm.js, split.js, CSS) embedded via `go:embed`
-- **Settings page** — configure server, notifications, scan interval, and Claude Code hooks from the UI
+<table>
+<tr>
+<td width="50%">
 
-## Requirements
+**Terminal Management**
+- Full interactive xterm.js terminals
+- Split panes (horizontal/vertical)
+- Tabs with drag-to-reorder
+- Session rename, kill, restart
 
-- **tmux** — required at runtime for session management
-- **Claude Code CLI** — installed and available in your PATH (`claude` command)
+</td>
+<td width="50%">
 
-### Build from source only
+**Session Intelligence**
+- Auto-discovers running Claude sessions
+- Take over sessions from other terminals
+- Resume previous conversations
+- SQLite-backed session history
 
-- **Go 1.26+**
-- **templ** — Go HTML template engine CLI
+</td>
+</tr>
+<tr>
+<td width="50%">
 
-### Install dependencies
+**Notifications**
+- Real-time WebSocket push notifications
+- Claude Code hooks integration
+- Desktop notifications for completions, errors, tool approvals
+- Configurable reminder intervals
+
+</td>
+<td width="50%">
+
+**Developer Experience**
+- Single binary, all assets embedded
+- Native GUI mode (no browser needed)
+- Git diff viewer per session
+- Dark theme (Tokyo Night)
+- Settings page with live config
+
+</td>
+</tr>
+</table>
+
+<!-- Screenshot placeholders — replace with actual screenshots -->
+<!--
+<details>
+<summary>More screenshots</summary>
+
+| Split Panes | Session Discovery | Notifications |
+|:-----------:|:-----------------:|:-------------:|
+| <img src="docs/screenshots/splits.png" width="250"> | <img src="docs/screenshots/discovery.png" width="250"> | <img src="docs/screenshots/notifications.png" width="250"> |
+
+| New Session | Settings | Git Diff |
+|:-----------:|:--------:|:--------:|
+| <img src="docs/screenshots/new-session.png" width="250"> | <img src="docs/screenshots/settings.png" width="250"> | <img src="docs/screenshots/git-diff.png" width="250"> |
+
+</details>
+-->
+
+---
+
+## Quick Start
 
 ```bash
-# Install tmux (required)
-# Ubuntu/Debian: sudo apt install tmux
-# macOS: brew install tmux
+# Install
+curl -LsSf https://raw.githubusercontent.com/IgorDeo/claude-websessions/main/install.sh | sh
 
-# For building from source:
-# Install Go — https://go.dev/dl/
-# Install templ CLI
-go install github.com/a-h/templ/cmd/templ@latest
-
-# Install golangci-lint (optional, for linting)
-# https://golangci-lint.run/usage/install/
+# Run
+websessions
 ```
+
+Open http://localhost:8080 — any running Claude Code sessions on your machine appear automatically.
+
+> **Want a native window instead of a browser?** See [GUI mode](#gui-mode-no-browser-needed) below.
 
 ## Installation
 
-### Quick install (recommended)
+### One-line install (recommended)
 
 ```bash
 curl -LsSf https://raw.githubusercontent.com/IgorDeo/claude-websessions/main/install.sh | sh
 ```
 
-This detects your OS/architecture, downloads the latest binary, and installs it to `~/.local/bin` (or `/usr/local/bin` if writable). Override with `WEBSESSIONS_INSTALL_DIR` or pin a version with `WEBSESSIONS_VERSION=v0.5.0`.
+Detects your OS/architecture, downloads the latest binary, and installs to `~/.local/bin` (or `/usr/local/bin` if writable).
+
+| Option | Description |
+|--------|-------------|
+| `WEBSESSIONS_VERSION=v0.7.0` | Pin a specific version |
+| `WEBSESSIONS_INSTALL_DIR=/opt/bin` | Custom install path |
+| `--gui` | Download GUI-enabled binary (see [GUI mode](#gui-mode-no-browser-needed)) |
 
 ### Download binary manually
 
-Download the latest release for your platform from [GitHub Releases](https://github.com/IgorDeo/claude-websessions/releases):
+Grab the latest from [GitHub Releases](https://github.com/IgorDeo/claude-websessions/releases):
 
 ```bash
 # Linux (amd64)
 curl -L https://github.com/IgorDeo/claude-websessions/releases/latest/download/websessions-linux-amd64 -o websessions
-chmod +x websessions
-./websessions
+chmod +x websessions && ./websessions
 
 # macOS (Apple Silicon)
 curl -L https://github.com/IgorDeo/claude-websessions/releases/latest/download/websessions-darwin-arm64 -o websessions
-chmod +x websessions
-./websessions
-
-# macOS (Intel)
-curl -L https://github.com/IgorDeo/claude-websessions/releases/latest/download/websessions-darwin-amd64 -o websessions
-chmod +x websessions
-./websessions
+chmod +x websessions && ./websessions
 ```
 
 ### Build from source
 
 ```bash
-# Clone the repository
 git clone https://github.com/IgorDeo/claude-websessions.git
 cd claude-websessions
-
-# Build
 make build
-
-# Run
 ./bin/websessions
 ```
 
-Open http://localhost:8080 in your browser.
+### Requirements
 
-Any running Claude Code sessions on your machine will automatically appear in the sidebar.
+| Dependency | Required | Notes |
+|-----------|----------|-------|
+| **tmux** | Yes | Session management runtime |
+| **Claude Code CLI** | Yes | `claude` command in PATH |
+| **Go 1.26+** | Build only | Not needed for binary installs |
+| **templ** | Build only | `go install github.com/a-h/templ/cmd/templ@latest` |
 
-## Build & Run
+---
+
+## Usage
+
+### Creating a session
+
+1. Click **+ New Session** in the footer or the **+** tab
+2. Pick a **recent project** or type a working directory (autocomplete available)
+3. Optionally select a previous Claude session to **resume**
+4. Give it a name and an optional initial prompt
+5. Click **Create** — the session opens automatically
+
+### Session discovery & takeover
+
+websessions scans for running `claude` processes on startup and periodically (default 30s). Discovered sessions appear in the sidebar with a **Take Over** button.
+
+**Take Over** resolves the Claude session ID, kills the original terminal process, and launches `claude --resume` in a websessions-owned PTY — the conversation continues where it left off.
+
+### Tabs and splits
+
+| Action | How |
+|--------|-----|
+| Open session | Click in sidebar |
+| Reorder tabs | Drag tabs |
+| Create split | Drag tab to terminal edges |
+| Tab context menu | Right-click tab |
+| Close tab | Click x (session keeps running) |
+| Split pane | Buttons in pane header |
+
+### Notifications
+
+Click the **bell icon** to see notifications. Events: session completed, errored, or waiting for input.
+
+**Claude Code Hooks** (recommended): Go to **Settings > Claude Code Hooks > Install Hooks** to get more reliable notifications via `~/.claude/settings.json`.
+
+### More actions
+
+| Feature | How |
+|---------|-----|
+| Kill session | Right-click tab > Close & stop, or stop button in header |
+| Rename session | Double-click name in pane header |
+| Git diff | Click **&#916;** button in pane header |
+| Session history | **History** tab in sidebar, with restart button |
+
+---
+
+## GUI Mode (no browser needed)
+
+Run websessions in a native desktop window using the OS webview engine — lightweight and fast, no Chrome needed.
+
+### Install with GUI support
 
 ```bash
-make build          # Build binary to bin/websessions (runs templ generate)
-make build-gui      # Build with native GUI support (requires CGO + system libs)
-make run            # Build and run in one step
-make run-gui        # Build and run with native GUI window
-make test           # Run all tests
-make lint           # Run golangci-lint
-make clean          # Remove build artifacts
+curl -LsSf https://raw.githubusercontent.com/IgorDeo/claude-websessions/main/install.sh | sh -s -- --gui
 ```
 
-### Run with options
+The install script checks for required system libraries and shows the exact install command if they're missing.
 
-```bash
-# Custom config file
-./bin/websessions --config /path/to/config.yaml
+### System dependencies
 
-# Debug logging
-./bin/websessions --log-level debug
-```
+| Platform | Command |
+|----------|---------|
+| Ubuntu/Debian | `sudo apt install libwebkit2gtk-4.1-0 libgtk-3-0` |
+| Fedora | `sudo dnf install webkit2gtk4.1 gtk3` |
+| Arch | `sudo pacman -S webkit2gtk-4.1 gtk3` |
+| macOS | No extra deps (WebKit is built-in) |
 
-### GUI mode (no browser needed)
-
-Run websessions in a native desktop window instead of opening a browser. Uses the OS webview engine (WebKit2GTK on Linux, WebKit on macOS) — lightweight and fast.
-
-**Install system dependencies:**
-
-```bash
-# Linux (Ubuntu/Debian)
-sudo apt install libwebkit2gtk-4.1-dev
-
-# Linux (Fedora)
-sudo dnf install webkit2gtk4.1-devel
-
-# macOS — no extra deps needed (WebKit is built-in)
-```
-
-**Build and run:**
+### Build from source
 
 ```bash
 make build-gui
 ./bin/websessions --gui
 ```
 
-Closing the window shuts down the server gracefully. The `--gui` flag requires the GUI-enabled build (`make build-gui`). The standard `make build` binary will show an error if `--gui` is used.
+Closing the window shuts down the server gracefully.
 
-### Docker
-
-```bash
-# Build image
-docker build -t websessions .
-
-# Run
-docker run -p 8080:8080 websessions
-```
-
-> Note: Docker mode can only manage sessions inside the container. For managing host sessions, run the binary directly.
+---
 
 ## Configuration
 
-Config file location: `~/.websessions/config.yaml` (created automatically, or copy from `config.example.yaml`)
+Config: `~/.websessions/config.yaml` (auto-created, or copy from `config.example.yaml`)
 
 ```yaml
 server:
@@ -176,104 +254,59 @@ notifications:
     - waiting
 ```
 
-All settings can also be changed from the **Settings** page in the UI (gear icon in the top bar).
+All settings can also be changed from the **Settings** page in the UI.
 
-## Usage
+---
 
-### Creating a session
+## Build & Run
 
-1. Click **+ New Session** in the footer or the **+** tab
-2. Pick a **recent project** or type a working directory (autocomplete available)
-3. Optionally select a previous Claude session to **resume**
-4. Give it a name and an optional initial prompt
-5. Click **Create** — the session opens automatically
+```bash
+make build          # Build binary (runs templ generate)
+make build-gui      # Build with native GUI support (requires CGO + system libs)
+make run            # Build and run
+make run-gui        # Build and run with native GUI window
+make test           # Run all tests
+make lint           # Run golangci-lint
+make clean          # Remove build artifacts
+```
 
-### Discovering existing sessions
+```bash
+./bin/websessions --config /path/to/config.yaml   # Custom config
+./bin/websessions --log-level debug                # Debug logging
+./bin/websessions --gui                            # Native window (GUI build only)
+```
 
-websessions scans for running `claude` processes on startup and periodically (default 30s). Discovered sessions appear in the sidebar with a **Take Over** button.
+### Docker
 
-**Take Over** does:
-1. Resolves the Claude session ID from `~/.claude/projects/`
-2. Kills the original terminal process
-3. Launches `claude --resume <session-id>` in a websessions-owned PTY
-4. The conversation continues where it left off
+```bash
+docker build -t websessions .
+docker run -p 8080:8080 websessions
+```
 
-### Tabs and splits
+> Docker mode can only manage sessions inside the container. For host sessions, run the binary directly.
 
-- **Click a session** in the sidebar to open it as a tab
-- **Drag tabs** to reorder them
-- **Drag a tab to the terminal area edges** (left/right/top/bottom) to create a split
-- **Right-click a tab** for context menu: close tab, close & stop session, close others, close all
-- **Tab close (x)** just closes the tab — the session keeps running
-- Use the **split buttons** in the pane header for horizontal/vertical splits
-- Use the **x button** in the pane header to close a split pane (session stays running)
-
-### Killing a session
-
-- **Right-click tab > Close & stop session** — kills the process, moves to history
-- **Stop button (&#9632;)** in the pane header — same, with confirmation prompt
-- Killed sessions appear in the **History** tab with a **Restart** button
-
-### Renaming a session
-
-Double-click the session name in the terminal pane header. Type the new name and press Enter. The name persists across restarts.
-
-### Git diff viewer
-
-Click the **&#916;** button in the pane header to see `git status` and `git diff` for that session's working directory.
-
-### Notifications
-
-Click the **bell icon** in the top bar to see notifications. Each notification shows:
-- Session name and project directory
-- Event type with icon (completed, errored, waiting)
-- Relative timestamp ("2 min ago")
-- Human-readable message
-
-Click a notification to open that session. Dismiss individual notifications or clear all.
-
-#### Claude Code Hooks (recommended)
-
-For more reliable notifications, install hooks in Claude's settings:
-
-1. Go to **Settings** (gear icon) > **Claude Code Hooks**
-2. Click **Install Hooks**
-
-This adds entries to `~/.claude/settings.json` that call back to websessions when:
-- **Notification** (permission_prompt) — Claude needs tool approval
-- **Stop** — Claude finishes its turn
-- **PreToolUse** — before each tool execution
-
-Hooks are added alongside your existing hooks and can be uninstalled cleanly.
-
-### Session history
-
-The **History** tab in the sidebar shows all past sessions (completed, errored, killed). Each entry has a **Restart** button that launches a new Claude session in the same directory with `--resume`.
-
-### Settings
-
-Access via the **gear icon** in the top bar:
-- **Server** — port, host
-- **Sessions** — scan interval, buffer size, default directory
-- **Notifications** — desktop notifications on/off, event toggles
-- **Claude Code Hooks** — install/uninstall with one click
+---
 
 ## Architecture
 
 ```
-cmd/websessions/main.go       Entry point, wires all components, signal handling
-internal/config/               YAML config loading with defaults
-internal/store/                SQLite (pure Go) for session history and notifications
-internal/session/              Session manager: PTY lifecycle, ring buffer, state machine
-internal/discovery/            Process scanner (/proc on Linux, ps on macOS), takeover
-internal/notification/         Event bus with NotificationSink interface
-internal/hooks/                Claude Code hooks installer for ~/.claude/settings.json
-internal/server/               chi router, htmx handlers, WebSocket streaming
-web/templates/                 Templ files (.templ) compiled to Go
-web/static/                    Vendored JS + CSS, embedded via go:embed
+cmd/websessions/          Entry point, signal handling, GUI launcher
+internal/config/           YAML config loading with defaults
+internal/store/            SQLite (pure Go) for session history and notifications
+internal/session/          Session manager: PTY lifecycle, ring buffer, state machine
+internal/discovery/        Process scanner (/proc on Linux, lsof on macOS), takeover
+internal/notification/     Event bus with NotificationSink interface
+internal/hooks/            Claude Code hooks installer for ~/.claude/settings.json
+internal/service/          Background service (systemd on Linux, launchd on macOS)
+internal/server/           chi router, htmx handlers, WebSocket streaming
+web/templates/             Templ files (.templ) compiled to Go
+web/static/                Vendored JS + CSS, embedded via go:embed
 ```
 
-### Key dependencies
+<details>
+<summary>Dependencies</summary>
+
+**Go packages**
 
 | Package | Purpose |
 |---------|---------|
@@ -284,9 +317,7 @@ web/static/                    Vendored JS + CSS, embedded via go:embed
 | [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite) | Pure Go SQLite driver (no CGO) |
 | [yaml.v3](https://pkg.go.dev/gopkg.in/yaml.v3) | YAML config parsing |
 
-### Vendored frontend libraries
-
-Embedded in the binary, no npm required:
+**Vendored frontend (embedded, no npm)**
 
 | Library | Version | Purpose |
 |---------|---------|---------|
@@ -295,7 +326,10 @@ Embedded in the binary, no npm required:
 | [xterm-addon-fit](https://www.npmjs.com/package/@xterm/addon-fit) | 0.10.0 | Terminal auto-resize |
 | [split.js](https://split.js.org/) | 1.6.5 | Resizable split panes |
 
-## Data storage
+</details>
+
+<details>
+<summary>Data storage</summary>
 
 | What | Where |
 |------|-------|
@@ -304,23 +338,18 @@ Embedded in the binary, no npm required:
 | Tab state | Browser localStorage |
 | Sidebar order | Browser localStorage |
 
+</details>
+
+---
+
 ## Development
 
 ```bash
-# Run tests
-make test
-
-# Run a single test
-go test ./internal/session/... -v -run TestManager_CreateSession
-
-# Integration tests
-go test ./internal/server/... -v -tags=integration
-
-# Regenerate templ templates (required after editing .templ files)
-templ generate
-
-# Build and run with debug logging
-make build && ./bin/websessions --log-level debug
+make test                                                    # All tests
+go test ./internal/session/... -v -run TestManager_CreateSession  # Single test
+go test ./internal/server/... -v -tags=integration           # Integration tests
+templ generate                                               # Regenerate templates
+make build && ./bin/websessions --log-level debug            # Debug run
 ```
 
 ## License
