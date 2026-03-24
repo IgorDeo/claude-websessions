@@ -861,6 +861,30 @@ window.websessions = (function() {
     }, 200);
   }
 
+  // Sidebar tab switching
+  function switchSidebarTab(tabName, btn) {
+    // Toggle tab buttons
+    var tabs = document.querySelectorAll('.sidebar-tab');
+    tabs.forEach(function(t) { t.classList.remove('sidebar-tab-active'); });
+    if (btn) btn.classList.add('sidebar-tab-active');
+    // Toggle panels
+    document.querySelectorAll('.sidebar-panel').forEach(function(p) { p.classList.remove('sidebar-panel-visible'); });
+    var panel = document.getElementById('sidebar-' + tabName);
+    if (panel) panel.classList.add('sidebar-panel-visible');
+    // Remember which tab is active
+    try { localStorage.setItem('ws-sidebar-tab', tabName); } catch(e) {}
+  }
+
+  // Restore sidebar tab on load/refresh
+  function restoreSidebarTab() {
+    var saved = null;
+    try { saved = localStorage.getItem('ws-sidebar-tab'); } catch(e) {}
+    if (saved && saved !== 'active') {
+      var btn = document.querySelector('.sidebar-tab:nth-child(2)');
+      switchSidebarTab(saved, btn);
+    }
+  }
+
   // Drag and drop reordering
   var draggedEl = null;
 
@@ -938,11 +962,12 @@ window.websessions = (function() {
   document.addEventListener('htmx:afterSettle', function(event) {
     if (event.detail.target.id === 'sidebar' || event.detail.target.querySelector('#session-list')) {
       applySessionOrder();
+      restoreSidebarTab();
     }
   });
 
   // Also apply on initial page load
-  document.addEventListener('DOMContentLoaded', function() { applySessionOrder(); });
+  document.addEventListener('DOMContentLoaded', function() { applySessionOrder(); restoreSidebarTab(); });
 
   // Global notification WebSocket
   var notifWs = null;
@@ -995,6 +1020,7 @@ window.websessions = (function() {
     killSession: killSession,
     startRename: startRename,
     dirAutocomplete: dirAutocomplete,
+    switchSidebarTab: switchSidebarTab,
     manageHooks: manageHooks,
     settingsDirAutocomplete: settingsDirAutocomplete,
     loadClaudeSessions: loadClaudeSessions,

@@ -28,7 +28,7 @@ html, body { height: 100%; background: var(--bg-primary); color: var(--text-prim
 
 .main { display: flex; flex: 1; overflow: hidden; }
 
-.sidebar { width: 240px; background: var(--bg-secondary); border-right: 1px solid var(--border); overflow-y: auto; flex-shrink: 0; }
+.sidebar { width: 240px; background: var(--bg-secondary); border-right: 1px solid var(--border); flex-shrink: 0; display: flex; flex-direction: column; overflow: hidden; }
 .session-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.75rem; cursor: pointer; border-bottom: 1px solid var(--border); }
 .session-item:hover { background: var(--bg-tertiary); }
 .status-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
@@ -46,12 +46,16 @@ html, body { height: 100%; background: var(--bg-primary); color: var(--text-prim
 .drag-handle:active { cursor: grabbing; }
 .session-item.dragging { opacity: 0.4; background: var(--bg-tertiary); }
 .session-item { transition: opacity 0.15s; }
-/* History section */
-.history-section { border-top: 1px solid var(--border); }
-.history-header { display: flex; align-items: center; padding: 0.4rem 0.75rem; }
-.history-title { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
-.session-item-history { opacity: 0.6; }
-.session-item-history:hover { opacity: 1; }
+/* Sidebar tabs */
+.sidebar-tabs { display: flex; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.sidebar-tab { flex: 1; padding: 0.4rem; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-muted); cursor: pointer; font-family: inherit; font-size: 0.75rem; text-align: center; }
+.sidebar-tab:hover { color: var(--text-secondary); }
+.sidebar-tab-active { color: var(--accent); border-bottom-color: var(--accent); }
+.sidebar-tab-count { font-size: 0.65rem; background: var(--bg-tertiary); color: var(--text-muted); padding: 0.05rem 0.3rem; border-radius: 8px; margin-left: 0.2rem; }
+.sidebar-panel { display: none; overflow-y: auto; flex: 1; }
+.sidebar-panel-visible { display: block; }
+.sidebar-empty { color: var(--text-muted); font-size: 0.8rem; text-align: center; padding: 1.5rem 0.5rem; }
+.session-status-label { font-size: 0.65rem; color: var(--text-muted); }
 
 .session-clickable { display: flex; align-items: center; gap: 0.5rem; flex: 1; overflow: hidden; cursor: pointer; }
 .takeover-btn, .restart-btn { border: none; padding: 0.2rem 0.5rem; border-radius: 3px; font-size: 0.7rem; cursor: pointer; white-space: nowrap; flex-shrink: 0; }

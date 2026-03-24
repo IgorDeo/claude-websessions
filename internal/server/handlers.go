@@ -52,6 +52,10 @@ func (s *Server) handleSidebar(w http.ResponseWriter, r *http.Request) {
 			if activeIDs[rec.ID] {
 				continue
 			}
+			// Only show finished sessions in history
+			if rec.Status != "completed" && rec.Status != "errored" && rec.Status != "killed" {
+				continue
+			}
 			name := rec.Name
 			if name == "" {
 				name = rec.ID
@@ -280,7 +284,15 @@ func (s *Server) handleKillSession(w http.ResponseWriter, r *http.Request, sessi
 		// Wait for process to finish
 		go s.mgr.Wait(sessionID)
 	}
-	// For offline/discovered, just remove from the list
+	// Save final state to SQLite before removing
+	if s.store != nil {
+		s.store.SaveSession(store.SessionRecord{
+			ID: sess.ID, Name: sess.Name, ClaudeID: sess.ClaudeID, WorkDir: sess.WorkDir,
+			StartTime: sess.StartTime, EndTime: time.Now(),
+			ExitCode: -1, Status: "killed", PID: sess.PID,
+		})
+	}
+	// For offline/discovered, remove from active list
 	if state == session.StateOffline || state == session.StateDiscovered {
 		s.mgr.Remove(sessionID)
 	}
