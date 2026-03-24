@@ -55,9 +55,10 @@ func tmuxCreateSession(name, workDir, command string, args []string) error {
 		return err
 	}
 
-	// Disable tmux status bar and visual clutter for this session
+	// Configure tmux session for clean embedded use
 	tmuxRun("set-option", "-t", name, "status", "off")
 	tmuxRun("set-option", "-t", name, "mouse", "off")
+	tmuxRun("set-option", "-t", name, "default-terminal", "screen-256color")
 	// Use the largest client size (not smallest) so the window expands to fill
 	tmuxRun("set-window-option", "-t", name, "aggressive-resize", "on")
 

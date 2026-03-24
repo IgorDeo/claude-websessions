@@ -104,8 +104,10 @@ func (m *Manager) startReader(s *Session) {
 
 	go func() {
 		// Attach to the tmux session in read-only mode.
-		// Set a large initial PTY so tmux doesn't constrain the window.
+		// Set TERM=screen to avoid terminal capability queries that produce
+		// visible garbage like ">0;276;0c" in the session output.
 		cmd := exec.Command("tmux", "attach-session", "-t", s.TmuxSession, "-r")
+		cmd.Env = append(os.Environ(), "TERM=screen")
 		ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: 50, Cols: 200})
 		if err != nil {
 			slog.Error("failed to attach to tmux session", "session", s.ID, "error", err)
