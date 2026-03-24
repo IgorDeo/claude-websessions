@@ -109,12 +109,23 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleOpenSession(w http.ResponseWriter, r *http.Request, sessionID string) {
 	sess, ok := s.mgr.Get(sessionID)
-	if !ok {
-		http.Error(w, "session not found", http.StatusNotFound)
+	if ok {
+		v := sessionToView(sess)
+		templates.Terminal(v.ID, v.Name, v.WorkDir, v.State).Render(r.Context(), w)
 		return
 	}
-	v := sessionToView(sess)
-	templates.Terminal(v.ID, v.Name, v.WorkDir, v.State).Render(r.Context(), w)
+	// Session not in active manager — check SQLite for history
+	if s.store != nil {
+		if rec, err := s.store.GetSession(sessionID); err == nil {
+			name := rec.Name
+			if name == "" {
+				name = sessionID
+			}
+			templates.Terminal(rec.ID, name, rec.WorkDir, rec.Status).Render(r.Context(), w)
+			return
+		}
+	}
+	http.Error(w, "session not found", http.StatusNotFound)
 }
 
 func (s *Server) handleNewSessionModal(w http.ResponseWriter, r *http.Request) {
