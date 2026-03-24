@@ -87,17 +87,34 @@ import "C"
 import (
 	_ "embed"
 	"os"
+	"runtime"
+	"syscall"
 	"unsafe"
 )
 
 //go:embed icon.png
 var iconPNG []byte
 
-func init() {
-	// WebKit's JavaScriptCore uses SIGUSR1 (signal 10) for GC by default,
-	// which conflicts with Go's runtime signal handling and causes crashes.
-	// Redirect JSC to use SIGUSR2 (signal 12) instead.
-	os.Setenv("JSC_SIGNAL_FOR_GC", "12")
+const jscSignalEnv = "JSC_SIGNAL_FOR_GC"
+
+// ensureJSCSignalEnv re-execs the current process with JSC_SIGNAL_FOR_GC set
+// so the env var is present BEFORE Go's runtime initializes signal handlers.
+// This prevents WebKit's JavaScriptCore from overriding Go's signal handlers,
+// which causes fatal stack corruption panics.
+func ensureJSCSignalEnv() {
+	if runtime.GOOS != "linux" {
+		return
+	}
+	if os.Getenv(jscSignalEnv) != "" {
+		return // already set, we're in the re-exec'd process
+	}
+	exe, err := os.Executable()
+	if err != nil {
+		return
+	}
+	env := append(os.Environ(), jscSignalEnv+"=42")
+	syscall.Exec(exe, os.Args, env)
+	// syscall.Exec replaces the process — if we get here, it failed
 }
 
 func openGUI(url string) error {

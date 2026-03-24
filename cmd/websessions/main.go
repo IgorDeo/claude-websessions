@@ -108,6 +108,12 @@ func main() {
 		}
 	}
 
+	// Must run before any WebKit initialization — re-execs the process
+	// with JSC_SIGNAL_FOR_GC set to avoid Go runtime signal conflicts.
+	if guiMode {
+		ensureJSCSignalEnv()
+	}
+
 	var level slog.Level
 	switch logLevel {
 	case "debug":
