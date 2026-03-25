@@ -1734,6 +1734,60 @@ window.websessions = (function() {
     } catch(e) {}
   })();
 
+  // ── Keyboard shortcuts ─────────────────────────────────────
+  document.addEventListener('keydown', function(e) {
+    // Don't intercept when typing in inputs/textareas
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+    var ctrl = e.ctrlKey || e.metaKey;
+
+    // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs
+    if (ctrl && e.key === 'Tab') {
+      e.preventDefault();
+      if (openTabs.length < 2) return;
+      var idx = openTabs.findIndex(function(t) { return t.id === activeTabId; });
+      if (e.shiftKey) {
+        idx = (idx - 1 + openTabs.length) % openTabs.length;
+      } else {
+        idx = (idx + 1) % openTabs.length;
+      }
+      openTab(openTabs[idx].id, openTabs[idx].name, openTabs[idx].state);
+      return;
+    }
+
+    // Ctrl+W — close active tab
+    if (ctrl && e.key === 'w') {
+      e.preventDefault();
+      if (activeTabId) closeTab(activeTabId);
+      return;
+    }
+
+    // Ctrl+N — new Claude session
+    if (ctrl && e.key === 'n') {
+      e.preventDefault();
+      htmx.ajax('GET', '/sessions/new', { target: '#modal', swap: 'innerHTML' });
+      return;
+    }
+
+    // Ctrl+T — new terminal
+    if (ctrl && e.key === 't') {
+      e.preventDefault();
+      openTerminal();
+      return;
+    }
+
+    // Ctrl+1-9 — switch to tab by number
+    if (ctrl && e.key >= '1' && e.key <= '9') {
+      e.preventDefault();
+      var tabIdx = parseInt(e.key) - 1;
+      if (tabIdx < openTabs.length) {
+        openTab(openTabs[tabIdx].id, openTabs[tabIdx].name, openTabs[tabIdx].state);
+      }
+      return;
+    }
+  });
+
   return {
     connectSession: connectSession,
     disconnectSession: disconnectSession,
