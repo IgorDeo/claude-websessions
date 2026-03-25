@@ -385,6 +385,7 @@ window.websessions = (function() {
       if (!tab.splits.find(function(s) { return s.id === sessionID2; })) {
         tab.splits.push({ id: sessionID2, name: sessionID2 });
       }
+      tab.splitDirection = direction;
       // Remove sessionID2 from top-level tabs if it exists separately
       openTabs = openTabs.filter(function(t) { return t.id !== sessionID2; });
       saveTabState();
@@ -626,7 +627,24 @@ window.websessions = (function() {
     }
     activeTabId = sessionID;
     renderTabs();
-    // Only load terminal from server if not already connected
+
+    var tab = openTabs.find(function(t) { return t.id === sessionID; });
+
+    // If this tab has splits, rebuild the split layout
+    if (tab && tab.splits && tab.splits.length > 1) {
+      // Disconnect any terminals currently in the area
+      var area = document.getElementById('terminal-area');
+      if (area) {
+        for (var sid in terminals) {
+          var el = document.getElementById('term-' + sid);
+          if (el && area.contains(el)) disconnectSession(sid);
+        }
+      }
+      doSplit(tab.splits[0].id, tab.splits[1].id, tab.splitDirection || 'horizontal');
+      return;
+    }
+
+    // Single session tab
     if (!terminals[sessionID]) {
       htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID) + '/open', {
         target: '#terminal-area',
@@ -634,9 +652,9 @@ window.websessions = (function() {
       });
     } else {
       // Show the already-connected terminal pane
-      var area = document.getElementById('terminal-area');
-      if (area) {
-        var panes = area.querySelectorAll('.terminal-pane');
+      var area2 = document.getElementById('terminal-area');
+      if (area2) {
+        var panes = area2.querySelectorAll('.terminal-pane');
         panes.forEach(function(p) {
           p.style.display = p.getAttribute('data-session-id') === sessionID ? '' : 'none';
         });
