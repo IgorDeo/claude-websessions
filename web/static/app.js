@@ -338,13 +338,20 @@ window.websessions = (function() {
     });
   }
 
+  var refitTimer = null;
+  function debouncedRefit() {
+    if (refitTimer) clearTimeout(refitTimer);
+    refitTimer = setTimeout(refitAllTerminals, 16);
+  }
+
   function createSplit(panes, direction) {
     return Split(panes, {
       direction: splitDirection(direction),
       sizes: panes.map(function() { return 100 / panes.length; }),
       minSize: 80,
       gutterSize: 4,
-      onDrag: refitAllTerminals,
+      onDrag: debouncedRefit,
+      onDragEnd: refitAllTerminals,
     });
   }
 
