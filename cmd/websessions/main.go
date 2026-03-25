@@ -328,6 +328,23 @@ func main() {
 		}()
 	}
 
+	// Auto-cleanup: remove completed/errored sessions from active list after 5 minutes
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			for _, s := range mgr.List() {
+				state := s.GetState()
+				if (state == session.StateCompleted || state == session.StateErrored) && !s.EndTime.IsZero() {
+					if time.Since(s.EndTime) > 5*time.Minute {
+						mgr.Remove(s.ID)
+						slog.Debug("auto-archived stale session", "id", s.ID, "state", state)
+					}
+				}
+			}
+		}
+	}()
+
 	// Waiting session reminder — re-notifies if a session stays in waiting state
 	snoozedSessions := make(map[string]time.Time) // session ID -> snooze until
 	if cfg.Notifications.ReminderMinutes > 0 {
