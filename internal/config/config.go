@@ -42,7 +42,7 @@ func defaults() *Config {
 	return &Config{
 		Server: ServerConfig{Port: 8080, Host: "0.0.0.0"},
 		Sessions: SessionsConfig{
-			ScanInterval: 10 * time.Second, ScanIntervalRaw: "10s",
+			ScanInterval: 30 * time.Second, ScanIntervalRaw: "30s",
 			OutputBufferSize: 10 * 1024 * 1024, OutputBufferRaw: "10MB",
 			DefaultDir: "~/projects",
 		},
