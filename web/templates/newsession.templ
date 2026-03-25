@@ -51,7 +51,7 @@ templ NewSessionModal(defaultDir string, recentDirs []string, dockerAvailable bo
 					<textarea id="prompt" name="prompt" rows="3" placeholder="What should Claude work on?"></textarea>
 				</div>
 				<div class="form-group">
-					<label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-size:0.8rem; color:var(--text-secondary); font-weight:500;">
+				<label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-size:0.8rem; color:var(--text-secondary); font-weight:500;">
 						if dockerAvailable {
 							<input type="checkbox" name="sandbox" value="true" style="width:16px; height:16px; flex-shrink:0; accent-color:var(--accent);"/>
 						} else {
