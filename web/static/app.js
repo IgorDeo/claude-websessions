@@ -192,6 +192,11 @@ window.websessions = (function() {
       ws.onclose = function() {
         if (session.closed) return;
         session.retries++;
+        if (session.retries > 5) {
+          term.write('\r\n\x1b[31m[Session unavailable — connection closed]\x1b[0m\r\n');
+          session.closed = true;
+          return;
+        }
         var delay = Math.min(1000 * Math.pow(2, session.retries - 1), 15000);
         term.write('\r\n\x1b[33m[Reconnecting in ' + Math.round(delay / 1000) + 's...]\x1b[0m\r\n');
         setTimeout(openWS, delay);
@@ -1059,10 +1064,45 @@ window.websessions = (function() {
     }).catch(function() {});
   }
 
+  // Prune tabs whose sessions no longer exist on the server
+  function pruneDeadTabs() {
+    fetch('/api/sessions')
+      .then(function(r) { return r.json(); })
+      .then(function(sessions) {
+        var activeIds = {};
+        (sessions || []).forEach(function(s) { activeIds[s.id] = true; });
+        var changed = false;
+        openTabs = openTabs.filter(function(tab) {
+          // For split tabs, check if at least one session is alive
+          if (tab.splitTree) {
+            var ids = treeSessionIds(tab.splitTree);
+            var anyAlive = ids.some(function(id) { return activeIds[id]; });
+            if (!anyAlive) { changed = true; return false; }
+            return true;
+          }
+          if (!activeIds[tab.id]) { changed = true; return false; }
+          return true;
+        });
+        if (changed) {
+          if (activeTabId && !openTabs.find(function(t) { return t.id === activeTabId; })) {
+            activeTabId = openTabs.length > 0 ? openTabs[0].id : null;
+          }
+          saveTabState();
+          renderTabs();
+          if (activeTabId) {
+            currentlyShowingTabId = null;
+            openTab(activeTabId);
+          }
+        }
+      }).catch(function() {});
+  }
+
   // Load tabs on page load (localStorage for instant render, then sync from server)
   loadTabState();
   document.addEventListener('DOMContentLoaded', function() {
     renderTabs();
+    // Prune dead tabs first, then restore active tab
+    pruneDeadTabs();
     // Reopen the active tab (handles both single and split tabs)
     if (activeTabId) {
       currentlyShowingTabId = null; // force re-render
