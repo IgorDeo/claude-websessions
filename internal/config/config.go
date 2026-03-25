@@ -14,6 +14,11 @@ type Config struct {
 	Server        ServerConfig        `yaml:"server"`
 	Sessions      SessionsConfig      `yaml:"sessions"`
 	Notifications NotificationsConfig `yaml:"notifications"`
+	Docker        DockerConfig        `yaml:"docker"`
+}
+
+type DockerConfig struct {
+	CopyCredentials bool `yaml:"copy_credentials"`
 }
 
 type ServerConfig struct {
@@ -45,6 +50,7 @@ func defaults() *Config {
 			DefaultDir: "~/projects",
 		},
 		Notifications: NotificationsConfig{Desktop: true, Events: []string{"completed", "errored", "waiting"}, ReminderMinutes: 5},
+		Docker:        DockerConfig{CopyCredentials: true},
 	}
 }
 

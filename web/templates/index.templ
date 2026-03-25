@@ -3,11 +3,12 @@ package templates
 import "fmt"
 
 type SessionView struct {
-	ID      string
-	Name    string
-	WorkDir string
-	State   string
-	Owned   bool
+	ID        string
+	Name      string
+	WorkDir   string
+	State     string
+	Owned     bool
+	Sandboxed bool
 }
 
 type NotificationView struct {

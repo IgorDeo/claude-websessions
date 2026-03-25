@@ -2,7 +2,7 @@ package templates
 
 import "path/filepath"
 
-templ NewSessionModal(defaultDir string, recentDirs []string) {
+templ NewSessionModal(defaultDir string, recentDirs []string, dockerAvailable bool) {
 	<div class="modal-overlay" onclick="this.remove()">
 		<div class="modal-content" onclick="event.stopPropagation()">
 			<h2>New Session</h2>
@@ -49,6 +49,19 @@ templ NewSessionModal(defaultDir string, recentDirs []string) {
 				<div class="form-group">
 					<label for="prompt">Initial Prompt (optional)</label>
 					<textarea id="prompt" name="prompt" rows="3" placeholder="What should Claude work on?"></textarea>
+				</div>
+				<div class="form-group">
+					<label class="checkbox-label">
+						if dockerAvailable {
+							<input type="checkbox" name="sandbox" value="true"/>
+						} else {
+							<input type="checkbox" name="sandbox" value="true" disabled/>
+						}
+						Run in Docker sandbox (VM-isolated, safe for autonomous mode)
+					</label>
+					if !dockerAvailable {
+						<span class="settings-hint">Docker Desktop is required for sandbox mode</span>
+					}
 				</div>
 				<div class="form-actions">
 					<button type="button" class="btn-cancel" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
