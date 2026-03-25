@@ -1742,12 +1742,12 @@ window.websessions = (function() {
 
     var ctrl = e.ctrlKey || e.metaKey;
 
-    // Ctrl+Tab / Ctrl+Shift+Tab — cycle tabs
-    if (ctrl && e.key === 'Tab') {
+    // Ctrl+] — next tab, Ctrl+[ — previous tab
+    if (ctrl && (e.key === ']' || e.key === '[')) {
       e.preventDefault();
       if (openTabs.length < 2) return;
       var idx = openTabs.findIndex(function(t) { return t.id === activeTabId; });
-      if (e.shiftKey) {
+      if (e.key === '[') {
         idx = (idx - 1 + openTabs.length) % openTabs.length;
       } else {
         idx = (idx + 1) % openTabs.length;
