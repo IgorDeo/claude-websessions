@@ -662,6 +662,8 @@ window.websessions = (function() {
   }
 
   // Tab management
+  var currentlyShowingTabId = null;
+
   function openTab(sessionID, name, state) {
     // Add to tabs if not already open
     var existing = openTabs.find(function(t) { return t.id === sessionID; });
@@ -669,52 +671,73 @@ window.websessions = (function() {
       openTabs.push({ id: sessionID, name: name || sessionID, state: state || 'running' });
       saveTabState();
     }
+
+    // Skip if already showing this tab (prevents re-split on double click)
+    if (sessionID === currentlyShowingTabId) return;
+
     activeTabId = sessionID;
+    currentlyShowingTabId = sessionID;
     renderTabs();
 
     var tab = openTabs.find(function(t) { return t.id === sessionID; });
 
+    // Clear the terminal area first
+    var area = document.getElementById('terminal-area');
+    if (area) {
+      for (var sid in terminals) {
+        var el = document.getElementById('term-' + sid);
+        if (el && area.contains(el)) disconnectSession(sid);
+      }
+      while (area.firstChild) area.removeChild(area.firstChild);
+      area.style.flexDirection = '';
+    }
+
     // If this tab has splits, rebuild the split layout
     if (tab && tab.splits && tab.splits.length > 1) {
-      // Clear the terminal area
-      var area = document.getElementById('terminal-area');
-      if (area) {
-        for (var sid in terminals) {
-          var el = document.getElementById('term-' + sid);
-          if (el && area.contains(el)) disconnectSession(sid);
-        }
-        while (area.firstChild) area.removeChild(area.firstChild);
-        area.style.flexDirection = '';
-      }
-      // Load first session, then split each additional one in
-      loadPaneSession(area, tab.splits[0].id);
-      var restoreSplits = tab.splits.slice(1);
-      // Small delay to let the first pane render before splitting
-      setTimeout(function() {
-        restoreSplits.forEach(function(s) {
-          doSplit(tab.splits[0].id, s.id, 'vertical');
-        });
-      }, 200);
+      rebuildSplitLayout(tab);
       return;
     }
 
     // Single session tab
-    if (!terminals[sessionID]) {
-      htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID) + '/open', {
-        target: '#terminal-area',
-        swap: 'innerHTML'
-      });
-    } else {
-      // Show the already-connected terminal pane
-      var area2 = document.getElementById('terminal-area');
-      if (area2) {
-        var panes = area2.querySelectorAll('.terminal-pane');
-        panes.forEach(function(p) {
-          p.style.display = p.getAttribute('data-session-id') === sessionID ? '' : 'none';
-        });
-        if (terminals[sessionID].fitAddon) terminals[sessionID].fitAddon.fit();
-      }
-    }
+    htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID) + '/open', {
+      target: '#terminal-area',
+      swap: 'innerHTML'
+    });
+  }
+
+  function rebuildSplitLayout(tab) {
+    var area = document.getElementById('terminal-area');
+    if (!area || !tab.splits || tab.splits.length < 2) return;
+
+    // Build all panes in a single split container
+    var splitContainer = document.createElement('div');
+    splitContainer.className = 'split-container';
+    splitContainer.style.display = 'flex';
+    splitContainer.style.flexDirection = 'row';
+    splitContainer.style.flex = '1';
+    splitContainer.style.overflow = 'hidden';
+
+    var panes = [];
+    tab.splits.forEach(function(s) {
+      var pane = document.createElement('div');
+      pane.className = 'split-pane';
+      pane.setAttribute('data-split-session', s.id);
+      splitContainer.appendChild(pane);
+      panes.push(pane);
+    });
+
+    area.appendChild(splitContainer);
+
+    Split(panes, {
+      direction: 'horizontal',
+      sizes: panes.map(function() { return 100 / panes.length; }),
+      minSize: 80,
+      gutterSize: 4,
+    });
+
+    panes.forEach(function(pane, i) {
+      loadPaneSession(pane, tab.splits[i].id);
+    });
   }
 
   function closeTab(sessionID, e) {
@@ -769,7 +792,31 @@ window.websessions = (function() {
       btn.appendChild(dot);
 
       var nameSpan = document.createElement('span');
+      nameSpan.className = 'tab-name';
       nameSpan.textContent = tab.name;
+      nameSpan.addEventListener('dblclick', function(e) {
+        e.stopPropagation();
+        var input = document.createElement('input');
+        input.className = 'tab-rename-input';
+        input.value = tab.name;
+        input.addEventListener('keydown', function(ev) {
+          if (ev.key === 'Enter') {
+            tab.name = input.value || tab.name;
+            saveTabState();
+            renderTabs();
+          } else if (ev.key === 'Escape') {
+            renderTabs();
+          }
+        });
+        input.addEventListener('blur', function() {
+          tab.name = input.value || tab.name;
+          saveTabState();
+          renderTabs();
+        });
+        nameSpan.replaceWith(input);
+        input.focus();
+        input.select();
+      });
       btn.appendChild(nameSpan);
 
       if (tab.splits && tab.splits.length > 1) {
@@ -924,13 +971,8 @@ window.websessions = (function() {
       }
       renderTabs();
       if (activeTabId) {
-        var tab = openTabs.find(function(t) { return t.id === activeTabId; });
-        if (tab) {
-          htmx.ajax('POST', '/sessions/' + encodeURIComponent(activeTabId) + '/open', {
-            target: '#terminal-area',
-            swap: 'innerHTML'
-          });
-        }
+        currentlyShowingTabId = null; // force re-render
+        openTab(activeTabId);
       }
     }).catch(function() {});
   }
@@ -939,15 +981,10 @@ window.websessions = (function() {
   loadTabState();
   document.addEventListener('DOMContentLoaded', function() {
     renderTabs();
-    // Reopen the active tab from localStorage cache
+    // Reopen the active tab (handles both single and split tabs)
     if (activeTabId) {
-      var tab = openTabs.find(function(t) { return t.id === activeTabId; });
-      if (tab) {
-        htmx.ajax('POST', '/sessions/' + encodeURIComponent(activeTabId) + '/open', {
-          target: '#terminal-area',
-          swap: 'innerHTML'
-        });
-      }
+      currentlyShowingTabId = null; // force re-render
+      openTab(activeTabId);
     }
     // Sync from server (authoritative) — overrides localStorage if different
     syncTabStateFromServer();

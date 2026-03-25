@@ -542,6 +542,12 @@ html, body {
 .split-picker-action:hover { background: var(--accent-glow); border-color: var(--accent); }
 .split-picker-action-term:hover { background: var(--green-glow); border-color: var(--green); }
 
+.tab-rename-input {
+  background: var(--bg-input); border: 1px solid var(--accent); color: var(--text-primary);
+  font-family: var(--font-mono); font-size: 0.72rem;
+  padding: 0 0.25rem; border-radius: 3px; width: 80px; outline: none;
+}
+
 .tab-split-badge {
   font-size: 0.55rem; font-weight: 700;
   background: var(--accent); color: #fff;
