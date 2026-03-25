@@ -141,7 +141,7 @@ window.websessions = (function() {
       scrollback: 10000,
       theme: currentTheme() === 'light' ? lightTermTheme : darkTermTheme,
       fontFamily: "'Maple Mono Normal NF', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace",
-      fontSize: 14,
+      fontSize: termFontSize,
     });
 
     const fitAddon = new FitAddon.FitAddon();
@@ -149,52 +149,69 @@ window.websessions = (function() {
     term.open(container);
     fitAddon.fit();
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(protocol + '//' + window.location.host + '/ws/' + sessionID);
-    ws.binaryType = 'arraybuffer';
+    var session = { term: term, ws: null, fitAddon: fitAddon, resizeObserver: null, closed: false, retries: 0 };
 
-    ws.onopen = function() {
-      var dims = { type: 'resize', rows: term.rows, cols: term.cols };
-      ws.send(JSON.stringify(dims));
-    };
+    function openWS() {
+      if (session.closed) return;
+      var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      var ws = new WebSocket(protocol + '//' + window.location.host + '/ws/' + sessionID);
+      ws.binaryType = 'arraybuffer';
+      session.ws = ws;
 
-    ws.onmessage = function(event) {
-      if (event.data instanceof ArrayBuffer) {
-        term.write(new Uint8Array(event.data));
-      } else {
-        try {
-          var msg = JSON.parse(event.data);
-          if (msg.type === 'notification') { handleNotification(msg); }
-        } catch(e) {
-          term.write(event.data);
+      ws.onopen = function() {
+        session.retries = 0;
+        var dims = { type: 'resize', rows: term.rows, cols: term.cols };
+        ws.send(JSON.stringify(dims));
+      };
+
+      ws.onmessage = function(event) {
+        if (event.data instanceof ArrayBuffer) {
+          term.write(new Uint8Array(event.data));
+        } else {
+          try {
+            var msg = JSON.parse(event.data);
+            if (msg.type === 'notification') { handleNotification(msg); }
+          } catch(e) {
+            term.write(event.data);
+          }
         }
-      }
-    };
+      };
 
-    ws.onclose = function() {
-      term.write('\r\n\x1b[33m[Connection closed]\x1b[0m\r\n');
-    };
+      ws.onclose = function() {
+        if (session.closed) return;
+        session.retries++;
+        var delay = Math.min(1000 * Math.pow(2, session.retries - 1), 15000);
+        term.write('\r\n\x1b[33m[Reconnecting in ' + Math.round(delay / 1000) + 's...]\x1b[0m\r\n');
+        setTimeout(openWS, delay);
+      };
+    }
+
+    openWS();
 
     term.onData(function(data) {
-      if (ws.readyState === WebSocket.OPEN) { ws.send(data); }
+      if (session.ws && session.ws.readyState === WebSocket.OPEN) {
+        session.ws.send(data);
+      }
     });
 
     var resizeObserver = new ResizeObserver(function() {
       fitAddon.fit();
-      if (ws.readyState === WebSocket.OPEN) {
+      if (session.ws && session.ws.readyState === WebSocket.OPEN) {
         var dims = { type: 'resize', rows: term.rows, cols: term.cols };
-        ws.send(JSON.stringify(dims));
+        session.ws.send(JSON.stringify(dims));
       }
     });
     resizeObserver.observe(container);
+    session.resizeObserver = resizeObserver;
 
-    terminals[sessionID] = { term: term, ws: ws, fitAddon: fitAddon, resizeObserver: resizeObserver };
+    terminals[sessionID] = session;
   }
 
   function disconnectSession(sessionID) {
     var t = terminals[sessionID];
     if (!t) return;
-    t.ws.close();
+    t.closed = true;
+    if (t.ws) t.ws.close();
     t.resizeObserver.disconnect();
     t.term.dispose();
     delete terminals[sessionID];
@@ -543,11 +560,23 @@ window.websessions = (function() {
     }
     activeTabId = sessionID;
     renderTabs();
-    // Load terminal
-    htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID) + '/open', {
-      target: '#terminal-area',
-      swap: 'innerHTML'
-    });
+    // Only load terminal from server if not already connected
+    if (!terminals[sessionID]) {
+      htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID) + '/open', {
+        target: '#terminal-area',
+        swap: 'innerHTML'
+      });
+    } else {
+      // Show the already-connected terminal pane
+      var area = document.getElementById('terminal-area');
+      if (area) {
+        var panes = area.querySelectorAll('.terminal-pane');
+        panes.forEach(function(p) {
+          p.style.display = p.getAttribute('data-session-id') === sessionID ? '' : 'none';
+        });
+        if (terminals[sessionID].fitAddon) terminals[sessionID].fitAddon.fit();
+      }
+    }
   }
 
   function closeTab(sessionID, e) {
@@ -1373,6 +1402,27 @@ window.websessions = (function() {
 
   // Notification panel
   var notifOpen = false;
+  var shortcutsOpen = false;
+  function toggleShortcuts() {
+    var dropdown = document.getElementById('shortcuts-dropdown');
+    if (!dropdown) return;
+    shortcutsOpen = !shortcutsOpen;
+    dropdown.classList.toggle('open', shortcutsOpen);
+    if (shortcutsOpen) {
+      setTimeout(function() {
+        document.addEventListener('click', closeShortcutsOnOutside, { once: true });
+      }, 0);
+    }
+  }
+  function closeShortcutsOnOutside(e) {
+    var wrapper = document.querySelector('.shortcuts-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+      shortcutsOpen = false;
+      var dropdown = document.getElementById('shortcuts-dropdown');
+      if (dropdown) dropdown.classList.remove('open');
+    }
+  }
+
   function toggleNotifications() {
     var dropdown = document.getElementById('notification-dropdown');
     if (!dropdown) return;
@@ -1431,6 +1481,7 @@ window.websessions = (function() {
         // Reset badge
         var badge = document.getElementById('notif-badge');
         if (badge) badge.remove();
+        updateFaviconBadge(0);
       });
   }
 
@@ -1456,6 +1507,21 @@ window.websessions = (function() {
       notifOpen = false;
     }
   });
+
+  // Session search/filter
+  function filterSessions(query) {
+    var q = (query || '').toLowerCase();
+    var items = document.querySelectorAll('.session-item');
+    items.forEach(function(item) {
+      var name = (item.querySelector('.session-name') || {}).textContent || '';
+      var dir = (item.querySelector('.session-dir') || {}).textContent || '';
+      if (!q || name.toLowerCase().indexOf(q) >= 0 || dir.toLowerCase().indexOf(q) >= 0) {
+        item.style.display = '';
+      } else {
+        item.style.display = 'none';
+      }
+    });
+  }
 
   // Sidebar tab switching
   function switchSidebarTab(tabName, btn) {
@@ -1591,6 +1657,7 @@ window.websessions = (function() {
           }
           if (badge) {
             badge.textContent = String(parseInt(badge.textContent || '0') + 1);
+            updateFaviconBadge(parseInt(badge.textContent));
           }
           // Play sound
           playNotifSound(msg.event);
@@ -1617,10 +1684,26 @@ window.websessions = (function() {
   }
   connectNotifications();
 
-  // ── Periodic update check (every 30 minutes) ──────────────
+  // ── Favicon badge ───────────────────────────────────────────
+  function updateFaviconBadge(count) {
+    var link = document.querySelector("link[rel~='icon']");
+    if (!link) return;
+    if (count <= 0) {
+      link.href = '/static/favicon.svg';
+      document.title = 'websessions';
+      return;
+    }
+    document.title = '(' + count + ') websessions';
+  }
+
+  // ── Periodic update check (every 30 minutes, cached) ──────
   var updateBannerShown = false;
+  var lastUpdateCheck = 0;
   function backgroundUpdateCheck() {
     if (updateBannerShown) return;
+    var now = Date.now();
+    if (now - lastUpdateCheck < 30 * 60 * 1000 && lastUpdateCheck > 0) return;
+    lastUpdateCheck = now;
     fetch('/api/check-update')
       .then(function(r) { return r.json(); })
       .then(function(data) {
@@ -1734,6 +1817,96 @@ window.websessions = (function() {
     } catch(e) {}
   })();
 
+  // ── Terminal font zoom ──────────────────────────────────────
+  var termFontSize = 14;
+  try {
+    var savedSize = localStorage.getItem('ws-term-font-size');
+    if (savedSize) termFontSize = parseInt(savedSize);
+  } catch(e) {}
+
+  function applyTermFontSize() {
+    Object.keys(terminals).forEach(function(id) {
+      var t = terminals[id];
+      if (t && t.term) {
+        t.term.options.fontSize = termFontSize;
+        if (t.fitAddon) t.fitAddon.fit();
+      }
+    });
+    try { localStorage.setItem('ws-term-font-size', String(termFontSize)); } catch(e) {}
+  }
+
+  // ── Keyboard shortcuts ─────────────────────────────────────
+  document.addEventListener('keydown', function(e) {
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+    var ctrl = e.ctrlKey || e.metaKey;
+
+    // Ctrl+= / Ctrl+- — terminal font zoom
+    if (ctrl && (e.key === '=' || e.key === '+')) {
+      e.preventDefault();
+      termFontSize = Math.min(termFontSize + 1, 28);
+      applyTermFontSize();
+      return;
+    }
+    if (ctrl && e.key === '-') {
+      e.preventDefault();
+      termFontSize = Math.max(termFontSize - 1, 8);
+      applyTermFontSize();
+      return;
+    }
+    if (ctrl && e.key === '0') {
+      e.preventDefault();
+      termFontSize = 14;
+      applyTermFontSize();
+      return;
+    }
+
+    // Ctrl+] — next tab, Ctrl+[ — previous tab
+    if (ctrl && (e.key === ']' || e.key === '[')) {
+      e.preventDefault();
+      if (openTabs.length < 2) return;
+      var idx = openTabs.findIndex(function(t) { return t.id === activeTabId; });
+      if (e.key === '[') {
+        idx = (idx - 1 + openTabs.length) % openTabs.length;
+      } else {
+        idx = (idx + 1) % openTabs.length;
+      }
+      openTab(openTabs[idx].id, openTabs[idx].name, openTabs[idx].state);
+      return;
+    }
+
+    // Ctrl+W — close active tab
+    if (ctrl && e.key === 'w') {
+      e.preventDefault();
+      if (activeTabId) closeTab(activeTabId);
+      return;
+    }
+
+    // Ctrl+N — new Claude session
+    if (ctrl && e.key === 'n') {
+      e.preventDefault();
+      htmx.ajax('GET', '/sessions/new', { target: '#modal', swap: 'innerHTML' });
+      return;
+    }
+
+    // Ctrl+T — new terminal
+    if (ctrl && e.key === 't') {
+      e.preventDefault();
+      openTerminal();
+      return;
+    }
+
+    // Ctrl+1-9 — switch to tab by number
+    if (ctrl && e.key >= '1' && e.key <= '9') {
+      e.preventDefault();
+      var tabIdx = parseInt(e.key) - 1;
+      if (tabIdx < openTabs.length) {
+        openTab(openTabs[tabIdx].id, openTabs[tabIdx].name, openTabs[tabIdx].state);
+      }
+      return;
+    }
+  });
   return {
     connectSession: connectSession,
     disconnectSession: disconnectSession,
@@ -1744,6 +1917,7 @@ window.websessions = (function() {
     splitPane: splitPane,
     openTerminal: openTerminal,
     toggleTheme: toggleTheme,
+    toggleShortcuts: toggleShortcuts,
     killAllSessions: killAllSessions,
     killSession: killSession,
     startRename: startRename,
@@ -1757,6 +1931,7 @@ window.websessions = (function() {
     snoozeNotification: snoozeNotification,
     clearAllNotifications: clearAllNotifications,
     switchSidebarTab: switchSidebarTab,
+    filterSessions: filterSessions,
     manageHooks: manageHooks,
     checkForUpdate: checkForUpdate,
     manageService: manageService,
