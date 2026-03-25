@@ -256,8 +256,43 @@ window.websessions = (function() {
     var title = document.createElement('h2');
     title.textContent = 'Open in split';
     content.appendChild(title);
+
+    // New session options
+    var newSection = document.createElement('div');
+    newSection.className = 'split-picker-new';
+
+    var newSessionBtn = document.createElement('button');
+    newSessionBtn.className = 'split-picker-action';
+    newSessionBtn.textContent = '+ New Claude Session';
+    newSessionBtn.addEventListener('click', function() {
+      overlay.remove();
+      htmx.ajax('GET', '/sessions/new', { target: '#modal', swap: 'innerHTML' });
+    });
+    newSection.appendChild(newSessionBtn);
+
+    var newTermBtn = document.createElement('button');
+    newTermBtn.className = 'split-picker-action split-picker-action-term';
+    newTermBtn.textContent = '\u2752 New Terminal';
+    newTermBtn.addEventListener('click', function() {
+      overlay.remove();
+      var form = new FormData();
+      form.append('work_dir', '~');
+      fetch('/sessions/terminal', { method: 'POST', body: form })
+        .then(function(r) {
+          var sid = r.headers.get('X-Session-ID');
+          if (sid) doSplit(currentSessionID, sid, direction);
+          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+          return r.text();
+        });
+    });
+    newSection.appendChild(newTermBtn);
+    content.appendChild(newSection);
+
+    // Existing sessions
+    var hasOthers = false;
     sessions.forEach(function(s) {
       if (s.id === currentSessionID) return;
+      hasOthers = true;
       var btn = document.createElement('button');
       btn.className = 'recent-item';
       btn.style.width = '100%';
@@ -276,12 +311,13 @@ window.websessions = (function() {
       });
       content.appendChild(btn);
     });
-    if (sessions.length <= 1) {
+    if (!hasOthers) {
       var msg = document.createElement('p');
-      msg.textContent = 'No other sessions available';
-      msg.style.color = '#565f89';
+      msg.textContent = 'No other active sessions';
+      msg.style.color = 'var(--text-muted)';
       msg.style.textAlign = 'center';
-      msg.style.padding = '1rem';
+      msg.style.padding = '0.5rem';
+      msg.style.fontSize = '0.7rem';
       content.appendChild(msg);
     }
     overlay.appendChild(content);

@@ -521,10 +521,26 @@ html, body {
 
 /* Footer */
 .footer {
-  display: flex; padding: 0.35rem 0.75rem;
+  display: flex; align-items: center; padding: 0.35rem 0.75rem;
   background: var(--bg-secondary);
   border-top: 1px solid var(--border);
 }
+.footer-spacer { flex: 1; }
+
+/* Split picker new session buttons */
+.split-picker-new {
+  display: flex; gap: 0.35rem; margin-bottom: 0.5rem;
+  padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+}
+.split-picker-action {
+  flex: 1; padding: 0.35rem 0.5rem; border-radius: var(--radius-sm);
+  font-family: var(--font-sans); font-size: 0.68rem; font-weight: 500;
+  cursor: pointer; border: 1px solid var(--border);
+  background: var(--bg-tertiary); color: var(--text-primary);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.split-picker-action:hover { background: var(--accent-glow); border-color: var(--accent); }
+.split-picker-action-term:hover { background: var(--green-glow); border-color: var(--green); }
 .new-session-btn {
   background: none; border: 1px solid var(--border);
   color: var(--text-muted); padding: 0.25rem 0.65rem;

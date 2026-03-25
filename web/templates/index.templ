@@ -52,7 +52,6 @@ templ Index(data PageData) {
 							</div>
 						</div>
 					</div>
-					<button class="kill-all-btn" onclick="window.websessions.killAllSessions()" title="Kill all running sessions">&#9632; Kill All</button>
 					<button class="theme-toggle" onclick="window.websessions.toggleTheme()" title="Toggle light/dark theme" id="theme-toggle-btn">&#9790;</button>
 					<a href="/settings" class="settings-link" title="Settings">&#9881;</a>
 					<div class="notification-wrapper">
@@ -91,6 +90,8 @@ templ Index(data PageData) {
 			<footer class="footer">
 				<button class="new-session-btn" hx-get="/sessions/new" hx-target="#modal" hx-swap="innerHTML">+ New Session</button>
 				<button class="new-terminal-btn" onclick="window.websessions.openTerminal()">&#9002; Terminal</button>
+				<div class="footer-spacer"></div>
+				<button class="kill-all-btn" onclick="window.websessions.killAllSessions()" title="Kill all running sessions">&#9632; Kill All</button>
 			</footer>
 			<div id="modal"></div>
 		</div>
