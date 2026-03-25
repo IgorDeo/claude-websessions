@@ -21,7 +21,10 @@ type SoundSink struct {
 
 func NewSoundSink(enabled bool, audioDevice string) *SoundSink {
 	s := &SoundSink{enabled: enabled, audioDevice: audioDevice}
-	s.wavDir, _ = os.MkdirTemp("", "websessions-sounds-*")
+	// Use a fixed path so sounds persist and don't leak temp dirs
+	home, _ := os.UserHomeDir()
+	s.wavDir = filepath.Join(home, ".websessions", "sounds")
+	os.MkdirAll(s.wavDir, 0755)
 	s.generateWAVs()
 	return s
 }
@@ -86,11 +89,6 @@ func (s *SoundSink) play(path, device string) {
 	}
 }
 
-func (s *SoundSink) Cleanup() {
-	if s.wavDir != "" {
-		os.RemoveAll(s.wavDir)
-	}
-}
 
 // ListAudioDevices returns available audio output devices.
 func ListAudioDevices() []AudioDevice {
