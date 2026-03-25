@@ -331,6 +331,23 @@ window.websessions = (function() {
     document.body.appendChild(overlay);
   }
 
+  function refitAllTerminals() {
+    Object.keys(terminals).forEach(function(id) {
+      var t = terminals[id];
+      if (t && t.fitAddon) t.fitAddon.fit();
+    });
+  }
+
+  function createSplit(panes, direction) {
+    return Split(panes, {
+      direction: splitDirection(direction),
+      sizes: panes.map(function() { return 100 / panes.length; }),
+      minSize: 80,
+      gutterSize: 4,
+      onDrag: refitAllTerminals,
+    });
+  }
+
   function loadPaneSession(pane, sid) {
     fetch('/sessions/' + encodeURIComponent(sid) + '/open', { method: 'POST' })
       .then(function(r) { return r.text(); })
@@ -419,7 +436,7 @@ window.websessions = (function() {
       p2.className = 'split-pane';
       area.appendChild(p1);
       area.appendChild(p2);
-      Split([p1, p2], { direction: splitDirection(direction), sizes: [50,50], minSize: 80, gutterSize: 4 });
+      createSplit([p1, p2], direction);
       loadPaneSession(p1, sessionID1);
       loadPaneSession(p2, sessionID2);
     } else {
@@ -440,7 +457,7 @@ window.websessions = (function() {
       container.appendChild(p1);
       container.appendChild(p2);
       parent.replaceChild(container, existingPane);
-      Split([p1, p2], { direction: splitDirection(direction), sizes: [50,50], minSize: 80, gutterSize: 4 });
+      createSplit([p1, p2], direction);
       loadPaneSession(p1, sessionID1);
       loadPaneSession(p2, sessionID2);
     }
@@ -770,12 +787,7 @@ window.websessions = (function() {
         }
       });
 
-      Split(panes, {
-        direction: splitDirection(node.dir),
-        sizes: panes.map(function() { return 100 / panes.length; }),
-        minSize: 80,
-        gutterSize: 4,
-      });
+      createSplit(panes, node.dir);
     }
 
     buildNode(tab.splitTree, area);
