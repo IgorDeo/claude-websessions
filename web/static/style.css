@@ -218,6 +218,9 @@ html, body {
   background: var(--bg-secondary);
   border-right: 1px solid var(--border);
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 .sidebar-resize-handle {
   width: 4px; cursor: col-resize; flex-shrink: 0;
@@ -255,8 +258,8 @@ html, body {
   padding: 0.05rem 0.35rem; border-radius: 8px; margin-left: 0.25rem;
   font-weight: 600;
 }
-.sidebar-panel { display: none; overflow-y: auto; flex: 1; }
-.sidebar-panel-visible { display: block; }
+.sidebar-panel { display: none; overflow-y: auto; flex: 1; min-height: 0; }
+.sidebar-panel-visible { display: flex; flex-direction: column; }
 .sidebar-empty { color: var(--text-muted); font-size: 0.75rem; text-align: center; padding: 2rem 0.75rem; }
 
 /* Session Items */
