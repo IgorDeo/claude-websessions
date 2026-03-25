@@ -16,7 +16,10 @@
 window.websessions = (function() {
   const terminals = {};
   const splitInstances = [];
-  var openTabs = []; // [{id, name, state, splits: [{id, name}] | null}]
+  // splitTree: null for single session, or:
+  // { type:'split', dir:'horizontal'|'vertical', children: [node, node] }
+  // leaf: { type:'session', id:'...', name:'...' }
+  var openTabs = []; // [{id, name, state, splitTree: node|null}]
   var activeTabId = null;
 
   var darkTermTheme = {
@@ -352,83 +355,116 @@ window.websessions = (function() {
     return direction === 'horizontal' ? 'column' : 'row';
   }
 
+  // -- Split tree helpers --
+  function treeFind(node, sessionID) {
+    if (!node) return null;
+    if (node.type === 'session') return node.id === sessionID ? node : null;
+    for (var i = 0; i < node.children.length; i++) {
+      var found = treeFind(node.children[i], sessionID);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function treeFindParent(node, sessionID) {
+    if (!node || node.type === 'session') return null;
+    for (var i = 0; i < node.children.length; i++) {
+      if (node.children[i].type === 'session' && node.children[i].id === sessionID) return { parent: node, index: i };
+      var found = treeFindParent(node.children[i], sessionID);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function treeSessionIds(node) {
+    if (!node) return [];
+    if (node.type === 'session') return [node.id];
+    var ids = [];
+    node.children.forEach(function(c) { ids = ids.concat(treeSessionIds(c)); });
+    return ids;
+  }
+
+  function treeRemove(node, sessionID) {
+    if (!node || node.type === 'session') return node;
+    var info = treeFindParent(node, sessionID);
+    if (!info) return node;
+    info.parent.children.splice(info.index, 1);
+    // If only one child left, collapse
+    if (info.parent.children.length === 1) {
+      var remaining = info.parent.children[0];
+      info.parent.type = remaining.type;
+      info.parent.children = remaining.children;
+      info.parent.id = remaining.id;
+      info.parent.name = remaining.name;
+      info.parent.dir = remaining.dir;
+    }
+    return node;
+  }
+
   function doSplit(sessionID1, sessionID2, direction) {
     var termEl = document.getElementById('term-' + sessionID1);
-
-    // Find the .split-pane that contains this session (for nested splits)
     var existingPane = termEl ? termEl.closest('.split-pane') : null;
 
-    // If not in a split-pane, use the terminal-area directly (first split)
     if (!existingPane) {
+      // First split — replace terminal-area
       var area = document.getElementById('terminal-area');
       if (!area) return;
-
-      // Disconnect existing terminal
       if (terminals[sessionID1]) disconnectSession(sessionID1);
-
       while (area.firstChild) area.removeChild(area.firstChild);
       area.style.flexDirection = splitFlex(direction);
 
-      var pane1 = document.createElement('div');
-      pane1.className = 'split-pane';
-      var pane2 = document.createElement('div');
-      pane2.className = 'split-pane';
-      area.appendChild(pane1);
-      area.appendChild(pane2);
-
-      Split([pane1, pane2], {
-        direction: splitDirection(direction),
-        sizes: [50, 50],
-        minSize: 80,
-        gutterSize: 4,
-      });
-
-      loadPaneSession(pane1, sessionID1);
-      loadPaneSession(pane2, sessionID2);
+      var p1 = document.createElement('div');
+      p1.className = 'split-pane';
+      var p2 = document.createElement('div');
+      p2.className = 'split-pane';
+      area.appendChild(p1);
+      area.appendChild(p2);
+      Split([p1, p2], { direction: splitDirection(direction), sizes: [50,50], minSize: 80, gutterSize: 4 });
+      loadPaneSession(p1, sessionID1);
+      loadPaneSession(p2, sessionID2);
     } else {
-      // Nested split: replace the existing pane with a split container
+      // Nested split — replace the specific pane
       var parent = existingPane.parentElement;
-
-      // Disconnect the terminal being split
       if (terminals[sessionID1]) disconnectSession(sessionID1);
 
-      // Create a container to replace the pane
       var container = document.createElement('div');
       container.className = 'split-pane';
       container.style.display = 'flex';
       container.style.flexDirection = splitFlex(direction);
       container.style.overflow = 'hidden';
 
-      var pane1 = document.createElement('div');
-      pane1.className = 'split-pane';
-      var pane2 = document.createElement('div');
-      pane2.className = 'split-pane';
-      container.appendChild(pane1);
-      container.appendChild(pane2);
-
-      // Replace the old pane in the DOM
+      var p1 = document.createElement('div');
+      p1.className = 'split-pane';
+      var p2 = document.createElement('div');
+      p2.className = 'split-pane';
+      container.appendChild(p1);
+      container.appendChild(p2);
       parent.replaceChild(container, existingPane);
-
-      Split([pane1, pane2], {
-        direction: splitDirection(direction),
-        sizes: [50, 50],
-        minSize: 80,
-        gutterSize: 4,
-      });
-
-      loadPaneSession(pane1, sessionID1);
-      loadPaneSession(pane2, sessionID2);
+      Split([p1, p2], { direction: splitDirection(direction), sizes: [50,50], minSize: 80, gutterSize: 4 });
+      loadPaneSession(p1, sessionID1);
+      loadPaneSession(p2, sessionID2);
     }
 
-    // Track the split as a tab group
+    // Update split tree
     var tab = openTabs.find(function(t) {
-      return t.id === sessionID1 || (t.splits && t.splits.find(function(s) { return s.id === sessionID1; }));
+      return t.id === sessionID1 || (t.splitTree && treeFind(t.splitTree, sessionID1));
     });
     if (tab) {
-      if (!tab.splits) tab.splits = [{ id: sessionID1, name: tab.name }];
-      if (!tab.splits.find(function(s) { return s.id === sessionID2; })) {
-        tab.splits.push({ id: sessionID2, name: sessionID2 });
+      var newNode = { type: 'split', dir: direction, children: [
+        { type: 'session', id: sessionID1, name: sessionID1 },
+        { type: 'session', id: sessionID2, name: sessionID2 }
+      ]};
+      if (!tab.splitTree) {
+        tab.splitTree = newNode;
+      } else {
+        var info = treeFindParent(tab.splitTree, sessionID1);
+        if (info) {
+          info.parent.children[info.index] = newNode;
+        } else if (tab.splitTree.type === 'session' && tab.splitTree.id === sessionID1) {
+          tab.splitTree = newNode;
+        }
       }
+      // Remove sessionID2 from top-level tabs
       openTabs = openTabs.filter(function(t) { return t.id !== sessionID2; });
       saveTabState();
       renderTabs();
@@ -690,8 +726,8 @@ window.websessions = (function() {
       area.style.flexDirection = '';
     }
 
-    // If this tab has splits, rebuild the split layout
-    if (tab && tab.splits && tab.splits.length > 1) {
+    // If this tab has a split tree, rebuild the split layout
+    if (tab && tab.splitTree) {
       rebuildSplitLayout(tab);
       return;
     }
@@ -705,45 +741,52 @@ window.websessions = (function() {
 
   function rebuildSplitLayout(tab) {
     var area = document.getElementById('terminal-area');
-    if (!area || !tab.splits || tab.splits.length < 2) return;
+    if (!area || !tab.splitTree) return;
 
-    // Build all panes in a single split container
-    var splitContainer = document.createElement('div');
-    splitContainer.className = 'split-container';
-    splitContainer.style.display = 'flex';
-    splitContainer.style.flexDirection = 'row';
-    splitContainer.style.flex = '1';
-    splitContainer.style.overflow = 'hidden';
+    function buildNode(node, container) {
+      if (node.type === 'session') {
+        var pane = document.createElement('div');
+        pane.className = 'split-pane';
+        container.appendChild(pane);
+        loadPaneSession(pane, node.id);
+        return pane;
+      }
+      // Split node
+      container.style.display = 'flex';
+      container.style.flexDirection = splitFlex(node.dir);
+      container.style.overflow = 'hidden';
 
-    var panes = [];
-    tab.splits.forEach(function(s) {
-      var pane = document.createElement('div');
-      pane.className = 'split-pane';
-      pane.setAttribute('data-split-session', s.id);
-      splitContainer.appendChild(pane);
-      panes.push(pane);
-    });
+      var panes = [];
+      node.children.forEach(function(child) {
+        var pane = document.createElement('div');
+        pane.className = 'split-pane';
+        pane.style.overflow = 'hidden';
+        container.appendChild(pane);
+        panes.push(pane);
+        if (child.type === 'split') {
+          buildNode(child, pane);
+        } else {
+          loadPaneSession(pane, child.id);
+        }
+      });
 
-    area.appendChild(splitContainer);
+      Split(panes, {
+        direction: splitDirection(node.dir),
+        sizes: panes.map(function() { return 100 / panes.length; }),
+        minSize: 80,
+        gutterSize: 4,
+      });
+    }
 
-    Split(panes, {
-      direction: 'horizontal',
-      sizes: panes.map(function() { return 100 / panes.length; }),
-      minSize: 80,
-      gutterSize: 4,
-    });
-
-    panes.forEach(function(pane, i) {
-      loadPaneSession(pane, tab.splits[i].id);
-    });
+    buildNode(tab.splitTree, area);
   }
 
   function closeTab(sessionID, e) {
     if (e) { e.stopPropagation(); e.preventDefault(); }
     var tab = openTabs.find(function(t) { return t.id === sessionID; });
     // Disconnect all sessions in the group
-    if (tab && tab.splits) {
-      tab.splits.forEach(function(s) { if (terminals[s.id]) disconnectSession(s.id); });
+    if (tab && tab.splitTree) {
+      treeSessionIds(tab.splitTree).forEach(function(sid) { if (terminals[sid]) disconnectSession(sid); });
     }
     openTabs = openTabs.filter(function(t) { return t.id !== sessionID; });
     if (terminals[sessionID]) disconnectSession(sessionID);
@@ -817,12 +860,15 @@ window.websessions = (function() {
       });
       btn.appendChild(nameSpan);
 
-      if (tab.splits && tab.splits.length > 1) {
-        var splitBadge = document.createElement('span');
-        splitBadge.className = 'tab-split-badge';
-        splitBadge.textContent = tab.splits.length;
-        splitBadge.title = tab.splits.map(function(s) { return s.name; }).join(' | ');
-        btn.appendChild(splitBadge);
+      if (tab.splitTree) {
+        var ids = treeSessionIds(tab.splitTree);
+        if (ids.length > 1) {
+          var splitBadge = document.createElement('span');
+          splitBadge.className = 'tab-split-badge';
+          splitBadge.textContent = ids.length;
+          splitBadge.title = ids.join(' | ');
+          btn.appendChild(splitBadge);
+        }
       }
 
       var closeSpan = document.createElement('span');
@@ -1111,15 +1157,15 @@ window.websessions = (function() {
       }
     });
 
-    // Update the tab group — remove the closed session from splits
+    // Update the split tree — remove the closed session
     var tab = openTabs.find(function(t) {
-      return t.splits && t.splits.find(function(s) { return s.id === sessionID; });
+      return t.splitTree && treeFind(t.splitTree, sessionID);
     });
     if (tab) {
-      tab.splits = tab.splits.filter(function(s) { return s.id !== sessionID; });
-      if (tab.splits.length <= 1) {
-        delete tab.splits;
-        delete tab.splitDirection;
+      treeRemove(tab.splitTree, sessionID);
+      // If tree collapsed to a single session, clear it
+      if (tab.splitTree && tab.splitTree.type === 'session') {
+        tab.splitTree = null;
       }
       saveTabState();
       renderTabs();
