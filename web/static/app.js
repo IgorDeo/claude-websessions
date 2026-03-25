@@ -149,52 +149,69 @@ window.websessions = (function() {
     term.open(container);
     fitAddon.fit();
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(protocol + '//' + window.location.host + '/ws/' + sessionID);
-    ws.binaryType = 'arraybuffer';
+    var session = { term: term, ws: null, fitAddon: fitAddon, resizeObserver: null, closed: false, retries: 0 };
 
-    ws.onopen = function() {
-      var dims = { type: 'resize', rows: term.rows, cols: term.cols };
-      ws.send(JSON.stringify(dims));
-    };
+    function openWS() {
+      if (session.closed) return;
+      var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      var ws = new WebSocket(protocol + '//' + window.location.host + '/ws/' + sessionID);
+      ws.binaryType = 'arraybuffer';
+      session.ws = ws;
 
-    ws.onmessage = function(event) {
-      if (event.data instanceof ArrayBuffer) {
-        term.write(new Uint8Array(event.data));
-      } else {
-        try {
-          var msg = JSON.parse(event.data);
-          if (msg.type === 'notification') { handleNotification(msg); }
-        } catch(e) {
-          term.write(event.data);
+      ws.onopen = function() {
+        session.retries = 0;
+        var dims = { type: 'resize', rows: term.rows, cols: term.cols };
+        ws.send(JSON.stringify(dims));
+      };
+
+      ws.onmessage = function(event) {
+        if (event.data instanceof ArrayBuffer) {
+          term.write(new Uint8Array(event.data));
+        } else {
+          try {
+            var msg = JSON.parse(event.data);
+            if (msg.type === 'notification') { handleNotification(msg); }
+          } catch(e) {
+            term.write(event.data);
+          }
         }
-      }
-    };
+      };
 
-    ws.onclose = function() {
-      term.write('\r\n\x1b[33m[Connection closed]\x1b[0m\r\n');
-    };
+      ws.onclose = function() {
+        if (session.closed) return;
+        session.retries++;
+        var delay = Math.min(1000 * Math.pow(2, session.retries - 1), 15000);
+        term.write('\r\n\x1b[33m[Reconnecting in ' + Math.round(delay / 1000) + 's...]\x1b[0m\r\n');
+        setTimeout(openWS, delay);
+      };
+    }
+
+    openWS();
 
     term.onData(function(data) {
-      if (ws.readyState === WebSocket.OPEN) { ws.send(data); }
+      if (session.ws && session.ws.readyState === WebSocket.OPEN) {
+        session.ws.send(data);
+      }
     });
 
     var resizeObserver = new ResizeObserver(function() {
       fitAddon.fit();
-      if (ws.readyState === WebSocket.OPEN) {
+      if (session.ws && session.ws.readyState === WebSocket.OPEN) {
         var dims = { type: 'resize', rows: term.rows, cols: term.cols };
-        ws.send(JSON.stringify(dims));
+        session.ws.send(JSON.stringify(dims));
       }
     });
     resizeObserver.observe(container);
+    session.resizeObserver = resizeObserver;
 
-    terminals[sessionID] = { term: term, ws: ws, fitAddon: fitAddon, resizeObserver: resizeObserver };
+    terminals[sessionID] = session;
   }
 
   function disconnectSession(sessionID) {
     var t = terminals[sessionID];
     if (!t) return;
-    t.ws.close();
+    t.closed = true;
+    if (t.ws) t.ws.close();
     t.resizeObserver.disconnect();
     t.term.dispose();
     delete terminals[sessionID];
