@@ -15,11 +15,12 @@ websessions is a web-based command center for managing multiple Claude Code CLI 
 ## Build & Run
 
 ```bash
-make build          # builds to bin/websessions (runs templ generate first)
-make run            # go run with templ generate
-make test           # go test ./... -v
-make lint           # golangci-lint
-templ generate      # regenerate templ templates (required before build)
+mise run build      # builds to bin/websessions (runs templ generate first)
+mise run run        # go run with templ generate
+mise run test       # go test ./... -v
+mise run lint       # golangci-lint
+mise run generate   # regenerate templ templates (required before build)
+mise run setup      # install dev tools (templ CLI)
 ```
 
 Run a single test:
