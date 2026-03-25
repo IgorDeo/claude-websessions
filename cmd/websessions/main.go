@@ -239,7 +239,24 @@ func main() {
 	discoveredCount := 0
 	processes, scanErr := discovery.Scan()
 	if scanErr == nil {
+		// Build dedup sets from already-recovered sessions
+		existingPIDs := make(map[int]bool)
+		existingDirs := make(map[string]bool)
+		for _, s := range mgr.List() {
+			if s.PID > 0 {
+				existingPIDs[s.PID] = true
+			}
+			if s.WorkDir != "" && s.Owned {
+				existingDirs[s.WorkDir] = true
+			}
+		}
 		for _, p := range processes {
+			if existingPIDs[p.PID] {
+				continue
+			}
+			if p.WorkDir != "" && existingDirs[p.WorkDir] {
+				continue
+			}
 			id := fmt.Sprintf("discovered-%d", p.PID)
 			s := mgr.AddDiscovered(id, p.ClaudeID, p.WorkDir, p.PID, p.StartTime)
 			st.SaveSession(store.SessionRecord{
