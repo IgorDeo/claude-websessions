@@ -328,19 +328,74 @@ window.websessions = (function() {
     document.body.appendChild(overlay);
   }
 
-  function doSplit(sessionID1, sessionID2, direction) {
-    var area = document.getElementById('terminal-area');
-    if (!area) return;
+  function loadPaneSession(pane, sid) {
+    fetch('/sessions/' + encodeURIComponent(sid) + '/open', { method: 'POST' })
+      .then(function(r) { return r.text(); })
+      .then(function(html) {
+        pane.innerHTML = html;
+        var termPane = pane.querySelector('.terminal-pane[data-session-id]');
+        if (termPane) {
+          var id = termPane.dataset.sessionId;
+          if (terminals[id]) disconnectSession(id);
+          connectSession(id, 'term-' + id);
+        }
+      });
+  }
 
-    // Disconnect existing terminals in the area
-    for (var sid in terminals) {
-      var el = document.getElementById('term-' + sid);
-      if (el && area.contains(el)) {
-        disconnectSession(sid);
+  // Split direction: "horizontal" = horizontal divider (top/bottom), "vertical" = vertical divider (side by side)
+  // Matches Terminator convention.
+  function splitDirection(direction) {
+    // Split.js 'vertical' = top/bottom, 'horizontal' = side by side
+    return direction === 'horizontal' ? 'vertical' : 'horizontal';
+  }
+  function splitFlex(direction) {
+    return direction === 'horizontal' ? 'column' : 'row';
+  }
+
+  function doSplit(sessionID1, sessionID2, direction) {
+    // Find the container holding sessionID1's terminal
+    var termEl = document.getElementById('term-' + sessionID1);
+    var target = null;
+
+    if (termEl) {
+      // Walk up to find the .split-pane or .terminal-pane parent
+      var parent = termEl.closest('.split-pane') || termEl.closest('.terminal-pane');
+      if (parent) {
+        target = parent.parentElement;
+        // Disconnect the existing terminal in this pane
+        disconnectSession(sessionID1);
       }
     }
 
-    // Create two pane containers (no IDs with session names — use data attributes)
+    // Fallback: use the terminal-area directly
+    if (!target) {
+      target = document.getElementById('terminal-area');
+      if (!target) return;
+      // Disconnect all terminals in the area
+      for (var sid in terminals) {
+        var el = document.getElementById('term-' + sid);
+        if (el && target.contains(el)) disconnectSession(sid);
+      }
+      while (target.firstChild) target.removeChild(target.firstChild);
+    } else {
+      // Remove the old pane content from the target
+      var oldPane = termEl.closest('.split-pane') || termEl.closest('.terminal-pane');
+      if (oldPane && oldPane.parentElement === target) {
+        target.removeChild(oldPane);
+        // Also remove any Split.js gutter that was next to it
+        var gutters = target.querySelectorAll('.gutter');
+        // Don't remove gutters from parent splits
+      }
+    }
+
+    // Create a split container
+    var splitContainer = document.createElement('div');
+    splitContainer.className = 'split-container';
+    splitContainer.style.display = 'flex';
+    splitContainer.style.flexDirection = splitFlex(direction);
+    splitContainer.style.flex = '1';
+    splitContainer.style.overflow = 'hidden';
+
     var pane1 = document.createElement('div');
     pane1.className = 'split-pane';
     pane1.setAttribute('data-split-session', sessionID1);
@@ -348,48 +403,33 @@ window.websessions = (function() {
     pane2.className = 'split-pane';
     pane2.setAttribute('data-split-session', sessionID2);
 
-    // Clear area and add panes
-    while (area.firstChild) area.removeChild(area.firstChild);
-    area.appendChild(pane1);
-    area.appendChild(pane2);
+    splitContainer.appendChild(pane1);
+    splitContainer.appendChild(pane2);
 
-    // Set flex direction based on split direction
-    area.style.flexDirection = direction === 'horizontal' ? 'row' : 'column';
+    // If target had the old pane removed, insert the split container
+    // Otherwise (terminal-area fallback), just append
+    target.appendChild(splitContainer);
+    target.style.flexDirection = splitFlex(direction);
 
-    // Use Split.js with DOM elements directly (not CSS selectors)
     Split([pane1, pane2], {
-      direction: direction === 'horizontal' ? 'horizontal' : 'vertical',
+      direction: splitDirection(direction),
       sizes: [50, 50],
-      minSize: 100,
+      minSize: 80,
       gutterSize: 4,
     });
 
-    // Load terminal content into each pane
-    function loadPaneSession(pane, sid) {
-      fetch('/sessions/' + encodeURIComponent(sid) + '/open', { method: 'POST' })
-        .then(function(r) { return r.text(); })
-        .then(function(html) {
-          pane.innerHTML = html;
-          var termPane = pane.querySelector('.terminal-pane[data-session-id]');
-          if (termPane) {
-            var id = termPane.dataset.sessionId;
-            if (terminals[id]) disconnectSession(id);
-            connectSession(id, 'term-' + id);
-          }
-        });
-    }
     loadPaneSession(pane1, sessionID1);
     loadPaneSession(pane2, sessionID2);
 
-    // Track the split as a tab group under the first session's tab
-    var tab = openTabs.find(function(t) { return t.id === sessionID1; });
+    // Track the split as a tab group
+    var tab = openTabs.find(function(t) {
+      return t.id === sessionID1 || (t.splits && t.splits.find(function(s) { return s.id === sessionID1; }));
+    });
     if (tab) {
       if (!tab.splits) tab.splits = [{ id: sessionID1, name: tab.name }];
-      // Add second session to the group (avoid duplicates)
       if (!tab.splits.find(function(s) { return s.id === sessionID2; })) {
         tab.splits.push({ id: sessionID2, name: sessionID2 });
       }
-      tab.splitDirection = direction;
       // Remove sessionID2 from top-level tabs if it exists separately
       openTabs = openTabs.filter(function(t) { return t.id !== sessionID2; });
       saveTabState();
@@ -636,15 +676,25 @@ window.websessions = (function() {
 
     // If this tab has splits, rebuild the split layout
     if (tab && tab.splits && tab.splits.length > 1) {
-      // Disconnect any terminals currently in the area
+      // Clear the terminal area
       var area = document.getElementById('terminal-area');
       if (area) {
         for (var sid in terminals) {
           var el = document.getElementById('term-' + sid);
           if (el && area.contains(el)) disconnectSession(sid);
         }
+        while (area.firstChild) area.removeChild(area.firstChild);
+        area.style.flexDirection = '';
       }
-      doSplit(tab.splits[0].id, tab.splits[1].id, tab.splitDirection || 'horizontal');
+      // Load first session, then split each additional one in
+      loadPaneSession(area, tab.splits[0].id);
+      var restoreSplits = tab.splits.slice(1);
+      // Small delay to let the first pane render before splitting
+      setTimeout(function() {
+        restoreSplits.forEach(function(s) {
+          doSplit(tab.splits[0].id, s.id, 'vertical');
+        });
+      }, 200);
       return;
     }
 
