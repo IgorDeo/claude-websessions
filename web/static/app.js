@@ -1457,6 +1457,21 @@ window.websessions = (function() {
     }
   });
 
+  // Session search/filter
+  function filterSessions(query) {
+    var q = (query || '').toLowerCase();
+    var items = document.querySelectorAll('.session-item');
+    items.forEach(function(item) {
+      var name = (item.querySelector('.session-name') || {}).textContent || '';
+      var dir = (item.querySelector('.session-dir') || {}).textContent || '';
+      if (!q || name.toLowerCase().indexOf(q) >= 0 || dir.toLowerCase().indexOf(q) >= 0) {
+        item.style.display = '';
+      } else {
+        item.style.display = 'none';
+      }
+    });
+  }
+
   // Sidebar tab switching
   function switchSidebarTab(tabName, btn) {
     // Toggle tab buttons
@@ -1757,6 +1772,7 @@ window.websessions = (function() {
     snoozeNotification: snoozeNotification,
     clearAllNotifications: clearAllNotifications,
     switchSidebarTab: switchSidebarTab,
+    filterSessions: filterSessions,
     manageHooks: manageHooks,
     checkForUpdate: checkForUpdate,
     manageService: manageService,

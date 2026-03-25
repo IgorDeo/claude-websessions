@@ -258,6 +258,19 @@ html, body {
   padding: 0.05rem 0.35rem; border-radius: 8px; margin-left: 0.25rem;
   font-weight: 600;
 }
+.sidebar-search {
+  padding: 0.3rem 0.5rem; flex-shrink: 0;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-search input {
+  width: 100%; padding: 0.25rem 0.4rem;
+  background: var(--bg-input); border: 1px solid var(--border);
+  color: var(--text-primary); border-radius: var(--radius-sm);
+  font-family: var(--font-mono); font-size: 0.7rem;
+  outline: none;
+}
+.sidebar-search input:focus { border-color: var(--accent); }
+.sidebar-search input::placeholder { color: var(--text-muted); }
 .sidebar-panel { display: none; overflow-y: auto; flex: 1; min-height: 0; }
 .sidebar-panel-visible { display: flex; flex-direction: column; }
 .sidebar-empty { color: var(--text-muted); font-size: 0.75rem; text-align: center; padding: 2rem 0.75rem; }
