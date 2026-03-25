@@ -35,6 +35,7 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
+	db.Exec("PRAGMA journal_mode=WAL")
 	if err := migrate(db); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("migrating database: %w", err)
