@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -93,6 +94,7 @@ func isProcessAlive(pid int) bool {
 func main() {
 	configPath := ""
 	logLevel := "info"
+	guiMode := false
 	for i, arg := range os.Args[1:] {
 		switch arg {
 		case "--config":
@@ -103,6 +105,8 @@ func main() {
 			if i+1 < len(os.Args)-1 {
 				logLevel = os.Args[i+2]
 			}
+		case "--gui":
+			guiMode = true
 		}
 	}
 
@@ -212,18 +216,24 @@ func main() {
 	prevSessions, err := st.ListSessions(50)
 	if err == nil {
 		for _, rec := range prevSessions {
-			if rec.Status == "running" || rec.Status == "waiting" || rec.Status == "created" || rec.Status == "discovered" {
-				// Skip if already recovered from tmux
-				if _, ok := mgr.Get(rec.ID); ok {
-					continue
-				}
-				name := rec.Name
-				if name == "" {
-					name = rec.ID
-				}
-				mgr.AddOffline(rec.ID, name, rec.ClaudeID, rec.WorkDir)
-				offlineCount++
+			// Only restore owned sessions that were running — skip
+			// discovered (never owned), killed, completed, errored
+			if rec.Status != "running" && rec.Status != "waiting" && rec.Status != "created" {
+				continue
 			}
+			if strings.HasPrefix(rec.ID, "discovered-") {
+				continue
+			}
+			// Skip if already recovered from tmux
+			if _, ok := mgr.Get(rec.ID); ok {
+				continue
+			}
+			name := rec.Name
+			if name == "" {
+				name = rec.ID
+			}
+			mgr.AddOffline(rec.ID, name, rec.ClaudeID, rec.WorkDir)
+			offlineCount++
 		}
 	}
 	printOffline(offlineCount)
@@ -232,7 +242,24 @@ func main() {
 	discoveredCount := 0
 	processes, scanErr := discovery.Scan()
 	if scanErr == nil {
+		// Build dedup sets from already-recovered sessions
+		existingPIDs := make(map[int]bool)
+		existingDirs := make(map[string]bool)
+		for _, s := range mgr.List() {
+			if s.PID > 0 {
+				existingPIDs[s.PID] = true
+			}
+			if s.WorkDir != "" && s.Owned {
+				existingDirs[s.WorkDir] = true
+			}
+		}
 		for _, p := range processes {
+			if existingPIDs[p.PID] {
+				continue
+			}
+			if p.WorkDir != "" && existingDirs[p.WorkDir] {
+				continue
+			}
 			id := fmt.Sprintf("discovered-%d", p.PID)
 			s := mgr.AddDiscovered(id, p.ClaudeID, p.WorkDir, p.PID, p.StartTime)
 			st.SaveSession(store.SessionRecord{
@@ -272,16 +299,24 @@ func main() {
 					continue
 				}
 
-				// Build set of PIDs already tracked
+				// Build sets of PIDs and WorkDirs already tracked
 				existingPIDs := make(map[int]bool)
+				existingDirs := make(map[string]bool)
 				for _, s := range mgr.List() {
 					if s.PID > 0 {
 						existingPIDs[s.PID] = true
+					}
+					if s.WorkDir != "" && s.Owned {
+						existingDirs[s.WorkDir] = true
 					}
 				}
 
 				for _, p := range processes {
 					if existingPIDs[p.PID] {
+						continue
+					}
+					// Skip if an owned session already manages this directory
+					if p.WorkDir != "" && existingDirs[p.WorkDir] {
 						continue
 					}
 					id := fmt.Sprintf("discovered-%d", p.PID)
@@ -295,6 +330,23 @@ func main() {
 			}
 		}()
 	}
+
+	// Auto-cleanup: remove completed/errored sessions from active list after 5 minutes
+	go func() {
+		ticker := time.NewTicker(60 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			for _, s := range mgr.List() {
+				state := s.GetState()
+				if (state == session.StateCompleted || state == session.StateErrored) && !s.EndTime.IsZero() {
+					if time.Since(s.EndTime) > 5*time.Minute {
+						mgr.Remove(s.ID)
+						slog.Debug("auto-archived stale session", "id", s.ID, "state", state)
+					}
+				}
+			}
+		}
+	}()
 
 	// Waiting session reminder — re-notifies if a session stays in waiting state
 	snoozedSessions := make(map[string]time.Time) // session ID -> snooze until
@@ -356,6 +408,17 @@ func main() {
 			os.Exit(1)
 		}
 	}()
+
+	if guiMode {
+		go func() {
+			url := fmt.Sprintf("http://localhost:%d", cfg.Server.Port)
+			if err := openGUI(url); err != nil {
+				fmt.Fprintf(os.Stderr, "\n  %s%s✗ GUI error: %s%s\n\n", colorRed, colorBold, err, colorReset)
+			}
+			// Window closed — trigger shutdown
+			done <- syscall.SIGTERM
+		}()
+	}
 
 	<-done
 	printShutdown()

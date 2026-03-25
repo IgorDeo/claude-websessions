@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -69,6 +70,7 @@ func (s *Server) loadHistory(activeViews []templates.SessionView) []templates.Se
 			Name:      name,
 			WorkDir:   rec.WorkDir,
 			State:     rec.Status,
+			Type:      sessionType(rec.ID),
 			Sandboxed: rec.Sandboxed,
 		})
 	}
@@ -132,22 +134,32 @@ func (s *Server) handleCreateTerminal(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid form", http.StatusBadRequest)
 		return
 	}
-	name := r.FormValue("name")
 	workDir := r.FormValue("work_dir")
 	if workDir == "" {
 		workDir = s.cfg.Sessions.DefaultDir
 	}
-	if name == "" {
-		name = "terminal"
+
+	// Count existing terminals to generate a friendly name
+	termCount := 0
+	for _, sess := range s.mgr.List() {
+		if strings.HasPrefix(sess.ID, "term-") {
+			termCount++
+		}
 	}
+	name := fmt.Sprintf("Terminal %d", termCount+1)
+	id := fmt.Sprintf("term-%d", time.Now().UnixMilli())
 
 	// Use the user's default shell
 	shell := os.Getenv("SHELL")
 	if shell == "" {
-		shell = "bash"
+		if runtime.GOOS == "darwin" {
+			shell = "/bin/zsh"
+		} else {
+			shell = "/bin/bash"
+		}
 	}
 
-	sess, err := s.mgr.Create("term-"+name, workDir, shell, nil)
+	sess, err := s.mgr.Create(id, workDir, shell, nil)
 	if err != nil {
 		slog.Error("failed to create terminal", "error", err)
 		http.Error(w, "failed to create terminal: "+err.Error(), http.StatusInternalServerError)
@@ -288,10 +300,20 @@ func eventMessage(eventType string) string {
 	}
 }
 
+func sessionType(id string) string {
+	if strings.HasPrefix(id, "term-") {
+		return "terminal"
+	}
+	if strings.HasPrefix(id, "discovered-") {
+		return "discovered"
+	}
+	return "claude"
+}
+
 func sessionToView(s *session.Session) templates.SessionView {
 	return templates.SessionView{
 		ID: s.ID, Name: s.Name, WorkDir: s.WorkDir,
-		State: string(s.GetState()), Owned: s.Owned,
+		State: string(s.GetState()), Type: sessionType(s.ID), Owned: s.Owned,
 		Sandboxed: s.Sandboxed,
 	}
 }
@@ -735,8 +757,8 @@ func (s *Server) handleHookCallback(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-// handleSystemd manages the systemd user service.
-func (s *Server) handleSystemd(w http.ResponseWriter, r *http.Request) {
+// handleService manages the background service (systemd on Linux, launchd on macOS).
+func (s *Server) handleService(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
 		Action string `json:"action"`
 	}
@@ -776,7 +798,7 @@ func (s *Server) handleSystemd(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err != nil {
-		slog.Error("systemd action failed", "action", payload.Action, "error", err)
+		slog.Error("service action failed", "action", payload.Action, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
@@ -885,8 +907,11 @@ func (s *Server) handleInstallHooks(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) setupNotificationBridge() {
+	desktopSink := notification.NewDesktopSink()
 	s.bus.Subscribe(func(e notification.SessionEvent) {
 		s.sink.Send(e)
+		desktopSink.Send(e)
+		s.sound.Send(e)
 		// Push to all connected notification WebSocket clients
 		msg, _ := json.Marshal(map[string]string{
 			"type":      "notification",
@@ -899,6 +924,90 @@ func (s *Server) setupNotificationBridge() {
 	})
 }
 
+func (s *Server) handleKillAll(w http.ResponseWriter, r *http.Request) {
+	killed := 0
+	for _, sess := range s.mgr.List() {
+		state := sess.GetState()
+		if state == session.StateRunning || state == session.StateWaiting || state == session.StateCreated {
+			sess.Killed = true
+			if s.store != nil {
+				s.store.SaveSession(store.SessionRecord{
+					ID: sess.ID, Name: sess.Name, ClaudeID: sess.ClaudeID, WorkDir: sess.WorkDir,
+					StartTime: sess.StartTime, EndTime: time.Now(),
+					ExitCode: -1, Status: "killed", PID: sess.PID,
+				})
+			}
+			if err := s.mgr.Kill(sess.ID); err != nil {
+				s.mgr.Remove(sess.ID)
+			}
+			killed++
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int{"killed": killed})
+}
+
+func (s *Server) handleGetPreferences(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.store == nil {
+		json.NewEncoder(w).Encode(map[string]string{})
+		return
+	}
+	prefs, err := s.store.GetAllPreferences()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	json.NewEncoder(w).Encode(prefs)
+}
+
+func (s *Server) handleSetPreference(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Key   string `json:"key"`
+		Value string `json:"value"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if s.store != nil {
+		s.store.SetPreference(payload.Key, payload.Value)
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleAudioDevices(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(notification.ListAudioDevices())
+}
+
+func (s *Server) handleSetAudioDevice(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Device string `json:"device"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	s.sound.SetAudioDevice(payload.Device)
+	s.cfg.Notifications.AudioDevice = payload.Device
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"ok": "true", "device": payload.Device})
+}
+
+func (s *Server) handleTestSound(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Event string `json:"event"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	s.sound.Send(notification.SessionEvent{Type: notification.EventType(payload.Event)})
+	w.WriteHeader(http.StatusOK)
+}
+
 // handleListDirs returns a JSON list of directories for the file finder autocomplete.
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	data := templates.SettingsData{
@@ -909,7 +1018,13 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		DefaultDir:       s.cfg.Sessions.DefaultDir,
 		DesktopNotifs:    s.cfg.Notifications.Desktop,
 		ReminderMinutes: s.cfg.Notifications.ReminderMinutes,
+		SoundEnabled:    s.cfg.Notifications.Sound,
+		AudioDevice:     s.cfg.Notifications.AudioDevice,
 		Version:         s.version,
+	}
+	// Populate audio devices
+	for _, d := range notification.ListAudioDevices() {
+		data.AudioDevices = append(data.AudioDevices, templates.AudioDeviceView{Name: d.Name, Description: d.Description})
 	}
 	// Check which events are enabled
 	for _, e := range s.cfg.Notifications.Events {
@@ -927,11 +1042,12 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		data.HooksInstalled = claudeSettings.IsInstalled()
 	}
-	// Check systemd status
-	data.SystemdInstalled = service.IsInstalled()
-	data.SystemdActive = service.IsActive()
-	data.SystemdEnabled = service.IsEnabled()
-	data.SystemdStatus = service.Status()
+	// Check service status (systemd on Linux, launchd on macOS)
+	data.ServiceInstalled = service.IsInstalled()
+	data.ServiceActive = service.IsActive()
+	data.ServiceEnabled = service.IsEnabled()
+	data.ServiceStatus = service.Status()
+	data.ServiceName = service.Name()
 	// Run doctor checks
 	checks := doctor.RunChecks()
 	for _, c := range checks {
@@ -970,6 +1086,10 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	s.cfg.Notifications.Events = events
 	s.cfg.Notifications.ReminderMinutes, _ = strconv.Atoi(r.FormValue("reminder_minutes"))
+	s.cfg.Notifications.Sound = r.FormValue("sound_enabled") == "on"
+	s.cfg.Notifications.AudioDevice = r.FormValue("audio_device")
+	s.sound.SetEnabled(s.cfg.Notifications.Sound)
+	s.sound.SetAudioDevice(s.cfg.Notifications.AudioDevice)
 
 	// If port or host changed, uninstall hooks (they contain the old URL)
 	if s.cfg.Server.Port != oldPort || s.cfg.Server.Host != oldHost {

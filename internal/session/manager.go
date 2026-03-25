@@ -277,12 +277,15 @@ func (m *Manager) List() []*Session {
 	for _, s := range m.sessions {
 		result = append(result, s)
 	}
-	sort.Slice(result, func(i, j int) bool {
+	sort.SliceStable(result, func(i, j int) bool {
 		pi, pj := statePriority(result[i].GetState()), statePriority(result[j].GetState())
 		if pi != pj {
 			return pi < pj
 		}
-		return result[i].Name < result[j].Name
+		if result[i].Name != result[j].Name {
+			return result[i].Name < result[j].Name
+		}
+		return result[i].ID < result[j].ID
 	})
 	return result
 }

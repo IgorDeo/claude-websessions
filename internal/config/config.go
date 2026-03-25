@@ -38,6 +38,8 @@ type NotificationsConfig struct {
 	Desktop         bool     `yaml:"desktop"`
 	Events          []string `yaml:"events"`
 	ReminderMinutes int      `yaml:"reminder_minutes"`
+	Sound           bool     `yaml:"sound"`
+	AudioDevice     string   `yaml:"audio_device"`
 }
 
 
@@ -49,7 +51,7 @@ func defaults() *Config {
 			OutputBufferSize: 10 * 1024 * 1024, OutputBufferRaw: "10MB",
 			DefaultDir: "~/projects",
 		},
-		Notifications: NotificationsConfig{Desktop: true, Events: []string{"completed", "errored", "waiting"}, ReminderMinutes: 5},
+		Notifications: NotificationsConfig{Desktop: true, Sound: true, Events: []string{"completed", "errored", "waiting"}, ReminderMinutes: 5},
 		Docker:        DockerConfig{CopyCredentials: true},
 	}
 }

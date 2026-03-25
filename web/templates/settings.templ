@@ -1,5 +1,10 @@
 package templates
 
+type AudioDeviceView struct {
+	Name        string
+	Description string
+}
+
 type SettingsData struct {
 	Port             int
 	Host             string
@@ -11,11 +16,15 @@ type SettingsData struct {
 	NotifErrored     bool
 	NotifWaiting     bool
 	ReminderMinutes  int
+	SoundEnabled     bool
+	AudioDevice      string
+	AudioDevices     []AudioDeviceView
 	HooksInstalled   bool
-	SystemdInstalled bool
-	SystemdActive    bool
-	SystemdEnabled   bool
-	SystemdStatus    string
+	ServiceInstalled bool
+	ServiceActive    bool
+	ServiceEnabled   bool
+	ServiceStatus    string
+	ServiceName      string
 	Version          string
 	Doctor           []DoctorCheck
 }
@@ -32,6 +41,9 @@ templ Settings(data SettingsData) {
 		<div class="app">
 			<header class="topbar">
 				<h1 class="topbar-title"><a href="/" class="topbar-link">websessions</a> / Settings</h1>
+				<div class="topbar-actions">
+					<button class="theme-toggle" onclick="window.websessions.toggleTheme()" title="Toggle light/dark theme" id="theme-toggle-btn">&#9790;</button>
+				</div>
 			</header>
 			<div class="settings-page">
 				<div class="settings-section doctor-section">
@@ -106,14 +118,31 @@ templ Settings(data SettingsData) {
 						</div>
 					<div class="settings-row">
 							<label class="checkbox-label">
-								<input type="checkbox" id="notif-sounds-toggle" onchange="window.websessions.setNotifSoundsEnabled(this.checked)"/>
-								Notification Sounds
+								if data.SoundEnabled {
+									<input type="checkbox" name="sound_enabled" checked/>
+								} else {
+									<input type="checkbox" name="sound_enabled"/>
+								}
+								Notification Sounds (server-side)
 							</label>
 							<div class="sound-test-btns">
 								<button type="button" class="btn-sound" onclick="window.websessions.testNotifSound('completed')" title="Test completed sound">&#9835; Completed</button>
 								<button type="button" class="btn-sound" onclick="window.websessions.testNotifSound('waiting')" title="Test waiting sound">&#9835; Waiting</button>
 								<button type="button" class="btn-sound" onclick="window.websessions.testNotifSound('errored')" title="Test error sound">&#9835; Error</button>
 							</div>
+						</div>
+						<div class="settings-row">
+							<span class="settings-sublabel">Audio output device</span>
+							<select name="audio_device" class="settings-input" id="audio-device-select">
+								<option value="">System default</option>
+								for _, dev := range data.AudioDevices {
+									if dev.Name == data.AudioDevice {
+										<option value={ dev.Name } selected>{ dev.Description }</option>
+									} else {
+										<option value={ dev.Name }>{ dev.Description }</option>
+									}
+								}
+							</select>
 						</div>
 						<div class="settings-row">
 							<span class="settings-sublabel">Notify on:</span>
@@ -179,41 +208,41 @@ templ Settings(data SettingsData) {
 						</ul>
 					</div>
 				</div>
-				<div class="settings-section" id="systemd-section">
+				<div class="settings-section" id="service-section">
 					<h3>Background Service</h3>
 					<p class="hooks-description">
-						Run websessions as a systemd user service so it starts automatically
+						Run websessions as a { data.ServiceName } service so it starts automatically
 						on login and stays running in the background.
 					</p>
-					<div class="settings-row hooks-status" id="systemd-status">
-						if data.SystemdInstalled {
-							if data.SystemdActive {
+					<div class="settings-row hooks-status" id="service-status">
+						if data.ServiceInstalled {
+							if data.ServiceActive {
 								<span class="hooks-badge hooks-active">Running</span>
 							} else {
 								<span class="hooks-badge hooks-inactive">Stopped</span>
 							}
-							if data.SystemdEnabled {
-								<span class="systemd-label">starts on login</span>
+							if data.ServiceEnabled {
+								<span class="service-label">starts on login</span>
 							}
-							<div class="systemd-actions">
-								if data.SystemdActive {
-									<button type="button" class="btn-cancel btn-small" onclick="window.websessions.manageSystemd('stop')">Stop</button>
+							<div class="service-actions">
+								if data.ServiceActive {
+									<button type="button" class="btn-cancel btn-small" onclick="window.websessions.manageService('stop')">Stop</button>
 								} else {
-									<button type="button" class="btn-create btn-small" onclick="window.websessions.manageSystemd('start')">Start</button>
+									<button type="button" class="btn-create btn-small" onclick="window.websessions.manageService('start')">Start</button>
 								}
-								if data.SystemdEnabled {
-									<button type="button" class="btn-cancel btn-small" onclick="window.websessions.manageSystemd('disable')">Disable autostart</button>
+								if data.ServiceEnabled {
+									<button type="button" class="btn-cancel btn-small" onclick="window.websessions.manageService('disable')">Disable autostart</button>
 								} else {
-									<button type="button" class="btn-small systemd-enable-btn" onclick="window.websessions.manageSystemd('enable')">Enable autostart</button>
+									<button type="button" class="btn-small service-enable-btn" onclick="window.websessions.manageService('enable')">Enable autostart</button>
 								}
-								<button type="button" class="btn-cancel btn-small" onclick="window.websessions.manageSystemd('uninstall')">Uninstall</button>
+								<button type="button" class="btn-cancel btn-small" onclick="window.websessions.manageService('uninstall')">Uninstall</button>
 							</div>
 						} else {
 							<span class="hooks-badge hooks-inactive">Not installed</span>
-							<button type="button" class="btn-create btn-small" onclick="window.websessions.manageSystemd('install')">Install Service</button>
+							<button type="button" class="btn-create btn-small" onclick="window.websessions.manageService('install')">Install Service</button>
 						}
 					</div>
-					<div id="systemd-feedback"></div>
+					<div id="service-feedback"></div>
 				</div>
 				<div class="settings-section" id="update-section">
 					<h3>Updates</h3>

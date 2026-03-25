@@ -1,8 +1,65 @@
+// ── Theme (runs immediately before app init) ──────────────
+(function() {
+  // Apply cached theme instantly to avoid flash
+  var saved = null;
+  try { saved = localStorage.getItem('ws-theme'); } catch(e) {}
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+  // Then sync from server (authoritative source)
+  fetch('/api/preferences').then(function(r) { return r.json(); }).then(function(prefs) {
+    if (prefs.theme) {
+      document.documentElement.setAttribute('data-theme', prefs.theme);
+      try { localStorage.setItem('ws-theme', prefs.theme); } catch(e) {}
+    }
+  }).catch(function() {});
+})();
+
 window.websessions = (function() {
   const terminals = {};
   const splitInstances = [];
   var openTabs = []; // [{id, name, state}]
   var activeTabId = null;
+
+  var darkTermTheme = {
+    background: '#13141c', foreground: '#d0d4f0',
+    cursor: '#6c8cff', selectionBackground: 'rgba(108, 140, 255, 0.2)',
+  };
+  var lightTermTheme = {
+    background: '#f5f6fa', foreground: '#1a1c2b',
+    cursor: '#4a6de5', selectionBackground: 'rgba(74, 109, 229, 0.15)',
+  };
+
+  function currentTheme() {
+    return document.documentElement.getAttribute('data-theme') || 'dark';
+  }
+
+  function updateThemeIcon() {
+    var btn = document.getElementById('theme-toggle-btn');
+    if (btn) btn.textContent = currentTheme() === 'light' ? '\u2600' : '\u263E';
+  }
+
+  function savePref(key, value) {
+    fetch('/api/preferences', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: key, value: value }),
+    }).catch(function() {});
+  }
+
+  function toggleTheme() {
+    var next = currentTheme() === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('ws-theme', next); } catch(e) {}
+    savePref('theme', next);
+    updateThemeIcon();
+    // Update all open xterm instances
+    var theme = next === 'light' ? lightTermTheme : darkTermTheme;
+    Object.keys(terminals).forEach(function(id) {
+      if (terminals[id]) terminals[id].options.theme = theme;
+    });
+  }
+
+  // Set icon on load
+  setTimeout(updateThemeIcon, 0);
 
   // ── Notification Sounds (Web Audio API) ──────────────────
   var audioCtx = null;
@@ -65,10 +122,13 @@ window.websessions = (function() {
     try { return localStorage.getItem('ws-notif-sounds') !== 'false'; } catch(e) { return true; }
   }
 
-  // Test sound for settings page
+  // Test sound — plays server-side via paplay/afplay
   function testNotifSound(eventType) {
-    var fn = notifSounds[eventType];
-    if (fn) fn();
+    fetch('/api/test-sound', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event: eventType }),
+    });
   }
   // ─────────────────────────────────────────────────────────
 
@@ -78,72 +138,89 @@ window.websessions = (function() {
 
     const term = new Terminal({
       cursorBlink: true,
-      scrollback: 10000,
-      theme: {
-        background: '#13141c',
-        foreground: '#d0d4f0',
-        cursor: '#6c8cff',
-        selectionBackground: 'rgba(108, 140, 255, 0.2)',
-      },
-      fontFamily: "'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace",
-      fontSize: 14,
+      scrollback: 50000,
+      theme: currentTheme() === 'light' ? lightTermTheme : darkTermTheme,
+      fontFamily: "'Maple Mono Normal NF', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace",
+      fontSize: termFontSize,
     });
+
+    // Regex to strip alternate screen escape sequences so all output stays
+    // in the normal scrollable buffer. Without this, Claude Code enters
+    // alternate screen mode which has no scrollback.
+    var altScreenRe = /\x1b\[\?(1049|1047|47)[hl]/g;
 
     const fitAddon = new FitAddon.FitAddon();
     term.loadAddon(fitAddon);
     term.open(container);
     fitAddon.fit();
 
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const ws = new WebSocket(protocol + '//' + window.location.host + '/ws/' + sessionID);
-    ws.binaryType = 'arraybuffer';
+    var session = { term: term, ws: null, fitAddon: fitAddon, resizeObserver: null, closed: false, retries: 0 };
 
-    ws.onopen = function() {
-      var dims = { type: 'resize', rows: term.rows, cols: term.cols };
-      ws.send(JSON.stringify(dims));
-    };
+    function openWS() {
+      if (session.closed) return;
+      var protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      var ws = new WebSocket(protocol + '//' + window.location.host + '/ws/' + sessionID);
+      ws.binaryType = 'arraybuffer';
+      session.ws = ws;
 
-    ws.onmessage = function(event) {
-      if (event.data instanceof ArrayBuffer) {
-        term.write(new Uint8Array(event.data), function() {
-          term.scrollToBottom();
-        });
-      } else {
-        try {
-          var msg = JSON.parse(event.data);
-          if (msg.type === 'notification') { handleNotification(msg); }
-        } catch(e) {
-          term.write(event.data, function() {
-            term.scrollToBottom();
-          });
+      ws.onopen = function() {
+        session.retries = 0;
+        var dims = { type: 'resize', rows: term.rows, cols: term.cols };
+        ws.send(JSON.stringify(dims));
+      };
+
+      ws.onmessage = function(event) {
+        if (event.data instanceof ArrayBuffer) {
+          // Decode, strip alternate screen sequences, write
+          var text = new TextDecoder().decode(new Uint8Array(event.data));
+          var filtered = text.replace(altScreenRe, '');
+          if (filtered) term.write(filtered);
+        } else {
+          try {
+            var msg = JSON.parse(event.data);
+            if (msg.type === 'notification') { handleNotification(msg); }
+          } catch(e) {
+            var filtered2 = event.data.replace(altScreenRe, '');
+            if (filtered2) term.write(filtered2);
+          }
         }
-      }
-    };
+      };
 
-    ws.onclose = function() {
-      term.write('\r\n\x1b[33m[Connection closed]\x1b[0m\r\n');
-    };
+      ws.onclose = function() {
+        if (session.closed) return;
+        session.retries++;
+        var delay = Math.min(1000 * Math.pow(2, session.retries - 1), 15000);
+        term.write('\r\n\x1b[33m[Reconnecting in ' + Math.round(delay / 1000) + 's...]\x1b[0m\r\n');
+        setTimeout(openWS, delay);
+      };
+    }
+
+    openWS();
 
     term.onData(function(data) {
-      if (ws.readyState === WebSocket.OPEN) { ws.send(data); }
+      if (session.ws && session.ws.readyState === WebSocket.OPEN) {
+        session.ws.send(data);
+      }
     });
 
     var resizeObserver = new ResizeObserver(function() {
       fitAddon.fit();
-      if (ws.readyState === WebSocket.OPEN) {
+      if (session.ws && session.ws.readyState === WebSocket.OPEN) {
         var dims = { type: 'resize', rows: term.rows, cols: term.cols };
-        ws.send(JSON.stringify(dims));
+        session.ws.send(JSON.stringify(dims));
       }
     });
     resizeObserver.observe(container);
+    session.resizeObserver = resizeObserver;
 
-    terminals[sessionID] = { term: term, ws: ws, fitAddon: fitAddon, resizeObserver: resizeObserver };
+    terminals[sessionID] = session;
   }
 
   function disconnectSession(sessionID) {
     var t = terminals[sessionID];
     if (!t) return;
-    t.ws.close();
+    t.closed = true;
+    if (t.ws) t.ws.close();
     t.resizeObserver.disconnect();
     t.term.dispose();
     delete terminals[sessionID];
@@ -179,8 +256,43 @@ window.websessions = (function() {
     var title = document.createElement('h2');
     title.textContent = 'Open in split';
     content.appendChild(title);
+
+    // New session options
+    var newSection = document.createElement('div');
+    newSection.className = 'split-picker-new';
+
+    var newSessionBtn = document.createElement('button');
+    newSessionBtn.className = 'split-picker-action';
+    newSessionBtn.textContent = '+ New Claude Session';
+    newSessionBtn.addEventListener('click', function() {
+      overlay.remove();
+      htmx.ajax('GET', '/sessions/new', { target: '#modal', swap: 'innerHTML' });
+    });
+    newSection.appendChild(newSessionBtn);
+
+    var newTermBtn = document.createElement('button');
+    newTermBtn.className = 'split-picker-action split-picker-action-term';
+    newTermBtn.textContent = '\u2752 New Terminal';
+    newTermBtn.addEventListener('click', function() {
+      overlay.remove();
+      var form = new FormData();
+      form.append('work_dir', '~');
+      fetch('/sessions/terminal', { method: 'POST', body: form })
+        .then(function(r) {
+          var sid = r.headers.get('X-Session-ID');
+          if (sid) doSplit(currentSessionID, sid, direction);
+          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+          return r.text();
+        });
+    });
+    newSection.appendChild(newTermBtn);
+    content.appendChild(newSection);
+
+    // Existing sessions
+    var hasOthers = false;
     sessions.forEach(function(s) {
       if (s.id === currentSessionID) return;
+      hasOthers = true;
       var btn = document.createElement('button');
       btn.className = 'recent-item';
       btn.style.width = '100%';
@@ -199,12 +311,13 @@ window.websessions = (function() {
       });
       content.appendChild(btn);
     });
-    if (sessions.length <= 1) {
+    if (!hasOthers) {
       var msg = document.createElement('p');
-      msg.textContent = 'No other sessions available';
-      msg.style.color = '#565f89';
+      msg.textContent = 'No other active sessions';
+      msg.style.color = 'var(--text-muted)';
       msg.style.textAlign = 'center';
-      msg.style.padding = '1rem';
+      msg.style.padding = '0.5rem';
+      msg.style.fontSize = '0.7rem';
       content.appendChild(msg);
     }
     overlay.appendChild(content);
@@ -258,17 +371,46 @@ window.websessions = (function() {
     });
   }
 
+  function showToast(title, body, event) {
+    var container = document.getElementById('toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'toast-container';
+      document.body.appendChild(container);
+    }
+    var toast = document.createElement('div');
+    toast.className = 'toast toast-' + (event || 'info');
+    var titleEl = document.createElement('div');
+    titleEl.className = 'toast-title';
+    titleEl.textContent = title;
+    var bodyEl = document.createElement('div');
+    bodyEl.className = 'toast-body';
+    bodyEl.textContent = body;
+    toast.appendChild(titleEl);
+    toast.appendChild(bodyEl);
+    toast.onclick = function() { toast.remove(); };
+    container.appendChild(toast);
+    setTimeout(function() {
+      toast.classList.add('toast-fade');
+      setTimeout(function() { toast.remove(); }, 300);
+    }, 5000);
+  }
+
   function handleNotification(msg) {
     var badge = document.querySelector('.badge');
     if (badge) {
       var count = parseInt(badge.textContent || '0') + 1;
       badge.textContent = count;
     }
+    var title = 'websessions: ' + msg.event;
+    var body = 'Session ' + msg.sessionID + ': ' + msg.event;
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('websessions: ' + msg.event, {
-        body: 'Session ' + msg.sessionID + ': ' + msg.event,
+      new Notification(title, {
+        body: body,
         tag: 'ws-' + msg.sessionID + '-' + msg.event,
       });
+    } else {
+      showToast(title, body, msg.event);
     }
   }
 
@@ -463,11 +605,23 @@ window.websessions = (function() {
     }
     activeTabId = sessionID;
     renderTabs();
-    // Load terminal
-    htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID) + '/open', {
-      target: '#terminal-area',
-      swap: 'innerHTML'
-    });
+    // Only load terminal from server if not already connected
+    if (!terminals[sessionID]) {
+      htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID) + '/open', {
+        target: '#terminal-area',
+        swap: 'innerHTML'
+      });
+    } else {
+      // Show the already-connected terminal pane
+      var area = document.getElementById('terminal-area');
+      if (area) {
+        var panes = area.querySelectorAll('.terminal-pane');
+        panes.forEach(function(p) {
+          p.style.display = p.getAttribute('data-session-id') === sessionID ? '' : 'none';
+        });
+        if (terminals[sessionID].fitAddon) terminals[sessionID].fitAddon.fit();
+      }
+    }
   }
 
   function closeTab(sessionID, e) {
@@ -629,11 +783,16 @@ window.websessions = (function() {
   }
 
   function saveTabState() {
-    try { localStorage.setItem('ws-open-tabs', JSON.stringify(openTabs)); } catch(e) {}
-    try { localStorage.setItem('ws-active-tab', activeTabId || ''); } catch(e) {}
+    var tabsJson = JSON.stringify(openTabs);
+    var activeJson = activeTabId || '';
+    try { localStorage.setItem('ws-open-tabs', tabsJson); } catch(e) {}
+    try { localStorage.setItem('ws-active-tab', activeJson); } catch(e) {}
+    savePref('open-tabs', tabsJson);
+    savePref('active-tab', activeJson);
   }
 
   function loadTabState() {
+    // Load from localStorage first (fast), then server overrides
     try {
       var saved = JSON.parse(localStorage.getItem('ws-open-tabs'));
       if (saved && saved.length) openTabs = saved;
@@ -641,11 +800,40 @@ window.websessions = (function() {
     } catch(e) {}
   }
 
-  // Load tabs on page load
+  // Sync tab state from server (runs after initial load)
+  function syncTabStateFromServer() {
+    fetch('/api/preferences').then(function(r) { return r.json(); }).then(function(prefs) {
+      if (prefs['open-tabs']) {
+        try {
+          var serverTabs = JSON.parse(prefs['open-tabs']);
+          if (serverTabs && serverTabs.length) {
+            openTabs = serverTabs;
+            try { localStorage.setItem('ws-open-tabs', prefs['open-tabs']); } catch(e) {}
+          }
+        } catch(e) {}
+      }
+      if (prefs['active-tab']) {
+        activeTabId = prefs['active-tab'];
+        try { localStorage.setItem('ws-active-tab', activeTabId); } catch(e) {}
+      }
+      renderTabs();
+      if (activeTabId) {
+        var tab = openTabs.find(function(t) { return t.id === activeTabId; });
+        if (tab) {
+          htmx.ajax('POST', '/sessions/' + encodeURIComponent(activeTabId) + '/open', {
+            target: '#terminal-area',
+            swap: 'innerHTML'
+          });
+        }
+      }
+    }).catch(function() {});
+  }
+
+  // Load tabs on page load (localStorage for instant render, then sync from server)
   loadTabState();
   document.addEventListener('DOMContentLoaded', function() {
     renderTabs();
-    // Reopen the active tab
+    // Reopen the active tab from localStorage cache
     if (activeTabId) {
       var tab = openTabs.find(function(t) { return t.id === activeTabId; });
       if (tab) {
@@ -655,12 +843,13 @@ window.websessions = (function() {
         });
       }
     }
+    // Sync from server (authoritative) — overrides localStorage if different
+    syncTabStateFromServer();
   });
 
   // Quick terminal creation
   function openTerminal() {
     var form = new FormData();
-    form.append('name', 'terminal-' + Date.now().toString(36));
     form.append('work_dir', '~');
     fetch('/sessions/terminal', { method: 'POST', body: form })
       .then(function(r) {
@@ -672,6 +861,72 @@ window.websessions = (function() {
         htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
         return r.text(); // consume body
       });
+  }
+
+  function killAllSessions() {
+    // Count running sessions
+    var running = openTabs.filter(function(t) { return t.state === 'running' || t.state === 'waiting'; });
+    var count = document.querySelectorAll('.session-item.state-running, .session-item.state-waiting').length;
+    if (count === 0 && running.length === 0) {
+      showToast('No sessions', 'No running sessions to kill.', 'info');
+      return;
+    }
+
+    // Show confirmation modal
+    var modal = document.getElementById('modal');
+    if (!modal) return;
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    var dialog = document.createElement('div');
+    dialog.className = 'modal-dialog kill-all-dialog';
+
+    var title = document.createElement('h3');
+    title.textContent = 'Kill all running sessions?';
+    title.className = 'modal-title';
+
+    var desc = document.createElement('p');
+    desc.className = 'modal-desc';
+    desc.textContent = 'This will terminate all running and waiting Claude sessions. This action cannot be undone.';
+
+    var actions = document.createElement('div');
+    actions.className = 'modal-actions';
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn-cancel';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.onclick = function() { modal.textContent = ''; };
+
+    var confirmBtn = document.createElement('button');
+    confirmBtn.className = 'btn-danger';
+    confirmBtn.textContent = 'Kill All Sessions';
+    confirmBtn.onclick = function() {
+      confirmBtn.textContent = 'Killing...';
+      confirmBtn.disabled = true;
+      fetch('/api/kill-all', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          modal.textContent = '';
+          // Close all tabs
+          openTabs.forEach(function(t) { if (terminals[t.id]) disconnectSession(t.id); });
+          openTabs = [];
+          activeTabId = null;
+          saveTabState();
+          renderTabs();
+          document.getElementById('terminal-area').innerHTML = '<div class="empty-state"><p>All sessions killed</p></div>';
+          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+          showToast('Sessions killed', data.killed + ' session(s) terminated.', 'completed');
+        });
+    };
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(confirmBtn);
+    dialog.appendChild(title);
+    dialog.appendChild(desc);
+    dialog.appendChild(actions);
+    overlay.appendChild(dialog);
+    overlay.onclick = function(e) { if (e.target === overlay) modal.textContent = ''; };
+    modal.textContent = '';
+    modal.appendChild(overlay);
   }
 
   function killSession(sessionID) {
@@ -891,12 +1146,12 @@ window.websessions = (function() {
       });
   }
 
-  // Systemd service management
-  function manageSystemd(action) {
-    var feedback = document.getElementById('systemd-feedback');
+  // Background service management (systemd on Linux, launchd on macOS)
+  function manageService(action) {
+    var feedback = document.getElementById('service-feedback');
     if (feedback) { feedback.textContent = 'Processing...'; feedback.className = 'hooks-feedback'; }
 
-    fetch('/settings/systemd', {
+    fetch('/settings/service', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: action }),
@@ -1192,6 +1447,27 @@ window.websessions = (function() {
 
   // Notification panel
   var notifOpen = false;
+  var shortcutsOpen = false;
+  function toggleShortcuts() {
+    var dropdown = document.getElementById('shortcuts-dropdown');
+    if (!dropdown) return;
+    shortcutsOpen = !shortcutsOpen;
+    dropdown.classList.toggle('open', shortcutsOpen);
+    if (shortcutsOpen) {
+      setTimeout(function() {
+        document.addEventListener('click', closeShortcutsOnOutside, { once: true });
+      }, 0);
+    }
+  }
+  function closeShortcutsOnOutside(e) {
+    var wrapper = document.querySelector('.shortcuts-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+      shortcutsOpen = false;
+      var dropdown = document.getElementById('shortcuts-dropdown');
+      if (dropdown) dropdown.classList.remove('open');
+    }
+  }
+
   function toggleNotifications() {
     var dropdown = document.getElementById('notification-dropdown');
     if (!dropdown) return;
@@ -1250,6 +1526,7 @@ window.websessions = (function() {
         // Reset badge
         var badge = document.getElementById('notif-badge');
         if (badge) badge.remove();
+        updateFaviconBadge(0);
       });
   }
 
@@ -1275,6 +1552,21 @@ window.websessions = (function() {
       notifOpen = false;
     }
   });
+
+  // Session search/filter
+  function filterSessions(query) {
+    var q = (query || '').toLowerCase();
+    var items = document.querySelectorAll('.session-item');
+    items.forEach(function(item) {
+      var name = (item.querySelector('.session-name') || {}).textContent || '';
+      var dir = (item.querySelector('.session-dir') || {}).textContent || '';
+      if (!q || name.toLowerCase().indexOf(q) >= 0 || dir.toLowerCase().indexOf(q) >= 0) {
+        item.style.display = '';
+      } else {
+        item.style.display = 'none';
+      }
+    });
+  }
 
   // Sidebar tab switching
   function switchSidebarTab(tabName, btn) {
@@ -1410,15 +1702,20 @@ window.websessions = (function() {
           }
           if (badge) {
             badge.textContent = String(parseInt(badge.textContent || '0') + 1);
+            updateFaviconBadge(parseInt(badge.textContent));
           }
           // Play sound
           playNotifSound(msg.event);
-          // Desktop notification
+          // Desktop notification (or in-app toast fallback for webview/GUI mode)
+          var notifTitle = 'websessions: ' + msg.event;
+          var notifBody = 'Session ' + msg.sessionID + (msg.message ? ': ' + msg.message : '');
           if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification('websessions: ' + msg.event, {
-              body: 'Session ' + msg.sessionID + (msg.message ? ': ' + msg.message : ''),
+            new Notification(notifTitle, {
+              body: notifBody,
               tag: 'ws-' + msg.sessionID + '-' + msg.event,
             });
+          } else {
+            showToast(notifTitle, notifBody, msg.event);
           }
           // Refresh sidebar to update session states
           htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
@@ -1432,6 +1729,229 @@ window.websessions = (function() {
   }
   connectNotifications();
 
+  // ── Favicon badge ───────────────────────────────────────────
+  function updateFaviconBadge(count) {
+    var link = document.querySelector("link[rel~='icon']");
+    if (!link) return;
+    if (count <= 0) {
+      link.href = '/static/favicon.svg';
+      document.title = 'websessions';
+      return;
+    }
+    document.title = '(' + count + ') websessions';
+  }
+
+  // ── Periodic update check (every 30 minutes, cached) ──────
+  var updateBannerShown = false;
+  var lastUpdateCheck = 0;
+  function backgroundUpdateCheck() {
+    if (updateBannerShown) return;
+    var now = Date.now();
+    if (now - lastUpdateCheck < 30 * 60 * 1000 && lastUpdateCheck > 0) return;
+    lastUpdateCheck = now;
+    fetch('/api/check-update')
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.UpdateAvail && !updateBannerShown) {
+          updateBannerShown = true;
+          showUpdateBanner(data.LatestVersion, data.ReleaseURL);
+        }
+      })
+      .catch(function() {}); // silently ignore errors
+  }
+
+  function showUpdateBanner(version, url) {
+    var existing = document.getElementById('update-banner');
+    if (existing) return;
+
+    var banner = document.createElement('div');
+    banner.id = 'update-banner';
+    banner.className = 'update-banner';
+
+    var text = document.createElement('span');
+    text.className = 'update-banner-text';
+    text.textContent = 'A new version of websessions is available: ' + version;
+
+    var actions = document.createElement('span');
+    actions.className = 'update-banner-actions';
+
+    var viewBtn = document.createElement('a');
+    viewBtn.className = 'update-banner-btn';
+    viewBtn.textContent = 'View release';
+    viewBtn.href = url || 'https://github.com/IgorDeo/claude-websessions/releases/latest';
+    viewBtn.target = '_blank';
+    viewBtn.rel = 'noopener';
+
+    var updateBtn = document.createElement('button');
+    updateBtn.className = 'update-banner-btn update-banner-btn-primary';
+    updateBtn.textContent = 'Update now';
+    updateBtn.onclick = function() {
+      updateBtn.textContent = 'Updating...';
+      updateBtn.disabled = true;
+      fetch('/api/self-update', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) {
+            updateBtn.textContent = 'Failed: ' + data.error;
+          } else {
+            text.textContent = 'Updated to ' + version + '. Restart websessions to apply.';
+            updateBtn.remove();
+            viewBtn.remove();
+          }
+        })
+        .catch(function(err) {
+          updateBtn.textContent = 'Failed';
+        });
+    };
+
+    var dismiss = document.createElement('button');
+    dismiss.className = 'update-banner-dismiss';
+    dismiss.textContent = '\u00d7';
+    dismiss.title = 'Dismiss';
+    dismiss.onclick = function() { banner.remove(); };
+
+    actions.appendChild(viewBtn);
+    actions.appendChild(updateBtn);
+    banner.appendChild(text);
+    banner.appendChild(actions);
+    banner.appendChild(dismiss);
+    document.body.insertBefore(banner, document.body.firstChild);
+  }
+
+  // Check on startup (after 10s delay) then every 30 minutes
+  setTimeout(backgroundUpdateCheck, 10000);
+  setInterval(backgroundUpdateCheck, 30 * 60 * 1000);
+
+  // ── Sidebar resize drag ────────────────────────────────────
+  (function() {
+    var handle = document.getElementById('sidebar-resize-handle');
+    var sidebar = document.getElementById('sidebar');
+    if (!handle || !sidebar) return;
+
+    var dragging = false;
+
+    handle.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+      dragging = true;
+      handle.classList.add('dragging');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    });
+
+    document.addEventListener('mousemove', function(e) {
+      if (!dragging) return;
+      var newWidth = e.clientX;
+      if (newWidth < 130) newWidth = 130;
+      if (newWidth > 600) newWidth = 600;
+      sidebar.style.width = newWidth + 'px';
+    });
+
+    document.addEventListener('mouseup', function() {
+      if (!dragging) return;
+      dragging = false;
+      handle.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      try { localStorage.setItem('ws-sidebar-width', sidebar.style.width); } catch(e) {}
+    });
+
+    // Restore saved width
+    try {
+      var saved = localStorage.getItem('ws-sidebar-width');
+      if (saved) sidebar.style.width = saved;
+    } catch(e) {}
+  })();
+
+  // ── Terminal font zoom ──────────────────────────────────────
+  var termFontSize = 14;
+  try {
+    var savedSize = localStorage.getItem('ws-term-font-size');
+    if (savedSize) termFontSize = parseInt(savedSize);
+  } catch(e) {}
+
+  function applyTermFontSize() {
+    Object.keys(terminals).forEach(function(id) {
+      var t = terminals[id];
+      if (t && t.term) {
+        t.term.options.fontSize = termFontSize;
+        if (t.fitAddon) t.fitAddon.fit();
+      }
+    });
+    try { localStorage.setItem('ws-term-font-size', String(termFontSize)); } catch(e) {}
+  }
+
+  // ── Keyboard shortcuts ─────────────────────────────────────
+  document.addEventListener('keydown', function(e) {
+    var tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+
+    var ctrl = e.ctrlKey || e.metaKey;
+
+    // Ctrl+= / Ctrl+- — terminal font zoom
+    if (ctrl && (e.key === '=' || e.key === '+')) {
+      e.preventDefault();
+      termFontSize = Math.min(termFontSize + 1, 28);
+      applyTermFontSize();
+      return;
+    }
+    if (ctrl && e.key === '-') {
+      e.preventDefault();
+      termFontSize = Math.max(termFontSize - 1, 8);
+      applyTermFontSize();
+      return;
+    }
+    if (ctrl && e.key === '0') {
+      e.preventDefault();
+      termFontSize = 14;
+      applyTermFontSize();
+      return;
+    }
+
+    // Ctrl+] — next tab, Ctrl+[ — previous tab
+    if (ctrl && (e.key === ']' || e.key === '[')) {
+      e.preventDefault();
+      if (openTabs.length < 2) return;
+      var idx = openTabs.findIndex(function(t) { return t.id === activeTabId; });
+      if (e.key === '[') {
+        idx = (idx - 1 + openTabs.length) % openTabs.length;
+      } else {
+        idx = (idx + 1) % openTabs.length;
+      }
+      openTab(openTabs[idx].id, openTabs[idx].name, openTabs[idx].state);
+      return;
+    }
+
+    // Ctrl+W — close active tab
+    if (ctrl && e.key === 'w') {
+      e.preventDefault();
+      if (activeTabId) closeTab(activeTabId);
+      return;
+    }
+
+    // Ctrl+N — new Claude session
+    if (ctrl && e.key === 'n') {
+      e.preventDefault();
+      htmx.ajax('GET', '/sessions/new', { target: '#modal', swap: 'innerHTML' });
+      return;
+    }
+
+    // Ctrl+T — new terminal
+    if (ctrl && e.key === 't') {
+      e.preventDefault();
+      openTerminal();
+      return;
+    }
+
+    // Ctrl+1-9 — switch to tab by number
+    if (ctrl && e.key >= '1' && e.key <= '9') {
+      e.preventDefault();
+      var tabIdx = parseInt(e.key) - 1;
+      if (tabIdx < openTabs.length) {
+        openTab(openTabs[tabIdx].id, openTabs[tabIdx].name, openTabs[tabIdx].state);
+      }
+      return;
+    }
+  });
   return {
     connectSession: connectSession,
     disconnectSession: disconnectSession,
@@ -1441,6 +1961,9 @@ window.websessions = (function() {
     unsplitPane: unsplitPane,
     splitPane: splitPane,
     openTerminal: openTerminal,
+    toggleTheme: toggleTheme,
+    toggleShortcuts: toggleShortcuts,
+    killAllSessions: killAllSessions,
     killSession: killSession,
     startRename: startRename,
     dirAutocomplete: dirAutocomplete,
@@ -1453,9 +1976,10 @@ window.websessions = (function() {
     snoozeNotification: snoozeNotification,
     clearAllNotifications: clearAllNotifications,
     switchSidebarTab: switchSidebarTab,
+    filterSessions: filterSessions,
     manageHooks: manageHooks,
     checkForUpdate: checkForUpdate,
-    manageSystemd: manageSystemd,
+    manageService: manageService,
     settingsDirAutocomplete: settingsDirAutocomplete,
     loadClaudeSessions: loadClaudeSessions,
     selectDir: selectDir,

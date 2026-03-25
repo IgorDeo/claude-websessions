@@ -37,6 +37,7 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
+	db.Exec("PRAGMA journal_mode=WAL")
 	if err := migrate(db); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("migrating database: %w", err)
@@ -61,6 +62,10 @@ func migrate(db *sql.DB) error {
 	CREATE TABLE IF NOT EXISTS audit_log (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
 		action TEXT, session_id TEXT, client_ip TEXT, timestamp DATETIME
+	);
+	CREATE TABLE IF NOT EXISTS preferences (
+		key TEXT PRIMARY KEY,
+		value TEXT
 	);`
 	_, err := db.Exec(schema)
 	if err != nil {
@@ -171,6 +176,40 @@ func (s *Store) RecentDirs(limit int) ([]string, error) {
 		dirs = append(dirs, d)
 	}
 	return dirs, rows.Err()
+}
+
+func (s *Store) GetPreference(key string) (string, error) {
+	var value string
+	err := s.db.QueryRow(`SELECT value FROM preferences WHERE key = ?`, key).Scan(&value)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	return value, err
+}
+
+func (s *Store) SetPreference(key, value string) error {
+	_, err := s.db.Exec(
+		`INSERT OR REPLACE INTO preferences (key, value) VALUES (?, ?)`,
+		key, value,
+	)
+	return err
+}
+
+func (s *Store) GetAllPreferences() (map[string]string, error) {
+	rows, err := s.db.Query(`SELECT key, value FROM preferences`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	prefs := make(map[string]string)
+	for rows.Next() {
+		var k, v string
+		if err := rows.Scan(&k, &v); err != nil {
+			return nil, err
+		}
+		prefs[k] = v
+	}
+	return prefs, rows.Err()
 }
 
 func (s *Store) LogAudit(action, sessionID, clientIP string) error {

@@ -10,6 +10,9 @@ templ Sidebar(sessions []SessionView, history []SessionView) {
 			}
 		</button>
 	</div>
+	<div class="sidebar-search">
+		<input type="text" id="session-search" placeholder="Search sessions..." oninput="window.websessions.filterSessions(this.value)"/>
+	</div>
 	<div id="sidebar-active" class="sidebar-panel sidebar-panel-visible">
 		<div class="session-list" id="session-list">
 			for _, s := range sessions {
@@ -30,12 +33,13 @@ templ Sidebar(sessions []SessionView, history []SessionView) {
 						>
 							<span class="status-dot"></span>
 							<div class="session-info">
-								<span class="session-name">
-									{ s.Name }
+								<div class="session-name-row">
+									<span class="session-name">{ s.Name }</span>
+									<span class={ "session-type-badge", "type-" + s.Type }>{ s.Type }</span>
 									if s.Sandboxed {
 										<span class="sandbox-badge" title="Running in Docker sandbox VM">&#128737;</span>
 									}
-								</span>
+								</div>
 								<span class="session-dir">{ s.WorkDir }</span>
 							</div>
 						</div>
@@ -43,12 +47,13 @@ templ Sidebar(sessions []SessionView, history []SessionView) {
 						<div class="session-clickable">
 							<span class="status-dot"></span>
 							<div class="session-info">
-								<span class="session-name">
-									{ s.Name }
+								<div class="session-name-row">
+									<span class="session-name">{ s.Name }</span>
+									<span class={ "session-type-badge", "type-" + s.Type }>{ s.Type }</span>
 									if s.Sandboxed {
 										<span class="sandbox-badge" title="Running in Docker sandbox VM">&#128737;</span>
 									}
-								</span>
+								</div>
 								<span class="session-dir">{ s.WorkDir }</span>
 							</div>
 						</div>
