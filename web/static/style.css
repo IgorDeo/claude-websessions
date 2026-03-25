@@ -343,10 +343,9 @@ html, body {
   overflow-x: auto;
   overflow-y: hidden;
   min-height: 33px;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
-.tab-bar::-webkit-scrollbar { height: 2px; }
-.tab-bar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.tab-bar::-webkit-scrollbar { display: none; }
 .tab {
   display: flex; align-items: center; gap: 0.35rem;
   padding: 0 0.75rem; height: 33px;
