@@ -1022,9 +1022,22 @@ window.websessions = (function() {
       }
     });
 
+    // Update the tab group — remove the closed session from splits
+    var tab = openTabs.find(function(t) {
+      return t.splits && t.splits.find(function(s) { return s.id === sessionID; });
+    });
+    if (tab) {
+      tab.splits = tab.splits.filter(function(s) { return s.id !== sessionID; });
+      if (tab.splits.length <= 1) {
+        delete tab.splits;
+        delete tab.splitDirection;
+      }
+      saveTabState();
+      renderTabs();
+    }
+
     // Rebuild area with just the remaining session
     if (keepSessionID) {
-      // Clear everything and reload the remaining session
       area.style.flexDirection = '';
       htmx.ajax('POST', '/sessions/' + encodeURIComponent(keepSessionID) + '/open', {
         target: '#terminal-area',
