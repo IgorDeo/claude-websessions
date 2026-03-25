@@ -16,7 +16,7 @@
 window.websessions = (function() {
   const terminals = {};
   const splitInstances = [];
-  var openTabs = []; // [{id, name, state, splits: [{id, name}] | null}]
+  var openTabs = []; // [{id, name, state}]
   var activeTabId = null;
 
   var darkTermTheme = {
@@ -360,36 +360,15 @@ window.websessions = (function() {
       gutterSize: 4,
     });
 
-    // Load terminal content into each pane
-    function loadPaneSession(pane, sid) {
-      fetch('/sessions/' + encodeURIComponent(sid) + '/open', { method: 'POST' })
-        .then(function(r) { return r.text(); })
-        .then(function(html) {
-          pane.innerHTML = html;
-          var termPane = pane.querySelector('.terminal-pane[data-session-id]');
-          if (termPane) {
-            var id = termPane.dataset.sessionId;
-            if (terminals[id]) disconnectSession(id);
-            connectSession(id, 'term-' + id);
-          }
-        });
-    }
-    loadPaneSession(pane1, sessionID1);
-    loadPaneSession(pane2, sessionID2);
-
-    // Track the split as a tab group under the first session's tab
-    var tab = openTabs.find(function(t) { return t.id === sessionID1; });
-    if (tab) {
-      if (!tab.splits) tab.splits = [{ id: sessionID1, name: tab.name }];
-      // Add second session to the group (avoid duplicates)
-      if (!tab.splits.find(function(s) { return s.id === sessionID2; })) {
-        tab.splits.push({ id: sessionID2, name: sessionID2 });
-      }
-      // Remove sessionID2 from top-level tabs if it exists separately
-      openTabs = openTabs.filter(function(t) { return t.id !== sessionID2; });
-      saveTabState();
-      renderTabs();
-    }
+    // Load terminal content into each pane via htmx
+    htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID1) + '/open', {
+      target: pane1,
+      swap: 'innerHTML'
+    });
+    htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID2) + '/open', {
+      target: pane2,
+      swap: 'innerHTML'
+    });
   }
 
   function showToast(title, body, event) {
@@ -647,11 +626,6 @@ window.websessions = (function() {
 
   function closeTab(sessionID, e) {
     if (e) { e.stopPropagation(); e.preventDefault(); }
-    var tab = openTabs.find(function(t) { return t.id === sessionID; });
-    // Disconnect all sessions in the group
-    if (tab && tab.splits) {
-      tab.splits.forEach(function(s) { if (terminals[s.id]) disconnectSession(s.id); });
-    }
     openTabs = openTabs.filter(function(t) { return t.id !== sessionID; });
     if (terminals[sessionID]) disconnectSession(sessionID);
     saveTabState();
@@ -699,14 +673,6 @@ window.websessions = (function() {
       var nameSpan = document.createElement('span');
       nameSpan.textContent = tab.name;
       btn.appendChild(nameSpan);
-
-      if (tab.splits && tab.splits.length > 1) {
-        var splitBadge = document.createElement('span');
-        splitBadge.className = 'tab-split-badge';
-        splitBadge.textContent = tab.splits.length;
-        splitBadge.title = tab.splits.map(function(s) { return s.name; }).join(' | ');
-        btn.appendChild(splitBadge);
-      }
 
       var closeSpan = document.createElement('span');
       closeSpan.className = 'tab-close';

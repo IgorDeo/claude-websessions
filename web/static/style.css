@@ -541,14 +541,6 @@ html, body {
 }
 .split-picker-action:hover { background: var(--accent-glow); border-color: var(--accent); }
 .split-picker-action-term:hover { background: var(--green-glow); border-color: var(--green); }
-
-.tab-split-badge {
-  font-size: 0.55rem; font-weight: 700;
-  background: var(--accent); color: #fff;
-  padding: 0.05rem 0.25rem; border-radius: 3px;
-  margin-left: 0.15rem;
-}
-
 .new-session-btn {
   background: none; border: 1px solid var(--border);
   color: var(--text-muted); padding: 0.25rem 0.65rem;
