@@ -41,8 +41,21 @@ func ParseCmdline(cmdline string) (*ProcessInfo, error) {
 }
 
 // ResolveClaudeSessionID finds the active Claude session ID for a working directory
-// by looking at the most recently modified .jsonl file in ~/.claude/projects/<project>/
+// by looking at .jsonl files in ~/.claude/projects/<project>/
+// If processStartTime is provided, picks the file whose modification time is closest
+// to (but after) the process start time, to avoid picking a different session's file
+// when multiple Claude instances share the same working directory.
 func ResolveClaudeSessionID(workDir string) string {
+	return resolveSessionID(workDir, time.Time{})
+}
+
+// ResolveClaudeSessionIDForProcess resolves the session ID using the process start time
+// to disambiguate when multiple sessions share the same working directory.
+func ResolveClaudeSessionIDForProcess(workDir string, processStartTime time.Time) string {
+	return resolveSessionID(workDir, processStartTime)
+}
+
+func resolveSessionID(workDir string, processStartTime time.Time) string {
 	if workDir == "" {
 		return ""
 	}
@@ -50,7 +63,6 @@ func ResolveClaudeSessionID(workDir string) string {
 	if err != nil {
 		return ""
 	}
-	// Convert path to claude's project folder: /home/user.name/foo -> -home-user-name-foo
 	projectName := strings.ReplaceAll(workDir, "/", "-")
 	projectName = strings.ReplaceAll(projectName, ".", "-")
 	projectDir := filepath.Join(home, ".claude", "projects", projectName)
@@ -60,8 +72,11 @@ func ResolveClaudeSessionID(workDir string) string {
 		return ""
 	}
 
-	var bestID string
-	var bestTime time.Time
+	type candidate struct {
+		id      string
+		modTime time.Time
+	}
+	var candidates []candidate
 	for _, entry := range entries {
 		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".jsonl") {
 			continue
@@ -70,9 +85,52 @@ func ResolveClaudeSessionID(workDir string) string {
 		if err != nil {
 			continue
 		}
-		if info.ModTime().After(bestTime) {
-			bestTime = info.ModTime()
-			bestID = strings.TrimSuffix(entry.Name(), ".jsonl")
+		candidates = append(candidates, candidate{
+			id:      strings.TrimSuffix(entry.Name(), ".jsonl"),
+			modTime: info.ModTime(),
+		})
+	}
+	if len(candidates) == 0 {
+		return ""
+	}
+
+	// If no process start time, just pick the most recently modified
+	if processStartTime.IsZero() {
+		var bestID string
+		var bestTime time.Time
+		for _, c := range candidates {
+			if c.modTime.After(bestTime) {
+				bestTime = c.modTime
+				bestID = c.id
+			}
+		}
+		return bestID
+	}
+
+	// With process start time: pick the file that was active when the process started.
+	// Find files modified after the process started (active sessions), then pick the one
+	// whose mod time is closest to the start time (the one that started being written
+	// around the same time the process launched).
+	var bestID string
+	var bestDelta time.Duration = 1<<63 - 1 // max duration
+	for _, c := range candidates {
+		if c.modTime.Before(processStartTime) {
+			continue // file hasn't been written since process started
+		}
+		delta := c.modTime.Sub(processStartTime)
+		if delta < bestDelta {
+			bestDelta = delta
+			bestID = c.id
+		}
+	}
+	// If no files found after process start, fallback to most recent
+	if bestID == "" {
+		var bestTime time.Time
+		for _, c := range candidates {
+			if c.modTime.After(bestTime) {
+				bestTime = c.modTime
+				bestID = c.id
+			}
 		}
 	}
 	return bestID
@@ -105,7 +163,7 @@ func scanLinux() ([]ProcessInfo, error) {
 		if err == nil { info.WorkDir = cwd }
 		// Resolve session ID from project files if not in args
 		if info.ClaudeID == "" && info.WorkDir != "" {
-			info.ClaudeID = ResolveClaudeSessionID(info.WorkDir)
+			info.ClaudeID = ResolveClaudeSessionIDForProcess(info.WorkDir, info.StartTime)
 		}
 		results = append(results, *info)
 	}
@@ -137,7 +195,7 @@ func scanDarwin() ([]ProcessInfo, error) {
 		info.WorkDir = darwinCwd(pid)
 
 		if info.ClaudeID == "" && info.WorkDir != "" {
-			info.ClaudeID = ResolveClaudeSessionID(info.WorkDir)
+			info.ClaudeID = ResolveClaudeSessionIDForProcess(info.WorkDir, info.StartTime)
 		}
 		results = append(results, *info)
 	}
