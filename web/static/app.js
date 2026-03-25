@@ -353,73 +353,72 @@ window.websessions = (function() {
   }
 
   function doSplit(sessionID1, sessionID2, direction) {
-    // Find the container holding sessionID1's terminal
     var termEl = document.getElementById('term-' + sessionID1);
-    var target = null;
 
-    if (termEl) {
-      // Walk up to find the .split-pane or .terminal-pane parent
-      var parent = termEl.closest('.split-pane') || termEl.closest('.terminal-pane');
-      if (parent) {
-        target = parent.parentElement;
-        // Disconnect the existing terminal in this pane
-        disconnectSession(sessionID1);
-      }
-    }
+    // Find the .split-pane that contains this session (for nested splits)
+    var existingPane = termEl ? termEl.closest('.split-pane') : null;
 
-    // Fallback: use the terminal-area directly
-    if (!target) {
-      target = document.getElementById('terminal-area');
-      if (!target) return;
-      // Disconnect all terminals in the area
-      for (var sid in terminals) {
-        var el = document.getElementById('term-' + sid);
-        if (el && target.contains(el)) disconnectSession(sid);
-      }
-      while (target.firstChild) target.removeChild(target.firstChild);
+    // If not in a split-pane, use the terminal-area directly (first split)
+    if (!existingPane) {
+      var area = document.getElementById('terminal-area');
+      if (!area) return;
+
+      // Disconnect existing terminal
+      if (terminals[sessionID1]) disconnectSession(sessionID1);
+
+      while (area.firstChild) area.removeChild(area.firstChild);
+      area.style.flexDirection = splitFlex(direction);
+
+      var pane1 = document.createElement('div');
+      pane1.className = 'split-pane';
+      var pane2 = document.createElement('div');
+      pane2.className = 'split-pane';
+      area.appendChild(pane1);
+      area.appendChild(pane2);
+
+      Split([pane1, pane2], {
+        direction: splitDirection(direction),
+        sizes: [50, 50],
+        minSize: 80,
+        gutterSize: 4,
+      });
+
+      loadPaneSession(pane1, sessionID1);
+      loadPaneSession(pane2, sessionID2);
     } else {
-      // Remove the old pane content from the target
-      var oldPane = termEl.closest('.split-pane') || termEl.closest('.terminal-pane');
-      if (oldPane && oldPane.parentElement === target) {
-        target.removeChild(oldPane);
-        // Also remove any Split.js gutter that was next to it
-        var gutters = target.querySelectorAll('.gutter');
-        // Don't remove gutters from parent splits
-      }
+      // Nested split: replace the existing pane with a split container
+      var parent = existingPane.parentElement;
+
+      // Disconnect the terminal being split
+      if (terminals[sessionID1]) disconnectSession(sessionID1);
+
+      // Create a container to replace the pane
+      var container = document.createElement('div');
+      container.className = 'split-pane';
+      container.style.display = 'flex';
+      container.style.flexDirection = splitFlex(direction);
+      container.style.overflow = 'hidden';
+
+      var pane1 = document.createElement('div');
+      pane1.className = 'split-pane';
+      var pane2 = document.createElement('div');
+      pane2.className = 'split-pane';
+      container.appendChild(pane1);
+      container.appendChild(pane2);
+
+      // Replace the old pane in the DOM
+      parent.replaceChild(container, existingPane);
+
+      Split([pane1, pane2], {
+        direction: splitDirection(direction),
+        sizes: [50, 50],
+        minSize: 80,
+        gutterSize: 4,
+      });
+
+      loadPaneSession(pane1, sessionID1);
+      loadPaneSession(pane2, sessionID2);
     }
-
-    // Create a split container
-    var splitContainer = document.createElement('div');
-    splitContainer.className = 'split-container';
-    splitContainer.style.display = 'flex';
-    splitContainer.style.flexDirection = splitFlex(direction);
-    splitContainer.style.flex = '1';
-    splitContainer.style.overflow = 'hidden';
-
-    var pane1 = document.createElement('div');
-    pane1.className = 'split-pane';
-    pane1.setAttribute('data-split-session', sessionID1);
-    var pane2 = document.createElement('div');
-    pane2.className = 'split-pane';
-    pane2.setAttribute('data-split-session', sessionID2);
-
-    splitContainer.appendChild(pane1);
-    splitContainer.appendChild(pane2);
-
-    // If target had the old pane removed, insert the split container
-    // Otherwise (terminal-area fallback), just append
-    target.appendChild(splitContainer);
-    target.style.flexDirection = splitFlex(direction);
-
-    Split([pane1, pane2], {
-      direction: splitDirection(direction),
-      sizes: [50, 50],
-      minSize: 80,
-      gutterSize: 4,
-    });
-
-    loadPaneSession(pane1, sessionID1);
-    loadPaneSession(pane2, sessionID2);
 
     // Track the split as a tab group
     var tab = openTabs.find(function(t) {
@@ -430,7 +429,6 @@ window.websessions = (function() {
       if (!tab.splits.find(function(s) { return s.id === sessionID2; })) {
         tab.splits.push({ id: sessionID2, name: sessionID2 });
       }
-      // Remove sessionID2 from top-level tabs if it exists separately
       openTabs = openTabs.filter(function(t) { return t.id !== sessionID2; });
       saveTabState();
       renderTabs();
