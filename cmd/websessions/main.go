@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -212,18 +213,24 @@ func main() {
 	prevSessions, err := st.ListSessions(50)
 	if err == nil {
 		for _, rec := range prevSessions {
-			if rec.Status == "running" || rec.Status == "waiting" || rec.Status == "created" || rec.Status == "discovered" {
-				// Skip if already recovered from tmux
-				if _, ok := mgr.Get(rec.ID); ok {
-					continue
-				}
-				name := rec.Name
-				if name == "" {
-					name = rec.ID
-				}
-				mgr.AddOffline(rec.ID, name, rec.ClaudeID, rec.WorkDir)
-				offlineCount++
+			// Only restore owned sessions that were running — skip
+			// discovered (never owned), killed, completed, errored
+			if rec.Status != "running" && rec.Status != "waiting" && rec.Status != "created" {
+				continue
 			}
+			if strings.HasPrefix(rec.ID, "discovered-") {
+				continue
+			}
+			// Skip if already recovered from tmux
+			if _, ok := mgr.Get(rec.ID); ok {
+				continue
+			}
+			name := rec.Name
+			if name == "" {
+				name = rec.ID
+			}
+			mgr.AddOffline(rec.ID, name, rec.ClaudeID, rec.WorkDir)
+			offlineCount++
 		}
 	}
 	printOffline(offlineCount)
