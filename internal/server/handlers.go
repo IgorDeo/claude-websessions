@@ -340,8 +340,6 @@ func (s *Server) handleTakeover(w http.ResponseWriter, r *http.Request, sessionI
 		return
 	}
 	v := sessionToView(newSess)
-	w.Header().Set("X-Session-ID", v.ID)
-	w.Header().Set("X-Session-Name", v.Name)
 	templates.Terminal(v.ID, v.Name, v.WorkDir, v.State).Render(r.Context(), w)
 }
 
