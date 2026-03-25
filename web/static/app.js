@@ -297,13 +297,17 @@ window.websessions = (function() {
       btn.className = 'recent-item';
       btn.style.width = '100%';
       btn.style.marginBottom = '0.25rem';
-      var nameSpan = document.createElement('span');
-      nameSpan.className = 'recent-name';
-      nameSpan.textContent = s.name;
+      var nameRow = document.createElement('span');
+      nameRow.className = 'recent-name';
+      nameRow.textContent = s.name + ' ';
+      var typeBadge = document.createElement('span');
+      typeBadge.className = 'session-type-badge type-' + (s.type || 'claude');
+      typeBadge.textContent = s.type || 'claude';
+      nameRow.appendChild(typeBadge);
       var pathSpan = document.createElement('span');
       pathSpan.className = 'recent-path';
-      pathSpan.textContent = s.state + ' - ' + s.work_dir;
-      btn.appendChild(nameSpan);
+      pathSpan.textContent = s.work_dir;
+      btn.appendChild(nameRow);
       btn.appendChild(pathSpan);
       btn.addEventListener('click', function() {
         overlay.remove();

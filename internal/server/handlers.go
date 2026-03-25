@@ -351,12 +351,13 @@ func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 		Name    string `json:"name"`
 		WorkDir string `json:"work_dir"`
 		State   string `json:"state"`
+		Type    string `json:"type"`
 	}
 	var result []sessionJSON
 	for _, sess := range sessions {
 		result = append(result, sessionJSON{
 			ID: sess.ID, Name: sess.Name, WorkDir: sess.WorkDir,
-			State: string(sess.GetState()),
+			State: string(sess.GetState()), Type: sessionType(sess.ID),
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")
