@@ -14,10 +14,29 @@ description = "Build the websessions binary"
 depends = ["generate"]
 run = "go build -o bin/websessions ./cmd/websessions"
 
+[tasks."build-gui"]
+description = "Build with GUI support (requires GTK/WebKit)"
+depends = ["generate", "build-webview-helper"]
+run = "go build -tags gui -o bin/websessions ./cmd/websessions"
+
+[tasks."build-webview-helper"]
+description = "Compile the webview helper (requires gtk+-3.0 and webkit2gtk-4.1)"
+run = """
+cc $(pkg-config --cflags gtk+-3.0 webkit2gtk-4.1) \
+  cmd/webview-helper/main.c \
+  $(pkg-config --libs gtk+-3.0 webkit2gtk-4.1) \
+  -o cmd/websessions/webview-helper
+"""
+
 [tasks.run]
 description = "Run websessions in development mode"
 depends = ["generate"]
 run = "go run ./cmd/websessions"
+
+[tasks."run-gui"]
+description = "Run with GUI support"
+depends = ["generate", "build-webview-helper"]
+run = "go run -tags gui ./cmd/websessions --gui"
 
 [tasks.test]
 description = "Run all tests"
@@ -29,4 +48,4 @@ run = "golangci-lint run ./..."
 
 [tasks.clean]
 description = "Remove build artifacts"
-run = "rm -rf bin"
+run = "rm -rf bin cmd/websessions/webview-helper"
