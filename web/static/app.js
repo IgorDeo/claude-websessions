@@ -567,8 +567,27 @@ window.websessions = (function() {
       connectSession(sessionID, containerID);
     });
 
-    // If a terminal was loaded into the terminal area, refresh sidebar to update states
+    // If a terminal was loaded into the terminal area, ensure a tab exists and refresh sidebar
     if (event.detail.target.id === 'terminal-area' && panes.length > 0) {
+      var xhr = event.detail.xhr;
+      var sid = xhr ? xhr.getResponseHeader('X-Session-ID') : null;
+      var sname = xhr ? xhr.getResponseHeader('X-Session-Name') : null;
+      if (!sid) {
+        sid = panes[0].dataset.sessionId;
+        var titleEl = panes[0].querySelector('.pane-title');
+        sname = titleEl ? titleEl.textContent : sid;
+      }
+      if (sid) {
+        // Add tab without reloading terminal (openTab would clear the area)
+        var existing = openTabs.find(function(t) { return t.id === sid; });
+        if (!existing) {
+          openTabs.push({ id: sid, name: sname || sid, state: 'running' });
+        }
+        activeTabId = sid;
+        currentlyShowingTabId = sid;
+        saveTabState();
+        renderTabs();
+      }
       htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
     }
   });
