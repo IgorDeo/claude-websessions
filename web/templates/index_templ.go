@@ -70,7 +70,7 @@ func Index(data PageData) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"app\"><header class=\"topbar\"><h1 class=\"topbar-title\">websessions</h1><div class=\"topbar-actions\"><button class=\"theme-toggle\" onclick=\"window.websessions.toggleTheme()\" title=\"Toggle light/dark theme\" id=\"theme-toggle-btn\">&#9790;</button> <a href=\"/settings\" class=\"settings-link\" title=\"Settings\">&#9881;</a><div class=\"notification-wrapper\"><button class=\"notification-bell\" onclick=\"window.websessions.toggleNotifications()\"><span class=\"bell-icon\">&#128276;</span> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"app\"><header class=\"topbar\"><h1 class=\"topbar-title\">websessions</h1><div class=\"topbar-actions\"><button class=\"kill-all-btn\" onclick=\"window.websessions.killAllSessions()\" title=\"Kill all running sessions\">&#9632; Kill All</button> <button class=\"theme-toggle\" onclick=\"window.websessions.toggleTheme()\" title=\"Toggle light/dark theme\" id=\"theme-toggle-btn\">&#9790;</button> <a href=\"/settings\" class=\"settings-link\" title=\"Settings\">&#9881;</a><div class=\"notification-wrapper\"><button class=\"notification-bell\" onclick=\"window.websessions.toggleNotifications()\"><span class=\"bell-icon\">&#128276;</span> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -82,7 +82,7 @@ func Index(data PageData) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(data.UnreadCount))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/index.templ`, Line: 44, Col: 69}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/index.templ`, Line: 45, Col: 69}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {

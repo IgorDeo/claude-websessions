@@ -789,6 +789,72 @@ window.websessions = (function() {
       });
   }
 
+  function killAllSessions() {
+    // Count running sessions
+    var running = openTabs.filter(function(t) { return t.state === 'running' || t.state === 'waiting'; });
+    var count = document.querySelectorAll('.session-item.state-running, .session-item.state-waiting').length;
+    if (count === 0 && running.length === 0) {
+      showToast('No sessions', 'No running sessions to kill.', 'info');
+      return;
+    }
+
+    // Show confirmation modal
+    var modal = document.getElementById('modal');
+    if (!modal) return;
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    var dialog = document.createElement('div');
+    dialog.className = 'modal-dialog kill-all-dialog';
+
+    var title = document.createElement('h3');
+    title.textContent = 'Kill all running sessions?';
+    title.className = 'modal-title';
+
+    var desc = document.createElement('p');
+    desc.className = 'modal-desc';
+    desc.textContent = 'This will terminate all running and waiting Claude sessions. This action cannot be undone.';
+
+    var actions = document.createElement('div');
+    actions.className = 'modal-actions';
+
+    var cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn-cancel';
+    cancelBtn.textContent = 'Cancel';
+    cancelBtn.onclick = function() { modal.textContent = ''; };
+
+    var confirmBtn = document.createElement('button');
+    confirmBtn.className = 'btn-danger';
+    confirmBtn.textContent = 'Kill All Sessions';
+    confirmBtn.onclick = function() {
+      confirmBtn.textContent = 'Killing...';
+      confirmBtn.disabled = true;
+      fetch('/api/kill-all', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          modal.textContent = '';
+          // Close all tabs
+          openTabs.forEach(function(t) { if (terminals[t.id]) disconnectSession(t.id); });
+          openTabs = [];
+          activeTabId = null;
+          saveTabState();
+          renderTabs();
+          document.getElementById('terminal-area').innerHTML = '<div class="empty-state"><p>All sessions killed</p></div>';
+          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+          showToast('Sessions killed', data.killed + ' session(s) terminated.', 'completed');
+        });
+    };
+
+    actions.appendChild(cancelBtn);
+    actions.appendChild(confirmBtn);
+    dialog.appendChild(title);
+    dialog.appendChild(desc);
+    dialog.appendChild(actions);
+    overlay.appendChild(dialog);
+    overlay.onclick = function(e) { if (e.target === overlay) modal.textContent = ''; };
+    modal.textContent = '';
+    modal.appendChild(overlay);
+  }
+
   function killSession(sessionID) {
     if (!confirm('Kill session "' + sessionID + '"?')) return;
     fetch('/sessions/' + encodeURIComponent(sessionID) + '/kill', { method: 'POST' })
@@ -1678,6 +1744,7 @@ window.websessions = (function() {
     splitPane: splitPane,
     openTerminal: openTerminal,
     toggleTheme: toggleTheme,
+    killAllSessions: killAllSessions,
     killSession: killSession,
     startRename: startRename,
     dirAutocomplete: dirAutocomplete,

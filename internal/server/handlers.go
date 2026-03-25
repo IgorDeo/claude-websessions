@@ -901,6 +901,29 @@ func (s *Server) setupNotificationBridge() {
 	})
 }
 
+func (s *Server) handleKillAll(w http.ResponseWriter, r *http.Request) {
+	killed := 0
+	for _, sess := range s.mgr.List() {
+		state := sess.GetState()
+		if state == session.StateRunning || state == session.StateWaiting || state == session.StateCreated {
+			sess.Killed = true
+			if s.store != nil {
+				s.store.SaveSession(store.SessionRecord{
+					ID: sess.ID, Name: sess.Name, ClaudeID: sess.ClaudeID, WorkDir: sess.WorkDir,
+					StartTime: sess.StartTime, EndTime: time.Now(),
+					ExitCode: -1, Status: "killed", PID: sess.PID,
+				})
+			}
+			if err := s.mgr.Kill(sess.ID); err != nil {
+				s.mgr.Remove(sess.ID)
+			}
+			killed++
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]int{"killed": killed})
+}
+
 func (s *Server) handleGetPreferences(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.store == nil {
