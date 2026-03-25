@@ -469,7 +469,9 @@ html, body {
 /* Terminal Area */
 .terminal-area { flex: 1; display: flex; overflow: hidden; background: var(--bg-primary); }
 .terminal-pane { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-.split-pane { overflow: hidden; }
+.split-pane { overflow: hidden; display: flex; flex-direction: column; }
+.gutter { flex-shrink: 0; background: var(--border); }
+.gutter:hover { background: var(--accent); }
 
 .pane-header {
   display: flex; align-items: center; gap: 0.5rem;
