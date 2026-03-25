@@ -141,7 +141,7 @@ chmod +x websessions && ./websessions
 ```bash
 git clone https://github.com/IgorDeo/claude-websessions.git
 cd claude-websessions
-make build
+mise run build
 ./bin/websessions
 ```
 
@@ -151,6 +151,7 @@ make build
 |-----------|----------|-------|
 | **tmux** | Yes | Session management runtime |
 | **Claude Code CLI** | Yes | `claude` command in PATH |
+| **[mise](https://mise.jdx.dev/)** | For source builds/runs | Version manager and task runner used by `mise run ...` commands |
 | **[Maple Mono Normal NF](https://github.com/subframe7536/maple-font)** | Recommended | Monospace font with ligatures and Nerd Font icons |
 | **Go 1.26+** | Build only | Not needed for binary installs |
 | **templ** | Build only | `go install github.com/a-h/templ/cmd/templ@latest` |
@@ -231,7 +232,7 @@ Closing the window shuts down the server gracefully.
 
 ```bash
 # Requires dev headers: sudo apt install libwebkit2gtk-4.1-dev libgtk-3-dev
-make build-gui
+mise run build-gui
 ./bin/websessions --gui
 ```
 
@@ -266,13 +267,13 @@ All settings can also be changed from the **Settings** page in the UI.
 ## Build & Run
 
 ```bash
-make build          # Build binary (runs templ generate)
-make build-gui      # Build with native GUI support (requires CGO + system libs)
-make run            # Build and run
-make run-gui        # Build and run with native GUI window
-make test           # Run all tests
-make lint           # Run golangci-lint
-make clean          # Remove build artifacts
+mise run build          # Build binary (runs templ generate)
+mise run build-gui      # Build with native GUI support (requires CGO + system libs)
+mise run run            # Build and run
+mise run run-gui        # Build and run with native GUI window
+mise run test           # Run all tests
+mise run lint           # Run golangci-lint
+mise run clean          # Remove build artifacts
 ```
 
 ```bash
@@ -360,11 +361,11 @@ Removes the binary, stops and removes any background service (systemd/launchd), 
 ## Development
 
 ```bash
-make test                                                    # All tests
+mise run test                                                # All tests
 go test ./internal/session/... -v -run TestManager_CreateSession  # Single test
 go test ./internal/server/... -v -tags=integration           # Integration tests
 templ generate                                               # Regenerate templates
-make build && ./bin/websessions --log-level debug            # Debug run
+mise run build && ./bin/websessions --log-level debug        # Debug run
 ```
 
 ## License
