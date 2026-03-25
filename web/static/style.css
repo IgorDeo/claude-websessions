@@ -341,8 +341,12 @@ html, body {
   background: var(--bg-secondary);
   border-bottom: 1px solid var(--border);
   overflow-x: auto;
+  overflow-y: hidden;
   min-height: 33px;
+  scrollbar-width: thin;
 }
+.tab-bar::-webkit-scrollbar { height: 2px; }
+.tab-bar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 .tab {
   display: flex; align-items: center; gap: 0.35rem;
   padding: 0 0.75rem; height: 33px;
@@ -351,6 +355,7 @@ html, body {
   color: var(--text-muted); cursor: pointer;
   font-family: var(--font-mono); font-size: 0.72rem;
   white-space: nowrap;
+  flex-shrink: 0;
   transition: color var(--transition-fast), background var(--transition-fast);
 }
 .tab:hover { color: var(--text-secondary); background: var(--bg-tertiary); }
