@@ -1,8 +1,16 @@
 // ── Theme (runs immediately before app init) ──────────────
 (function() {
+  // Apply cached theme instantly to avoid flash
   var saved = null;
   try { saved = localStorage.getItem('ws-theme'); } catch(e) {}
   if (saved) document.documentElement.setAttribute('data-theme', saved);
+  // Then sync from server (authoritative source)
+  fetch('/api/preferences').then(function(r) { return r.json(); }).then(function(prefs) {
+    if (prefs.theme) {
+      document.documentElement.setAttribute('data-theme', prefs.theme);
+      try { localStorage.setItem('ws-theme', prefs.theme); } catch(e) {}
+    }
+  }).catch(function() {});
 })();
 
 window.websessions = (function() {
@@ -29,10 +37,19 @@ window.websessions = (function() {
     if (btn) btn.textContent = currentTheme() === 'light' ? '\u2600' : '\u263E';
   }
 
+  function savePref(key, value) {
+    fetch('/api/preferences', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: key, value: value }),
+    }).catch(function() {});
+  }
+
   function toggleTheme() {
     var next = currentTheme() === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     try { localStorage.setItem('ws-theme', next); } catch(e) {}
+    savePref('theme', next);
     updateThemeIcon();
     // Update all open xterm instances
     var theme = next === 'light' ? lightTermTheme : darkTermTheme;
@@ -692,11 +709,16 @@ window.websessions = (function() {
   }
 
   function saveTabState() {
-    try { localStorage.setItem('ws-open-tabs', JSON.stringify(openTabs)); } catch(e) {}
-    try { localStorage.setItem('ws-active-tab', activeTabId || ''); } catch(e) {}
+    var tabsJson = JSON.stringify(openTabs);
+    var activeJson = activeTabId || '';
+    try { localStorage.setItem('ws-open-tabs', tabsJson); } catch(e) {}
+    try { localStorage.setItem('ws-active-tab', activeJson); } catch(e) {}
+    savePref('open-tabs', tabsJson);
+    savePref('active-tab', activeJson);
   }
 
   function loadTabState() {
+    // Load from localStorage first (fast), then server overrides
     try {
       var saved = JSON.parse(localStorage.getItem('ws-open-tabs'));
       if (saved && saved.length) openTabs = saved;
@@ -704,11 +726,40 @@ window.websessions = (function() {
     } catch(e) {}
   }
 
-  // Load tabs on page load
+  // Sync tab state from server (runs after initial load)
+  function syncTabStateFromServer() {
+    fetch('/api/preferences').then(function(r) { return r.json(); }).then(function(prefs) {
+      if (prefs['open-tabs']) {
+        try {
+          var serverTabs = JSON.parse(prefs['open-tabs']);
+          if (serverTabs && serverTabs.length) {
+            openTabs = serverTabs;
+            try { localStorage.setItem('ws-open-tabs', prefs['open-tabs']); } catch(e) {}
+          }
+        } catch(e) {}
+      }
+      if (prefs['active-tab']) {
+        activeTabId = prefs['active-tab'];
+        try { localStorage.setItem('ws-active-tab', activeTabId); } catch(e) {}
+      }
+      renderTabs();
+      if (activeTabId) {
+        var tab = openTabs.find(function(t) { return t.id === activeTabId; });
+        if (tab) {
+          htmx.ajax('POST', '/sessions/' + encodeURIComponent(activeTabId) + '/open', {
+            target: '#terminal-area',
+            swap: 'innerHTML'
+          });
+        }
+      }
+    }).catch(function() {});
+  }
+
+  // Load tabs on page load (localStorage for instant render, then sync from server)
   loadTabState();
   document.addEventListener('DOMContentLoaded', function() {
     renderTabs();
-    // Reopen the active tab
+    // Reopen the active tab from localStorage cache
     if (activeTabId) {
       var tab = openTabs.find(function(t) { return t.id === activeTabId; });
       if (tab) {
@@ -718,6 +769,8 @@ window.websessions = (function() {
         });
       }
     }
+    // Sync from server (authoritative) — overrides localStorage if different
+    syncTabStateFromServer();
   });
 
   // Quick terminal creation

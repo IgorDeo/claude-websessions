@@ -901,6 +901,36 @@ func (s *Server) setupNotificationBridge() {
 	})
 }
 
+func (s *Server) handleGetPreferences(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	if s.store == nil {
+		json.NewEncoder(w).Encode(map[string]string{})
+		return
+	}
+	prefs, err := s.store.GetAllPreferences()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+	json.NewEncoder(w).Encode(prefs)
+}
+
+func (s *Server) handleSetPreference(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Key   string `json:"key"`
+		Value string `json:"value"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if s.store != nil {
+		s.store.SetPreference(payload.Key, payload.Value)
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 func (s *Server) handleAudioDevices(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(notification.ListAudioDevices())

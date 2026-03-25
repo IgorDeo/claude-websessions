@@ -65,6 +65,8 @@ func (s *Server) routes() http.Handler {
 	r.Post("/settings/hooks", s.handleInstallHooks)
 	r.Get("/api/check-update", s.handleCheckUpdate)
 	r.Post("/api/self-update", s.handleSelfUpdate)
+	r.Get("/api/preferences", s.handleGetPreferences)
+	r.Put("/api/preferences", s.handleSetPreference)
 	r.Get("/api/audio-devices", s.handleAudioDevices)
 	r.Post("/api/audio-device", s.handleSetAudioDevice)
 	r.Post("/api/test-sound", s.handleTestSound)
