@@ -279,16 +279,24 @@ func main() {
 					continue
 				}
 
-				// Build set of PIDs already tracked
+				// Build sets of PIDs and WorkDirs already tracked
 				existingPIDs := make(map[int]bool)
+				existingDirs := make(map[string]bool)
 				for _, s := range mgr.List() {
 					if s.PID > 0 {
 						existingPIDs[s.PID] = true
+					}
+					if s.WorkDir != "" && s.Owned {
+						existingDirs[s.WorkDir] = true
 					}
 				}
 
 				for _, p := range processes {
 					if existingPIDs[p.PID] {
+						continue
+					}
+					// Skip if an owned session already manages this directory
+					if p.WorkDir != "" && existingDirs[p.WorkDir] {
 						continue
 					}
 					id := fmt.Sprintf("discovered-%d", p.PID)
