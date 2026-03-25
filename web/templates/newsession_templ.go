@@ -10,7 +10,7 @@ import templruntime "github.com/a-h/templ/runtime"
 
 import "path/filepath"
 
-func NewSessionModal(defaultDir string, recentDirs []string) templ.Component {
+func NewSessionModal(defaultDir string, recentDirs []string, dockerAvailable bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -116,7 +116,32 @@ func NewSessionModal(defaultDir string, recentDirs []string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" required autocomplete=\"off\" oninput=\"window.websessions.dirAutocomplete(this)\" onchange=\"window.websessions.loadClaudeSessions(this.value)\"><div id=\"dir-suggestions\" class=\"dir-suggestions\"></div></div><div id=\"claude-sessions-section\" class=\"claude-sessions-section\" style=\"display:none;\"><label class=\"recent-label\">Resume previous Claude session</label><div id=\"claude-sessions-list\" class=\"recent-list\"></div></div><div class=\"form-group\"><label for=\"prompt\">Initial Prompt (optional)</label> <textarea id=\"prompt\" name=\"prompt\" rows=\"3\" placeholder=\"What should Claude work on?\"></textarea></div><div class=\"form-actions\"><button type=\"button\" class=\"btn-cancel\" onclick=\"this.closest('.modal-overlay').remove()\">Cancel</button> <button type=\"submit\" class=\"btn-create\">Create</button></div></form></div></div>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" required autocomplete=\"off\" oninput=\"window.websessions.dirAutocomplete(this)\" onchange=\"window.websessions.loadClaudeSessions(this.value)\"><div id=\"dir-suggestions\" class=\"dir-suggestions\"></div></div><div id=\"claude-sessions-section\" class=\"claude-sessions-section\" style=\"display:none;\"><label class=\"recent-label\">Resume previous Claude session</label><div id=\"claude-sessions-list\" class=\"recent-list\"></div></div><div class=\"form-group\"><label for=\"prompt\">Initial Prompt (optional)</label> <textarea id=\"prompt\" name=\"prompt\" rows=\"3\" placeholder=\"What should Claude work on?\"></textarea></div><div class=\"form-group\"><label class=\"checkbox-label\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if dockerAvailable {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<input type=\"checkbox\" name=\"sandbox\" value=\"true\"> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		} else {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<input type=\"checkbox\" name=\"sandbox\" value=\"true\" disabled> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "Run in Docker sandbox (VM-isolated, safe for autonomous mode)</label> ")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		if !dockerAvailable {
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<span class=\"settings-hint\">Docker Desktop is required for sandbox mode</span>")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div><div class=\"form-actions\"><button type=\"button\" class=\"btn-cancel\" onclick=\"this.closest('.modal-overlay').remove()\">Cancel</button> <button type=\"submit\" class=\"btn-create\">Create</button></div></form></div></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

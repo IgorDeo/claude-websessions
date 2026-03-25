@@ -9,6 +9,7 @@ type SessionView struct {
 	State     string
 	Type      string // "claude", "terminal", "discovered"
 	Owned     bool
+	Sandboxed bool
 	GroupName string // non-empty if session is in a split tab group
 }
 

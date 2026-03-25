@@ -1,11 +1,13 @@
 package doctor
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 )
 
 type Check struct {
@@ -20,6 +22,7 @@ func RunChecks() []Check {
 
 	checks = append(checks, checkTmux())
 	checks = append(checks, checkClaude())
+	checks = append(checks, checkDocker())
 	checks = append(checks, checkGit())
 	checks = append(checks, checkShell())
 	checks = append(checks, checkSQLite())
@@ -64,6 +67,29 @@ func checkClaude() Check {
 	}
 	c.Status = "ok"
 	c.Version = ver
+	c.Detail = path
+	return c
+}
+
+func checkDocker() Check {
+	c := Check{Name: "docker sandbox"}
+	path, err := exec.LookPath("docker")
+	if err != nil {
+		c.Status = "missing"
+		c.Detail = "Optional. Required for sandboxed sessions. Install Docker Desktop."
+		return c
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "docker", "sandbox", "version")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		c.Status = "warning"
+		c.Detail = "Docker Desktop is required — docker engine alone is not enough"
+		return c
+	}
+	c.Status = "ok"
+	c.Version = strings.TrimSpace(string(out))
 	c.Detail = path
 	return c
 }
