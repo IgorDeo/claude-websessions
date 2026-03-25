@@ -138,11 +138,16 @@ window.websessions = (function() {
 
     const term = new Terminal({
       cursorBlink: true,
-      scrollback: 10000,
+      scrollback: 50000,
       theme: currentTheme() === 'light' ? lightTermTheme : darkTermTheme,
       fontFamily: "'Maple Mono Normal NF', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace",
       fontSize: 14,
     });
+
+    // Strip alternate screen escape sequences so all output stays in the
+    // normal scrollable buffer. Claude Code uses alternate screen which
+    // has no scrollback, making mouse wheel scroll prompt history instead.
+    var altScreenRe = /\x1b\[\?(1049|1047|47)[hl]/g;
 
     const fitAddon = new FitAddon.FitAddon();
     term.loadAddon(fitAddon);
@@ -160,13 +165,16 @@ window.websessions = (function() {
 
     ws.onmessage = function(event) {
       if (event.data instanceof ArrayBuffer) {
-        term.write(new Uint8Array(event.data));
+        var text = new TextDecoder().decode(new Uint8Array(event.data));
+        var filtered = text.replace(altScreenRe, '');
+        if (filtered) term.write(filtered);
       } else {
         try {
           var msg = JSON.parse(event.data);
           if (msg.type === 'notification') { handleNotification(msg); }
         } catch(e) {
-          term.write(event.data);
+          var filtered2 = event.data.replace(altScreenRe, '');
+          if (filtered2) term.write(filtered2);
         }
       }
     };
