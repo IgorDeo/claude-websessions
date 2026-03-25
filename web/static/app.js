@@ -141,7 +141,7 @@ window.websessions = (function() {
       scrollback: 10000,
       theme: currentTheme() === 'light' ? lightTermTheme : darkTermTheme,
       fontFamily: "'Maple Mono Normal NF', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace",
-      fontSize: 14,
+      fontSize: termFontSize,
     });
 
     const fitAddon = new FitAddon.FitAddon();
@@ -1431,6 +1431,7 @@ window.websessions = (function() {
         // Reset badge
         var badge = document.getElementById('notif-badge');
         if (badge) badge.remove();
+        updateFaviconBadge(0);
       });
   }
 
@@ -1591,6 +1592,7 @@ window.websessions = (function() {
           }
           if (badge) {
             badge.textContent = String(parseInt(badge.textContent || '0') + 1);
+            updateFaviconBadge(parseInt(badge.textContent));
           }
           // Play sound
           playNotifSound(msg.event);
@@ -1617,10 +1619,26 @@ window.websessions = (function() {
   }
   connectNotifications();
 
-  // ── Periodic update check (every 30 minutes) ──────────────
+  // ── Favicon badge ───────────────────────────────────────────
+  function updateFaviconBadge(count) {
+    var link = document.querySelector("link[rel~='icon']");
+    if (!link) return;
+    if (count <= 0) {
+      link.href = '/static/favicon.svg';
+      document.title = 'websessions';
+      return;
+    }
+    document.title = '(' + count + ') websessions';
+  }
+
+  // ── Periodic update check (every 30 minutes, cached) ──────
   var updateBannerShown = false;
+  var lastUpdateCheck = 0;
   function backgroundUpdateCheck() {
     if (updateBannerShown) return;
+    var now = Date.now();
+    if (now - lastUpdateCheck < 30 * 60 * 1000 && lastUpdateCheck > 0) return;
+    lastUpdateCheck = now;
     fetch('/api/check-update')
       .then(function(r) { return r.json(); })
       .then(function(data) {
@@ -1733,6 +1751,42 @@ window.websessions = (function() {
       if (saved) sidebar.style.width = saved;
     } catch(e) {}
   })();
+
+  // ── Terminal font zoom (Ctrl+= / Ctrl+-) ──────────────────
+  var termFontSize = 14;
+  try {
+    var savedSize = localStorage.getItem('ws-term-font-size');
+    if (savedSize) termFontSize = parseInt(savedSize);
+  } catch(e) {}
+
+  document.addEventListener('keydown', function(e) {
+    var ctrl = e.ctrlKey || e.metaKey;
+    if (!ctrl) return;
+    if (e.key === '=' || e.key === '+') {
+      e.preventDefault();
+      termFontSize = Math.min(termFontSize + 1, 28);
+      applyTermFontSize();
+    } else if (e.key === '-') {
+      e.preventDefault();
+      termFontSize = Math.max(termFontSize - 1, 8);
+      applyTermFontSize();
+    } else if (e.key === '0') {
+      e.preventDefault();
+      termFontSize = 14;
+      applyTermFontSize();
+    }
+  });
+
+  function applyTermFontSize() {
+    Object.keys(terminals).forEach(function(id) {
+      var t = terminals[id];
+      if (t && t.term) {
+        t.term.options.fontSize = termFontSize;
+        if (t.fitAddon) t.fitAddon.fit();
+      }
+    });
+    try { localStorage.setItem('ws-term-font-size', String(termFontSize)); } catch(e) {}
+  }
 
   return {
     connectSession: connectSession,
