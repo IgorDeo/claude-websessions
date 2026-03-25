@@ -195,6 +195,8 @@ window.websessions = (function() {
         if (session.retries > 5) {
           term.write('\r\n\x1b[31m[Session unavailable — connection closed]\x1b[0m\r\n');
           session.closed = true;
+          // Auto-close the tab after a brief delay
+          setTimeout(function() { closeTab(sessionID); }, 2000);
           return;
         }
         var delay = Math.min(1000 * Math.pow(2, session.retries - 1), 15000);
