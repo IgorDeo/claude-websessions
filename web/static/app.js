@@ -138,11 +138,16 @@ window.websessions = (function() {
 
     const term = new Terminal({
       cursorBlink: true,
-      scrollback: 10000,
+      scrollback: 50000,
       theme: currentTheme() === 'light' ? lightTermTheme : darkTermTheme,
       fontFamily: "'Maple Mono Normal NF', 'IBM Plex Mono', 'JetBrains Mono', 'Fira Code', monospace",
-      fontSize: 14,
+      fontSize: termFontSize,
     });
+
+    // Regex to strip alternate screen escape sequences so all output stays
+    // in the normal scrollable buffer. Without this, Claude Code enters
+    // alternate screen mode which has no scrollback.
+    var altScreenRe = /\x1b\[\?(1049|1047|47)[hl]/g;
 
     const fitAddon = new FitAddon.FitAddon();
     term.loadAddon(fitAddon);
@@ -166,13 +171,17 @@ window.websessions = (function() {
 
       ws.onmessage = function(event) {
         if (event.data instanceof ArrayBuffer) {
-          term.write(new Uint8Array(event.data));
+          // Decode, strip alternate screen sequences, write
+          var text = new TextDecoder().decode(new Uint8Array(event.data));
+          var filtered = text.replace(altScreenRe, '');
+          if (filtered) term.write(filtered);
         } else {
           try {
             var msg = JSON.parse(event.data);
             if (msg.type === 'notification') { handleNotification(msg); }
           } catch(e) {
-            term.write(event.data);
+            var filtered2 = event.data.replace(altScreenRe, '');
+            if (filtered2) term.write(filtered2);
           }
         }
       };
@@ -560,11 +569,23 @@ window.websessions = (function() {
     }
     activeTabId = sessionID;
     renderTabs();
-    // Load terminal
-    htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID) + '/open', {
-      target: '#terminal-area',
-      swap: 'innerHTML'
-    });
+    // Only load terminal from server if not already connected
+    if (!terminals[sessionID]) {
+      htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID) + '/open', {
+        target: '#terminal-area',
+        swap: 'innerHTML'
+      });
+    } else {
+      // Show the already-connected terminal pane
+      var area = document.getElementById('terminal-area');
+      if (area) {
+        var panes = area.querySelectorAll('.terminal-pane');
+        panes.forEach(function(p) {
+          p.style.display = p.getAttribute('data-session-id') === sessionID ? '' : 'none';
+        });
+        if (terminals[sessionID].fitAddon) terminals[sessionID].fitAddon.fit();
+      }
+    }
   }
 
   function closeTab(sessionID, e) {
@@ -1390,6 +1411,27 @@ window.websessions = (function() {
 
   // Notification panel
   var notifOpen = false;
+  var shortcutsOpen = false;
+  function toggleShortcuts() {
+    var dropdown = document.getElementById('shortcuts-dropdown');
+    if (!dropdown) return;
+    shortcutsOpen = !shortcutsOpen;
+    dropdown.classList.toggle('open', shortcutsOpen);
+    if (shortcutsOpen) {
+      setTimeout(function() {
+        document.addEventListener('click', closeShortcutsOnOutside, { once: true });
+      }, 0);
+    }
+  }
+  function closeShortcutsOnOutside(e) {
+    var wrapper = document.querySelector('.shortcuts-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+      shortcutsOpen = false;
+      var dropdown = document.getElementById('shortcuts-dropdown');
+      if (dropdown) dropdown.classList.remove('open');
+    }
+  }
+
   function toggleNotifications() {
     var dropdown = document.getElementById('notification-dropdown');
     if (!dropdown) return;
@@ -1448,6 +1490,7 @@ window.websessions = (function() {
         // Reset badge
         var badge = document.getElementById('notif-badge');
         if (badge) badge.remove();
+        updateFaviconBadge(0);
       });
   }
 
@@ -1623,6 +1666,7 @@ window.websessions = (function() {
           }
           if (badge) {
             badge.textContent = String(parseInt(badge.textContent || '0') + 1);
+            updateFaviconBadge(parseInt(badge.textContent));
           }
           // Play sound
           playNotifSound(msg.event);
@@ -1649,10 +1693,26 @@ window.websessions = (function() {
   }
   connectNotifications();
 
-  // ── Periodic update check (every 30 minutes) ──────────────
+  // ── Favicon badge ───────────────────────────────────────────
+  function updateFaviconBadge(count) {
+    var link = document.querySelector("link[rel~='icon']");
+    if (!link) return;
+    if (count <= 0) {
+      link.href = '/static/favicon.svg';
+      document.title = 'websessions';
+      return;
+    }
+    document.title = '(' + count + ') websessions';
+  }
+
+  // ── Periodic update check (every 30 minutes, cached) ──────
   var updateBannerShown = false;
+  var lastUpdateCheck = 0;
   function backgroundUpdateCheck() {
     if (updateBannerShown) return;
+    var now = Date.now();
+    if (now - lastUpdateCheck < 30 * 60 * 1000 && lastUpdateCheck > 0) return;
+    lastUpdateCheck = now;
     fetch('/api/check-update')
       .then(function(r) { return r.json(); })
       .then(function(data) {
@@ -1766,13 +1826,50 @@ window.websessions = (function() {
     } catch(e) {}
   })();
 
+  // ── Terminal font zoom ──────────────────────────────────────
+  var termFontSize = 14;
+  try {
+    var savedSize = localStorage.getItem('ws-term-font-size');
+    if (savedSize) termFontSize = parseInt(savedSize);
+  } catch(e) {}
+
+  function applyTermFontSize() {
+    Object.keys(terminals).forEach(function(id) {
+      var t = terminals[id];
+      if (t && t.term) {
+        t.term.options.fontSize = termFontSize;
+        if (t.fitAddon) t.fitAddon.fit();
+      }
+    });
+    try { localStorage.setItem('ws-term-font-size', String(termFontSize)); } catch(e) {}
+  }
+
   // ── Keyboard shortcuts ─────────────────────────────────────
   document.addEventListener('keydown', function(e) {
-    // Don't intercept when typing in inputs/textareas
     var tag = (e.target.tagName || '').toLowerCase();
     if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
 
     var ctrl = e.ctrlKey || e.metaKey;
+
+    // Ctrl+= / Ctrl+- — terminal font zoom
+    if (ctrl && (e.key === '=' || e.key === '+')) {
+      e.preventDefault();
+      termFontSize = Math.min(termFontSize + 1, 28);
+      applyTermFontSize();
+      return;
+    }
+    if (ctrl && e.key === '-') {
+      e.preventDefault();
+      termFontSize = Math.max(termFontSize - 1, 8);
+      applyTermFontSize();
+      return;
+    }
+    if (ctrl && e.key === '0') {
+      e.preventDefault();
+      termFontSize = 14;
+      applyTermFontSize();
+      return;
+    }
 
     // Ctrl+] — next tab, Ctrl+[ — previous tab
     if (ctrl && (e.key === ']' || e.key === '[')) {
@@ -1819,7 +1916,6 @@ window.websessions = (function() {
       return;
     }
   });
-
   return {
     connectSession: connectSession,
     disconnectSession: disconnectSession,
@@ -1830,6 +1926,7 @@ window.websessions = (function() {
     splitPane: splitPane,
     openTerminal: openTerminal,
     toggleTheme: toggleTheme,
+    toggleShortcuts: toggleShortcuts,
     killAllSessions: killAllSessions,
     killSession: killSession,
     startRename: startRename,
