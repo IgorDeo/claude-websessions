@@ -311,7 +311,7 @@ func (s *Server) handleOpenIframe(w http.ResponseWriter, r *http.Request) {
 		title = "Iframe"
 	}
 	paneID := fmt.Sprintf("iframe-%d", time.Now().UnixMilli())
-	templates.IframePane(paneID, title, iframeURL).Render(r.Context(), w)
+	_ = templates.IframePane(paneID, title, iframeURL).Render(r.Context(), w)
 }
 
 func (s *Server) handleCreateIframePane(w http.ResponseWriter, r *http.Request) {
@@ -343,7 +343,7 @@ func (s *Server) handleCreateIframePane(w http.ResponseWriter, r *http.Request) 
 	s.hub.broadcastNotification(msg)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"ok": true})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": true})
 }
 
 func (s *Server) handleNewSessionModal(w http.ResponseWriter, r *http.Request) {
@@ -1103,7 +1103,7 @@ func (s *Server) handlePlannotatorIntegration(w http.ResponseWriter, r *http.Req
 		slog.Error("plannotator integration failed", "action", payload.Action, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 
@@ -1114,7 +1114,7 @@ func (s *Server) handlePlannotatorIntegration(w http.ResponseWriter, r *http.Req
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"ok":      true,
 		"action":  payload.Action,
 		"enabled": enabled,
