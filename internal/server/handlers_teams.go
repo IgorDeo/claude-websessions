@@ -2,9 +2,14 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
+	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/IgorDeo/claude-websessions/internal/hooks"
+	"github.com/IgorDeo/claude-websessions/web/templates"
 )
 
 // handleListTeams returns all discovered agent teams as JSON.
@@ -120,4 +125,164 @@ func (s *Server) handleTeamMessages(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	renderTeamMessagesHTML(w, team)
+}
+
+// handleNewTeamModal renders the "Create Team" modal.
+func (s *Server) handleNewTeamModal(w http.ResponseWriter, r *http.Request) {
+	var recentDirs []string
+	if s.store != nil {
+		recentDirs, _ = s.store.RecentDirs(10)
+	}
+	if err := templates.NewTeamModal(s.cfg.Sessions.DefaultDir, recentDirs).Render(r.Context(), w); err != nil {
+		slog.Error("failed to render new team modal", "error", err)
+	}
+}
+
+// handleCreateTeam spawns a new Claude Code session as a team lead.
+func (s *Server) handleCreateTeam(w http.ResponseWriter, r *http.Request) {
+	if s.teamMgr == nil {
+		http.Error(w, "teams feature is disabled", http.StatusBadRequest)
+		return
+	}
+
+	name := strings.TrimSpace(r.FormValue("name"))
+	workDir := strings.TrimSpace(r.FormValue("work_dir"))
+	prompt := strings.TrimSpace(r.FormValue("prompt"))
+	model := strings.TrimSpace(r.FormValue("model"))
+
+	if name == "" || workDir == "" || prompt == "" {
+		http.Error(w, "name, work_dir, and prompt are required", http.StatusBadRequest)
+		return
+	}
+
+	// Build the claude CLI args with agent teams env
+	id := "team-lead-" + name
+	args := []string{"--name", name}
+	if model != "" {
+		args = append(args, "--model", model)
+	}
+
+	// Create the session — the CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS env var
+	// is set by injecting it into the tmux session environment
+	sess, err := s.mgr.Create(id, workDir, "claude", args)
+	if err != nil {
+		slog.Error("failed to create team lead session", "error", err)
+		http.Error(w, fmt.Sprintf("failed to create session: %v", err), http.StatusInternalServerError)
+		return
+	}
+	sess.Name = name + " (lead)"
+	sess.TeamName = name
+	sess.TeamRole = "lead"
+
+	// Send the agent teams env and the team creation prompt to the session
+	envCmd := fmt.Sprintf("export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1\n")
+	_ = s.mgr.WriteInput(id, []byte(envCmd))
+
+	// Wait briefly for the session to start, then send the prompt
+	// The prompt tells Claude to create an agent team
+	teamPrompt := prompt + "\n"
+	_ = s.mgr.WriteInput(id, []byte(teamPrompt))
+
+	// Return htmx redirect to open the session
+	w.Header().Set("HX-Trigger", `{"closeModal": true, "refreshSidebar": true}`)
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleSendTeamMessage sends a message to a teammate via the lead session's input.
+func (s *Server) handleSendTeamMessage(w http.ResponseWriter, r *http.Request) {
+	teamName := chi.URLParam(r, "name")
+	if s.teamMgr == nil {
+		http.Error(w, "teams feature is disabled", http.StatusBadRequest)
+		return
+	}
+
+	team, ok := s.teamMgr.Get(teamName)
+	if !ok {
+		http.Error(w, "team not found", http.StatusNotFound)
+		return
+	}
+
+	var payload struct {
+		To      string `json:"to"`
+		Content string `json:"content"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if payload.Content == "" {
+		http.Error(w, "content is required", http.StatusBadRequest)
+		return
+	}
+
+	// Find the lead session to send the message through
+	var leadSessionID string
+	for _, m := range team.Members {
+		if m.Role == "lead" && m.SessionID != "" {
+			leadSessionID = m.SessionID
+			break
+		}
+	}
+	if leadSessionID == "" {
+		http.Error(w, "lead session not connected", http.StatusBadRequest)
+		return
+	}
+
+	// Verify the lead session exists
+	if _, ok := s.mgr.Get(leadSessionID); !ok {
+		http.Error(w, "lead session not found", http.StatusBadRequest)
+		return
+	}
+
+	// Send the message command to the lead session
+	var msgCmd string
+	if payload.To == "" || payload.To == "all" {
+		msgCmd = fmt.Sprintf("Broadcast to all teammates: %s\n", payload.Content)
+	} else {
+		msgCmd = fmt.Sprintf("Send message to %s: %s\n", payload.To, payload.Content)
+	}
+	if err := s.mgr.WriteInput(leadSessionID, []byte(msgCmd)); err != nil {
+		http.Error(w, fmt.Sprintf("failed to send message: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "sent"})
+}
+
+// handleTeamHookCallback receives webhook callbacks from Claude Code's team hooks
+// (TeammateIdle, TaskCreated, TaskCompleted).
+func (s *Server) handleTeamHookCallback(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Event     string `json:"event"`
+		SessionID string `json:"session_id"`
+		TeamName  string `json:"team_name"`
+		TaskID    string `json:"task_id"`
+		AgentID   string `json:"agent_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	slog.Info("team hook callback", "event", payload.Event, "team", payload.TeamName, "task", payload.TaskID)
+
+	// Trigger a team rescan to pick up the latest state
+	if s.teamMgr != nil {
+		_ = s.teamMgr.Scan()
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+// handleInstallTeamHooks installs agent team hooks into Claude's settings.json.
+func (s *Server) handleInstallTeamHooks(w http.ResponseWriter, r *http.Request) {
+	baseURL := fmt.Sprintf("http://localhost:%d", s.cfg.Server.Port)
+	if err := hooks.InstallTeamHooks(baseURL); err != nil {
+		slog.Error("failed to install team hooks", "error", err)
+		http.Error(w, fmt.Sprintf("failed to install hooks: %v", err), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]string{"status": "installed"})
 }

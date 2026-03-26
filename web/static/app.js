@@ -1026,8 +1026,51 @@ window.websessions = (function() {
       if (window.htmx) {
         htmx.ajax('GET', '/teams/' + encodeURIComponent(teamName), { target: pane, swap: 'innerHTML' });
       }
+
+      // Connect team WebSocket for real-time updates
+      connectTeamWS(teamName, pane);
     }
     saveTabState();
+  }
+
+  var teamWSConnections = {};
+
+  function connectTeamWS(teamName, pane) {
+    if (teamWSConnections[teamName]) return;
+    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var ws = new WebSocket(proto + '//' + location.host + '/ws/teams/' + encodeURIComponent(teamName));
+    teamWSConnections[teamName] = ws;
+
+    ws.onmessage = function(evt) {
+      try {
+        var data = JSON.parse(evt.data);
+        if (data.type === 'team_event' && pane) {
+          // Refresh task board and messages via htmx when team events arrive
+          var taskBoard = pane.querySelector('.task-board');
+          if (taskBoard && window.htmx) {
+            htmx.trigger(taskBoard, 'teamUpdate');
+          }
+          var msgLog = pane.querySelector('.message-log');
+          if (msgLog && window.htmx) {
+            htmx.trigger(msgLog, 'teamUpdate');
+          }
+        }
+      } catch(e) { /* ignore parse errors */ }
+    };
+
+    ws.onclose = function() {
+      delete teamWSConnections[teamName];
+      // Reconnect after 3s if tab is still open
+      setTimeout(function() {
+        for (var i = 0; i < openTabs.length; i++) {
+          if (openTabs[i].id === 'team-' + teamName) {
+            var p = document.getElementById('team-pane-' + teamName);
+            if (p) connectTeamWS(teamName, p);
+            break;
+          }
+        }
+      }, 3000);
+    };
   }
 
   // Focus a session by switching to its tab (used by team member click)

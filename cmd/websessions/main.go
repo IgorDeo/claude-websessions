@@ -420,6 +420,17 @@ func main() {
 	// Agent Teams integration (opt-in via config)
 	var teamMgr *teams.Manager
 	if cfg.Teams.Enabled {
+		// Check Claude Code version for agent teams support
+		ver, supported := teams.CheckClaudeVersion()
+		if ver != "" {
+			fmt.Fprintf(os.Stderr, "  %s● Agent teams enabled (Claude Code %s)%s\n", colorGreen, ver, colorReset)
+			if !supported {
+				fmt.Fprintf(os.Stderr, "  %s⚠ Agent teams require Claude Code v2.1.32+%s\n", colorYellow, colorReset)
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "  %s⚠ Agent teams enabled but Claude Code not found in PATH%s\n", colorYellow, colorReset)
+		}
+
 		teamMgr = teams.NewManager(mgr, bus)
 		go func() {
 			ticker := time.NewTicker(cfg.Teams.ScanInterval)
@@ -430,7 +441,6 @@ func main() {
 				}
 			}
 		}()
-		slog.Info("agent teams integration enabled", "scan_interval", cfg.Teams.ScanInterval)
 	}
 
 	srv := server.New(cfg, mgr, bus, sink, st, teamMgr)

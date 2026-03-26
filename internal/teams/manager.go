@@ -2,6 +2,8 @@ package teams
 
 import (
 	"log/slog"
+	"os/exec"
+	"strings"
 	"sync"
 	"time"
 
@@ -214,6 +216,60 @@ func (m *Manager) scanTeamMessages(team *Team) {
 			})
 		}
 	}
+}
+
+// CheckClaudeVersion verifies that Claude Code is installed and meets the
+// minimum version requirement for agent teams (v2.1.32+).
+// Returns the version string and whether it meets the requirement.
+func CheckClaudeVersion() (version string, supported bool) {
+	out, err := exec.Command("claude", "--version").Output()
+	if err != nil {
+		return "", false
+	}
+	ver := strings.TrimSpace(string(out))
+	// Version format varies; check if it contains a version number
+	// Agent teams require v2.1.32+, but we do a best-effort check
+	if ver == "" {
+		return "", false
+	}
+	// Parse major.minor.patch from the version string
+	parts := strings.Fields(ver)
+	for _, p := range parts {
+		if isVersionString(p) {
+			return p, compareVersion(p, "2.1.32") >= 0
+		}
+	}
+	return ver, true // assume compatible if we can't parse
+}
+
+func isVersionString(s string) bool {
+	for _, c := range s {
+		if c != '.' && (c < '0' || c > '9') {
+			return false
+		}
+	}
+	return strings.Contains(s, ".")
+}
+
+func compareVersion(a, b string) int {
+	aParts := strings.Split(a, ".")
+	bParts := strings.Split(b, ".")
+	for i := 0; i < len(aParts) && i < len(bParts); i++ {
+		ai, bi := 0, 0
+		for _, c := range aParts[i] {
+			ai = ai*10 + int(c-'0')
+		}
+		for _, c := range bParts[i] {
+			bi = bi*10 + int(c-'0')
+		}
+		if ai != bi {
+			if ai > bi {
+				return 1
+			}
+			return -1
+		}
+	}
+	return len(aParts) - len(bParts)
 }
 
 // Get returns a team by name.

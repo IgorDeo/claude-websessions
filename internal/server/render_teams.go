@@ -89,7 +89,7 @@ func renderTeamTasksHTML(w io.Writer, team *teams.Team) {
 		}
 	}
 
-	fmt.Fprintf(w, `<div class="task-board" hx-get="/teams/%s/tasks" hx-trigger="every 5s" hx-swap="outerHTML">`, html.EscapeString(team.Name))
+	fmt.Fprintf(w, `<div class="task-board" hx-get="/teams/%s/tasks" hx-trigger="every 10s, teamUpdate" hx-swap="outerHTML">`, html.EscapeString(team.Name))
 
 	renderTaskColumn(w, "Pending", "pending", pending)
 	renderTaskColumn(w, "In Progress", "in-progress", inProgress)
@@ -114,7 +114,7 @@ func renderTaskColumn(w io.Writer, title, className string, tasks []teams.Task) 
 
 // renderTeamMessagesHTML writes the message log as HTML.
 func renderTeamMessagesHTML(w io.Writer, team *teams.Team) {
-	fmt.Fprintf(w, `<div class="message-log" hx-get="/teams/%s/messages" hx-trigger="every 3s" hx-swap="outerHTML">`, html.EscapeString(team.Name))
+	fmt.Fprintf(w, `<div class="message-log" hx-get="/teams/%s/messages" hx-trigger="every 10s, teamUpdate" hx-swap="outerHTML">`, html.EscapeString(team.Name))
 	fmt.Fprintf(w, `<h4>Messages</h4>`)
 
 	if len(team.Messages) == 0 {

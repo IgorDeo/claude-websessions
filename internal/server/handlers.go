@@ -41,7 +41,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.applyTabGroups(views)
-	data := templates.PageData{Sessions: views, UnreadCount: s.sink.UnreadCount()}
+	data := templates.PageData{Sessions: views, UnreadCount: s.sink.UnreadCount(), TeamsEnabled: s.teamMgr != nil}
 	data.History = s.loadHistory(views)
 	if err := templates.Index(data).Render(r.Context(), w); err != nil {
 		slog.Error("failed to render index", "error", err)
@@ -1188,6 +1188,19 @@ func (s *Server) setupNotificationBridge() {
 			"timestamp": e.Timestamp.Format("15:04:05"),
 		})
 		s.hub.broadcastNotification(msg)
+
+		// Push team events to team-specific WS clients
+		if e.TeamName != "" {
+			teamMsg, _ := json.Marshal(map[string]interface{}{
+				"type":      "team_event",
+				"event":     string(e.Type),
+				"teamName":  e.TeamName,
+				"message":   e.Message,
+				"timestamp": e.Timestamp.Format("15:04:05"),
+				"metadata":  e.Metadata,
+			})
+			s.hub.broadcastTeam(e.TeamName, teamMsg)
+		}
 	})
 }
 

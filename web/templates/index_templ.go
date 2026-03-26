@@ -19,8 +19,6 @@ type SessionView struct {
 	Owned     bool
 	Sandboxed bool
 	GroupName string // non-empty if session is in a split tab group
-	Note      string
-	Color     string
 	TeamName  string // non-empty if session belongs to an agent team
 	TeamRole  string // "lead" or "teammate"
 }
@@ -41,6 +39,7 @@ type PageData struct {
 	History       []SessionView
 	Notifications []NotificationView
 	UnreadCount   int
+	TeamsEnabled  bool
 }
 
 func Index(data PageData) templ.Component {
@@ -76,7 +75,7 @@ func Index(data PageData) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"app\"><header class=\"topbar\"><h1 class=\"topbar-title\">websessions</h1><div class=\"topbar-actions\"><div class=\"shortcuts-wrapper\"><button class=\"shortcuts-btn\" onclick=\"window.websessions.toggleShortcuts()\" title=\"Keyboard shortcuts\">?</button><div id=\"shortcuts-dropdown\" class=\"dropdown shortcuts-dropdown\"><div class=\"shortcuts-panel\"><div class=\"shortcuts-title\">Keyboard Shortcuts</div><div class=\"shortcut-row\"><kbd>Ctrl+N</kbd> <span>New session</span></div><div class=\"shortcut-row\"><kbd>Ctrl+T</kbd> <span>New terminal</span></div><div class=\"shortcut-row\"><kbd>Ctrl+W</kbd> <span>Close tab</span></div><div class=\"shortcut-row\"><kbd>Ctrl+]</kbd> <span>Next tab</span></div><div class=\"shortcut-row\"><kbd>Ctrl+[</kbd> <span>Previous tab</span></div><div class=\"shortcut-row\"><kbd>Ctrl+1-9</kbd> <span>Go to tab</span></div><div class=\"shortcut-row\"><kbd>Ctrl+=</kbd> <span>Zoom in</span></div><div class=\"shortcut-row\"><kbd>Ctrl+-</kbd> <span>Zoom out</span></div><div class=\"shortcut-row\"><kbd>Ctrl+0</kbd> <span>Reset zoom</span></div></div></div></div><button class=\"theme-toggle\" onclick=\"window.websessions.toggleTheme()\" title=\"Toggle light/dark theme\" id=\"theme-toggle-btn\">&#9790;</button> <a href=\"/metrics/dashboard\" class=\"settings-link\" title=\"Metrics\">&#9776;</a> <a href=\"/settings\" class=\"settings-link\" title=\"Settings\">&#9881;</a><div class=\"notification-wrapper\"><button class=\"notification-bell\" onclick=\"window.websessions.toggleNotifications()\"><span class=\"bell-icon\">&#128276;</span> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"app\"><header class=\"topbar\"><h1 class=\"topbar-title\">websessions</h1><div class=\"topbar-actions\"><div class=\"shortcuts-wrapper\"><button class=\"shortcuts-btn\" onclick=\"window.websessions.toggleShortcuts()\" title=\"Keyboard shortcuts\">?</button><div id=\"shortcuts-dropdown\" class=\"dropdown shortcuts-dropdown\"><div class=\"shortcuts-panel\"><div class=\"shortcuts-title\">Keyboard Shortcuts</div><div class=\"shortcut-row\"><kbd>Ctrl+N</kbd> <span>New session</span></div><div class=\"shortcut-row\"><kbd>Ctrl+T</kbd> <span>New terminal</span></div><div class=\"shortcut-row\"><kbd>Ctrl+W</kbd> <span>Close tab</span></div><div class=\"shortcut-row\"><kbd>Ctrl+]</kbd> <span>Next tab</span></div><div class=\"shortcut-row\"><kbd>Ctrl+[</kbd> <span>Previous tab</span></div><div class=\"shortcut-row\"><kbd>Ctrl+1-9</kbd> <span>Go to tab</span></div><div class=\"shortcut-row\"><kbd>Ctrl+=</kbd> <span>Zoom in</span></div><div class=\"shortcut-row\"><kbd>Ctrl+-</kbd> <span>Zoom out</span></div><div class=\"shortcut-row\"><kbd>Ctrl+0</kbd> <span>Reset zoom</span></div></div></div></div><button class=\"theme-toggle\" onclick=\"window.websessions.toggleTheme()\" title=\"Toggle light/dark theme\" id=\"theme-toggle-btn\">&#9790;</button> <a href=\"/settings\" class=\"settings-link\" title=\"Settings\">&#9881;</a><div class=\"notification-wrapper\"><button class=\"notification-bell\" onclick=\"window.websessions.toggleNotifications()\"><span class=\"bell-icon\">&#128276;</span> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -88,7 +87,7 @@ func Index(data PageData) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(data.UnreadCount))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/index.templ`, Line: 68, Col: 69}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/index.templ`, Line: 66, Col: 69}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -115,7 +114,17 @@ func Index(data PageData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div><div id=\"terminal-area\" class=\"terminal-area\"><div class=\"empty-state\"><p>Select a session from the sidebar or create a new one</p><p class=\"empty-state-hint\">Running Claude Code sessions are discovered automatically</p><p class=\"empty-state-keys\"><kbd>Ctrl+N</kbd> new session <kbd>Ctrl+T</kbd> terminal <kbd>Ctrl+Tab</kbd> cycle tabs</p></div></div><div id=\"drop-overlay\" class=\"drop-overlay\"><div class=\"drop-overlay-content\"><p>Drop not supported by browsers</p><p class=\"drop-hint\">Use Ctrl+N and paste a directory path</p></div></div></div></div><footer class=\"footer\"><button class=\"new-session-btn\" hx-get=\"/sessions/new\" hx-target=\"#modal\" hx-swap=\"innerHTML\">+ New Session</button> <button class=\"new-terminal-btn\" onclick=\"window.websessions.openTerminal()\">&#9002; Terminal</button><div class=\"footer-spacer\"></div><button class=\"kill-all-btn\" onclick=\"window.websessions.killAllSessions()\" title=\"Kill all running sessions\">&#9632; Kill All</button></footer><div id=\"modal\"></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div><div id=\"terminal-area\" class=\"terminal-area\"><div class=\"empty-state\"><p>Select a session from the sidebar or create a new one</p><p class=\"empty-state-hint\">Running Claude Code sessions are discovered automatically</p><p class=\"empty-state-keys\"><kbd>Ctrl+N</kbd> new session <kbd>Ctrl+T</kbd> terminal <kbd>Ctrl+Tab</kbd> cycle tabs</p></div></div></div></div><footer class=\"footer\"><button class=\"new-session-btn\" hx-get=\"/sessions/new\" hx-target=\"#modal\" hx-swap=\"innerHTML\">+ New Session</button> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			if data.TeamsEnabled {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "<button class=\"new-team-btn\" hx-get=\"/teams/new\" hx-target=\"#modal\" hx-swap=\"innerHTML\">&#x1F46B; New Team</button> ")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+			}
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "<button class=\"new-terminal-btn\" onclick=\"window.websessions.openTerminal()\">&#9002; Terminal</button><div class=\"footer-spacer\"></div><button class=\"kill-all-btn\" onclick=\"window.websessions.killAllSessions()\" title=\"Kill all running sessions\">&#9632; Kill All</button></footer><div id=\"modal\"></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

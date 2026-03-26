@@ -132,6 +132,88 @@ func Install(baseURL string) error {
 	return settings.Save()
 }
 
+// InstallTeamHooks adds agent team lifecycle hooks to Claude's settings.
+// These hooks notify websessions in real-time when team events occur.
+func InstallTeamHooks(baseURL string) error {
+	settings, err := Load()
+	if err != nil {
+		return err
+	}
+
+	hooks, ok := settings.raw["hooks"].(map[string]interface{})
+	if !ok {
+		hooks = make(map[string]interface{})
+		settings.raw["hooks"] = hooks
+	}
+
+	// Check if team hooks are already installed
+	if hasTeamHooks(hooks) {
+		return nil
+	}
+
+	addTeamHook(hooks, "TeammateIdle", baseURL, "teammate_idle")
+	addTeamHook(hooks, "TaskCreated", baseURL, "task_created")
+	addTeamHook(hooks, "TaskCompleted", baseURL, "task_completed")
+
+	return settings.Save()
+}
+
+const teamHookMarker = "websessions-team-hook"
+
+func hasTeamHooks(hooks map[string]interface{}) bool {
+	for _, eventHooks := range hooks {
+		entries, ok := eventHooks.([]interface{})
+		if !ok {
+			continue
+		}
+		for _, entry := range entries {
+			entryMap, ok := entry.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			hooksList, ok := entryMap["hooks"].([]interface{})
+			if !ok {
+				continue
+			}
+			for _, h := range hooksList {
+				hMap, ok := h.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				cmd, _ := hMap["command"].(string)
+				if len(cmd) > 0 && contains(cmd, teamHookMarker) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func addTeamHook(hooks map[string]interface{}, event, baseURL, eventType string) {
+	cmd := fmt.Sprintf(
+		`python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps({'event':'%s','session_id':d.get('session_id',''),'team_name':d.get('team_name',''),'task_id':d.get('task_id',''),'agent_id':d.get('agent_id','')}))" | curl -s -X POST %s/api/hook/team -H "Content-Type: application/json" -d @- # %s`,
+		eventType, baseURL, teamHookMarker,
+	)
+
+	entry := map[string]interface{}{
+		"matcher": "",
+		"hooks": []interface{}{
+			map[string]interface{}{
+				"type":    "command",
+				"command": cmd,
+			},
+		},
+	}
+
+	existing, ok := hooks[event].([]interface{})
+	if !ok {
+		existing = []interface{}{}
+	}
+	existing = append(existing, entry)
+	hooks[event] = existing
+}
+
 func addHook(hooks map[string]interface{}, event, matcher, baseURL, eventType string) {
 	// Claude Code hooks receive JSON on stdin with session_id and cwd.
 	// We read stdin, extract fields with python, and POST to websessions.

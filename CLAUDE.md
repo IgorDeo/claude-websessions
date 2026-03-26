@@ -65,6 +65,7 @@ When modifying code that changes a documented flow, **update the corresponding d
 | `docs/tabs-and-splits.md` | Tab bar, split tree, persistence, drag-drop, iframe panes, focus management | Split/tab JS in `app.js`, `web/templates/terminal.templ`, `web/templates/iframe.templ`, `web/templates/tabs.templ`, tab-related handlers |
 | `docs/discovery-and-takeover.md` | Process scanning, Claude project discovery, hook session resolution, takeover | `internal/discovery/`, discovery loop in `main.go`, `handleHookCallback`/`handleTakeover`/`handleClaudeSessions` in `handlers.go` |
 | `docs/configuration-and-platform.md` | Config, SQLite store, hooks install, service management, self-update, Docker sandbox, doctor checks | `internal/config/`, `internal/store/`, `internal/hooks/`, `internal/service/`, `internal/updater/`, `internal/doctor/`, `install.sh`, settings handlers |
+| `docs/agent-teams.md` | Agent teams integration, team discovery, task board, messaging, team hooks, dashboard UI | `internal/teams/`, team handlers in `handlers_teams.go`, `render_teams.go`, team WS in `ws.go`, team JS in `app.js`, team config in `config.go` |
 
 ## Browser Testing (Claude-in-Chrome)
 

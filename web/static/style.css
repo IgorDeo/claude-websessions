@@ -1024,6 +1024,8 @@ html, body {
 .team-dashboard-link { margin-left: auto; text-decoration: none; font-size: 14px; opacity: 0.6; }
 .team-dashboard-link:hover { opacity: 1; }
 .team-badge { font-size: 11px; margin-left: 4px; }
+.new-team-btn { background: rgba(99,102,241,0.15); color: #818cf8; border: 1px solid rgba(99,102,241,0.3); border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+.new-team-btn:hover { background: rgba(99,102,241,0.25); }
 
 .team-dashboard { padding: 16px; font-family: var(--font-mono, monospace); color: var(--text-primary); overflow-y: auto; height: 100%; }
 .team-header { display: flex; align-items: center; gap: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px; flex-wrap: wrap; }
