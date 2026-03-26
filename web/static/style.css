@@ -469,7 +469,10 @@ html, body {
 /* Terminal Area */
 .terminal-area { flex: 1; display: flex; overflow: hidden; background: var(--bg-primary); }
 .terminal-pane { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
-.split-pane { overflow: hidden; }
+.terminal-pane .xterm { flex: 1; }
+.split-pane { overflow: hidden; display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; }
+.gutter { flex-shrink: 0; background: var(--border); }
+.gutter:hover { background: var(--accent); }
 
 .pane-header {
   display: flex; align-items: center; gap: 0.5rem;
@@ -541,6 +544,20 @@ html, body {
 }
 .split-picker-action:hover { background: var(--accent-glow); border-color: var(--accent); }
 .split-picker-action-term:hover { background: var(--green-glow); border-color: var(--green); }
+
+.tab-rename-input {
+  background: var(--bg-input); border: 1px solid var(--accent); color: var(--text-primary);
+  font-family: var(--font-mono); font-size: 0.72rem;
+  padding: 0 0.25rem; border-radius: 3px; width: 80px; outline: none;
+}
+
+.tab-split-badge {
+  font-size: 0.55rem; font-weight: 700;
+  background: var(--accent); color: #fff;
+  padding: 0.05rem 0.25rem; border-radius: 3px;
+  margin-left: 0.15rem;
+}
+
 .new-session-btn {
   background: none; border: 1px solid var(--border);
   color: var(--text-muted); padding: 0.25rem 0.65rem;

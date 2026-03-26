@@ -16,7 +16,10 @@
 window.websessions = (function() {
   const terminals = {};
   const splitInstances = [];
-  var openTabs = []; // [{id, name, state}]
+  // splitTree: null for single session, or:
+  // { type:'split', dir:'horizontal'|'vertical', children: [node, node] }
+  // leaf: { type:'session', id:'...', name:'...' }
+  var openTabs = []; // [{id, name, state, splitTree: node|null}]
   var activeTabId = null;
 
   var darkTermTheme = {
@@ -297,13 +300,17 @@ window.websessions = (function() {
       btn.className = 'recent-item';
       btn.style.width = '100%';
       btn.style.marginBottom = '0.25rem';
-      var nameSpan = document.createElement('span');
-      nameSpan.className = 'recent-name';
-      nameSpan.textContent = s.name;
+      var nameRow = document.createElement('span');
+      nameRow.className = 'recent-name';
+      nameRow.textContent = s.name + ' ';
+      var typeBadge = document.createElement('span');
+      typeBadge.className = 'session-type-badge type-' + (s.type || 'claude');
+      typeBadge.textContent = s.type || 'claude';
+      nameRow.appendChild(typeBadge);
       var pathSpan = document.createElement('span');
       pathSpan.className = 'recent-path';
-      pathSpan.textContent = s.state + ' - ' + s.work_dir;
-      btn.appendChild(nameSpan);
+      pathSpan.textContent = s.work_dir;
+      btn.appendChild(nameRow);
       btn.appendChild(pathSpan);
       btn.addEventListener('click', function() {
         overlay.remove();
@@ -324,51 +331,168 @@ window.websessions = (function() {
     document.body.appendChild(overlay);
   }
 
-  function doSplit(sessionID1, sessionID2, direction) {
-    var area = document.getElementById('terminal-area');
-    if (!area) return;
+  function refitAllTerminals() {
+    Object.keys(terminals).forEach(function(id) {
+      var t = terminals[id];
+      if (t && t.fitAddon) t.fitAddon.fit();
+    });
+  }
 
-    // Disconnect existing terminals in the area
-    for (var sid in terminals) {
-      var el = document.getElementById('term-' + sid);
-      if (el && area.contains(el)) {
-        disconnectSession(sid);
-      }
+  var refitTimer = null;
+  function debouncedRefit() {
+    if (refitTimer) clearTimeout(refitTimer);
+    refitTimer = setTimeout(refitAllTerminals, 16);
+  }
+
+  function createSplit(panes, direction) {
+    return Split(panes, {
+      direction: splitDirection(direction),
+      sizes: panes.map(function() { return 100 / panes.length; }),
+      minSize: 80,
+      gutterSize: 4,
+      onDrag: debouncedRefit,
+      onDragEnd: refitAllTerminals,
+    });
+  }
+
+  function loadPaneSession(pane, sid) {
+    fetch('/sessions/' + encodeURIComponent(sid) + '/open', { method: 'POST' })
+      .then(function(r) { return r.text(); })
+      .then(function(html) {
+        pane.innerHTML = html;
+        var termPane = pane.querySelector('.terminal-pane[data-session-id]');
+        if (termPane) {
+          var id = termPane.dataset.sessionId;
+          if (terminals[id]) disconnectSession(id);
+          connectSession(id, 'term-' + id);
+        }
+      });
+  }
+
+  // Split direction: "horizontal" = horizontal divider (top/bottom), "vertical" = vertical divider (side by side)
+  // Matches Terminator convention.
+  function splitDirection(direction) {
+    // Split.js 'vertical' = top/bottom, 'horizontal' = side by side
+    return direction === 'horizontal' ? 'vertical' : 'horizontal';
+  }
+  function splitFlex(direction) {
+    return direction === 'horizontal' ? 'column' : 'row';
+  }
+
+  // -- Split tree helpers --
+  function treeFind(node, sessionID) {
+    if (!node) return null;
+    if (node.type === 'session') return node.id === sessionID ? node : null;
+    for (var i = 0; i < node.children.length; i++) {
+      var found = treeFind(node.children[i], sessionID);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function treeFindParent(node, sessionID) {
+    if (!node || node.type === 'session') return null;
+    for (var i = 0; i < node.children.length; i++) {
+      if (node.children[i].type === 'session' && node.children[i].id === sessionID) return { parent: node, index: i };
+      var found = treeFindParent(node.children[i], sessionID);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function treeSessionIds(node) {
+    if (!node) return [];
+    if (node.type === 'session') return [node.id];
+    var ids = [];
+    node.children.forEach(function(c) { ids = ids.concat(treeSessionIds(c)); });
+    return ids;
+  }
+
+  function treeRemove(node, sessionID) {
+    if (!node || node.type === 'session') return node;
+    var info = treeFindParent(node, sessionID);
+    if (!info) return node;
+    info.parent.children.splice(info.index, 1);
+    // If only one child left, collapse
+    if (info.parent.children.length === 1) {
+      var remaining = info.parent.children[0];
+      info.parent.type = remaining.type;
+      info.parent.children = remaining.children;
+      info.parent.id = remaining.id;
+      info.parent.name = remaining.name;
+      info.parent.dir = remaining.dir;
+    }
+    return node;
+  }
+
+  function doSplit(sessionID1, sessionID2, direction) {
+    var termEl = document.getElementById('term-' + sessionID1);
+    var existingPane = termEl ? termEl.closest('.split-pane') : null;
+
+    if (!existingPane) {
+      // First split — replace terminal-area
+      var area = document.getElementById('terminal-area');
+      if (!area) return;
+      if (terminals[sessionID1]) disconnectSession(sessionID1);
+      while (area.firstChild) area.removeChild(area.firstChild);
+      area.style.flexDirection = splitFlex(direction);
+
+      var p1 = document.createElement('div');
+      p1.className = 'split-pane';
+      var p2 = document.createElement('div');
+      p2.className = 'split-pane';
+      area.appendChild(p1);
+      area.appendChild(p2);
+      createSplit([p1, p2], direction);
+      loadPaneSession(p1, sessionID1);
+      loadPaneSession(p2, sessionID2);
+    } else {
+      // Nested split — replace the specific pane
+      var parent = existingPane.parentElement;
+      if (terminals[sessionID1]) disconnectSession(sessionID1);
+
+      var container = document.createElement('div');
+      container.className = 'split-pane';
+      container.style.display = 'flex';
+      container.style.flexDirection = splitFlex(direction);
+      container.style.overflow = 'hidden';
+
+      var p1 = document.createElement('div');
+      p1.className = 'split-pane';
+      var p2 = document.createElement('div');
+      p2.className = 'split-pane';
+      container.appendChild(p1);
+      container.appendChild(p2);
+      parent.replaceChild(container, existingPane);
+      createSplit([p1, p2], direction);
+      loadPaneSession(p1, sessionID1);
+      loadPaneSession(p2, sessionID2);
     }
 
-    // Create two pane containers (no IDs with session names — use data attributes)
-    var pane1 = document.createElement('div');
-    pane1.className = 'split-pane';
-    pane1.setAttribute('data-split-session', sessionID1);
-    var pane2 = document.createElement('div');
-    pane2.className = 'split-pane';
-    pane2.setAttribute('data-split-session', sessionID2);
-
-    // Clear area and add panes
-    while (area.firstChild) area.removeChild(area.firstChild);
-    area.appendChild(pane1);
-    area.appendChild(pane2);
-
-    // Set flex direction based on split direction
-    area.style.flexDirection = direction === 'horizontal' ? 'row' : 'column';
-
-    // Use Split.js with DOM elements directly (not CSS selectors)
-    Split([pane1, pane2], {
-      direction: direction === 'horizontal' ? 'horizontal' : 'vertical',
-      sizes: [50, 50],
-      minSize: 100,
-      gutterSize: 4,
+    // Update split tree
+    var tab = openTabs.find(function(t) {
+      return t.id === sessionID1 || (t.splitTree && treeFind(t.splitTree, sessionID1));
     });
-
-    // Load terminal content into each pane via htmx
-    htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID1) + '/open', {
-      target: pane1,
-      swap: 'innerHTML'
-    });
-    htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID2) + '/open', {
-      target: pane2,
-      swap: 'innerHTML'
-    });
+    if (tab) {
+      var newNode = { type: 'split', dir: direction, children: [
+        { type: 'session', id: sessionID1, name: sessionID1 },
+        { type: 'session', id: sessionID2, name: sessionID2 }
+      ]};
+      if (!tab.splitTree) {
+        tab.splitTree = newNode;
+      } else {
+        var info = treeFindParent(tab.splitTree, sessionID1);
+        if (info) {
+          info.parent.children[info.index] = newNode;
+        } else if (tab.splitTree.type === 'session' && tab.splitTree.id === sessionID1) {
+          tab.splitTree = newNode;
+        }
+      }
+      // Remove sessionID2 from top-level tabs
+      openTabs = openTabs.filter(function(t) { return t.id !== sessionID2; });
+      saveTabState();
+      renderTabs();
+    }
   }
 
   function showToast(title, body, event) {
@@ -596,6 +720,8 @@ window.websessions = (function() {
   }
 
   // Tab management
+  var currentlyShowingTabId = null;
+
   function openTab(sessionID, name, state) {
     // Add to tabs if not already open
     var existing = openTabs.find(function(t) { return t.id === sessionID; });
@@ -603,29 +729,84 @@ window.websessions = (function() {
       openTabs.push({ id: sessionID, name: name || sessionID, state: state || 'running' });
       saveTabState();
     }
+
+    // Skip if already showing this tab (prevents re-split on double click)
+    if (sessionID === currentlyShowingTabId) return;
+
     activeTabId = sessionID;
+    currentlyShowingTabId = sessionID;
     renderTabs();
-    // Only load terminal from server if not already connected
-    if (!terminals[sessionID]) {
-      htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID) + '/open', {
-        target: '#terminal-area',
-        swap: 'innerHTML'
-      });
-    } else {
-      // Show the already-connected terminal pane
-      var area = document.getElementById('terminal-area');
-      if (area) {
-        var panes = area.querySelectorAll('.terminal-pane');
-        panes.forEach(function(p) {
-          p.style.display = p.getAttribute('data-session-id') === sessionID ? '' : 'none';
-        });
-        if (terminals[sessionID].fitAddon) terminals[sessionID].fitAddon.fit();
+
+    var tab = openTabs.find(function(t) { return t.id === sessionID; });
+
+    // Clear the terminal area first
+    var area = document.getElementById('terminal-area');
+    if (area) {
+      for (var sid in terminals) {
+        var el = document.getElementById('term-' + sid);
+        if (el && area.contains(el)) disconnectSession(sid);
       }
+      while (area.firstChild) area.removeChild(area.firstChild);
+      area.style.flexDirection = '';
     }
+
+    // If this tab has a split tree, rebuild the split layout
+    if (tab && tab.splitTree) {
+      rebuildSplitLayout(tab);
+      return;
+    }
+
+    // Single session tab
+    htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID) + '/open', {
+      target: '#terminal-area',
+      swap: 'innerHTML'
+    });
+  }
+
+  function rebuildSplitLayout(tab) {
+    var area = document.getElementById('terminal-area');
+    if (!area || !tab.splitTree) return;
+
+    function buildNode(node, container) {
+      if (node.type === 'session') {
+        var pane = document.createElement('div');
+        pane.className = 'split-pane';
+        container.appendChild(pane);
+        loadPaneSession(pane, node.id);
+        return pane;
+      }
+      // Split node
+      container.style.display = 'flex';
+      container.style.flexDirection = splitFlex(node.dir);
+      container.style.overflow = 'hidden';
+
+      var panes = [];
+      node.children.forEach(function(child) {
+        var pane = document.createElement('div');
+        pane.className = 'split-pane';
+        pane.style.overflow = 'hidden';
+        container.appendChild(pane);
+        panes.push(pane);
+        if (child.type === 'split') {
+          buildNode(child, pane);
+        } else {
+          loadPaneSession(pane, child.id);
+        }
+      });
+
+      createSplit(panes, node.dir);
+    }
+
+    buildNode(tab.splitTree, area);
   }
 
   function closeTab(sessionID, e) {
     if (e) { e.stopPropagation(); e.preventDefault(); }
+    var tab = openTabs.find(function(t) { return t.id === sessionID; });
+    // Disconnect all sessions in the group
+    if (tab && tab.splitTree) {
+      treeSessionIds(tab.splitTree).forEach(function(sid) { if (terminals[sid]) disconnectSession(sid); });
+    }
     openTabs = openTabs.filter(function(t) { return t.id !== sessionID; });
     if (terminals[sessionID]) disconnectSession(sessionID);
     saveTabState();
@@ -671,8 +852,43 @@ window.websessions = (function() {
       btn.appendChild(dot);
 
       var nameSpan = document.createElement('span');
+      nameSpan.className = 'tab-name';
       nameSpan.textContent = tab.name;
+      nameSpan.addEventListener('dblclick', function(e) {
+        e.stopPropagation();
+        var input = document.createElement('input');
+        input.className = 'tab-rename-input';
+        input.value = tab.name;
+        input.addEventListener('keydown', function(ev) {
+          if (ev.key === 'Enter') {
+            tab.name = input.value || tab.name;
+            saveTabState();
+            renderTabs();
+          } else if (ev.key === 'Escape') {
+            renderTabs();
+          }
+        });
+        input.addEventListener('blur', function() {
+          tab.name = input.value || tab.name;
+          saveTabState();
+          renderTabs();
+        });
+        nameSpan.replaceWith(input);
+        input.focus();
+        input.select();
+      });
       btn.appendChild(nameSpan);
+
+      if (tab.splitTree) {
+        var ids = treeSessionIds(tab.splitTree);
+        if (ids.length > 1) {
+          var splitBadge = document.createElement('span');
+          splitBadge.className = 'tab-split-badge';
+          splitBadge.textContent = ids.length;
+          splitBadge.title = ids.join(' | ');
+          btn.appendChild(splitBadge);
+        }
+      }
 
       var closeSpan = document.createElement('span');
       closeSpan.className = 'tab-close';
@@ -818,13 +1034,8 @@ window.websessions = (function() {
       }
       renderTabs();
       if (activeTabId) {
-        var tab = openTabs.find(function(t) { return t.id === activeTabId; });
-        if (tab) {
-          htmx.ajax('POST', '/sessions/' + encodeURIComponent(activeTabId) + '/open', {
-            target: '#terminal-area',
-            swap: 'innerHTML'
-          });
-        }
+        currentlyShowingTabId = null; // force re-render
+        openTab(activeTabId);
       }
     }).catch(function() {});
   }
@@ -833,15 +1044,10 @@ window.websessions = (function() {
   loadTabState();
   document.addEventListener('DOMContentLoaded', function() {
     renderTabs();
-    // Reopen the active tab from localStorage cache
+    // Reopen the active tab (handles both single and split tabs)
     if (activeTabId) {
-      var tab = openTabs.find(function(t) { return t.id === activeTabId; });
-      if (tab) {
-        htmx.ajax('POST', '/sessions/' + encodeURIComponent(activeTabId) + '/open', {
-          target: '#terminal-area',
-          swap: 'innerHTML'
-        });
-      }
+      currentlyShowingTabId = null; // force re-render
+      openTab(activeTabId);
     }
     // Sync from server (authoritative) — overrides localStorage if different
     syncTabStateFromServer();
@@ -970,9 +1176,22 @@ window.websessions = (function() {
       }
     });
 
+    // Update the split tree — remove the closed session
+    var tab = openTabs.find(function(t) {
+      return t.splitTree && treeFind(t.splitTree, sessionID);
+    });
+    if (tab) {
+      treeRemove(tab.splitTree, sessionID);
+      // If tree collapsed to a single session, clear it
+      if (tab.splitTree && tab.splitTree.type === 'session') {
+        tab.splitTree = null;
+      }
+      saveTabState();
+      renderTabs();
+    }
+
     // Rebuild area with just the remaining session
     if (keepSessionID) {
-      // Clear everything and reload the remaining session
       area.style.flexDirection = '';
       htmx.ajax('POST', '/sessions/' + encodeURIComponent(keepSessionID) + '/open', {
         target: '#terminal-area',
