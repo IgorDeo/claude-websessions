@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -116,7 +117,7 @@ func extractNodeIDs(raw json.RawMessage) []string {
 	if json.Unmarshal(raw, &node) != nil {
 		return nil
 	}
-	if node.Type == "session" && node.ID != "" {
+	if node.Type != "split" && node.ID != "" {
 		return []string{node.ID}
 	}
 	var ids []string
@@ -276,6 +277,65 @@ func (s *Server) handleOpenSession(w http.ResponseWriter, r *http.Request, sessi
 		}
 	}
 	http.Error(w, "session not found", http.StatusNotFound)
+}
+
+func isLocalhostURL(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	host := u.Hostname()
+	return host == "localhost" || host == "127.0.0.1"
+}
+
+func (s *Server) handleOpenIframe(w http.ResponseWriter, r *http.Request) {
+	iframeURL := r.URL.Query().Get("url")
+	title := r.URL.Query().Get("title")
+	if iframeURL == "" {
+		http.Error(w, "url parameter required", http.StatusBadRequest)
+		return
+	}
+	if !isLocalhostURL(iframeURL) {
+		http.Error(w, "only localhost URLs are allowed", http.StatusBadRequest)
+		return
+	}
+	if title == "" {
+		title = "Iframe"
+	}
+	paneID := fmt.Sprintf("iframe-%d", time.Now().UnixMilli())
+	templates.IframePane(paneID, title, iframeURL).Render(r.Context(), w)
+}
+
+func (s *Server) handleCreateIframePane(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		URL   string `json:"url"`
+		Title string `json:"title"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if payload.URL == "" {
+		http.Error(w, "url field required", http.StatusBadRequest)
+		return
+	}
+	if !isLocalhostURL(payload.URL) {
+		http.Error(w, "only localhost URLs are allowed", http.StatusBadRequest)
+		return
+	}
+	if payload.Title == "" {
+		payload.Title = "Iframe"
+	}
+
+	msg, _ := json.Marshal(map[string]string{
+		"type":  "iframe-open",
+		"url":   payload.URL,
+		"title": payload.Title,
+	})
+	s.hub.broadcastNotification(msg)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{"ok": true})
 }
 
 func (s *Server) handleNewSessionModal(w http.ResponseWriter, r *http.Request) {
@@ -989,6 +1049,52 @@ func (s *Server) handleInstallHooks(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+func (s *Server) handlePlannotatorIntegration(w http.ResponseWriter, r *http.Request) {
+	var payload struct {
+		Action string `json:"action"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+
+	// Resolve the path to ws-open-url relative to the running binary
+	exePath, _ := os.Executable()
+	scriptPath := filepath.Join(filepath.Dir(exePath), "ws-open-url")
+
+	var err error
+	switch payload.Action {
+	case "enable":
+		err = hooks.SetPlannotatorIntegration(true, scriptPath)
+	case "disable":
+		err = hooks.SetPlannotatorIntegration(false, "")
+	default:
+		http.Error(w, "action must be 'enable' or 'disable'", http.StatusBadRequest)
+		return
+	}
+
+	if err != nil {
+		slog.Error("plannotator integration failed", "action", payload.Action, "error", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		return
+	}
+
+	enabled := false
+	claudeSettings, loadErr := hooks.Load()
+	if loadErr == nil {
+		enabled = claudeSettings.IsPlannotatorIntegrated()
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"ok":      true,
+		"action":  payload.Action,
+		"enabled": enabled,
+	})
+}
+
 func (s *Server) setupNotificationBridge() {
 	desktopSink := notification.NewDesktopSink()
 	s.bus.Subscribe(func(e notification.SessionEvent) {
@@ -1124,6 +1230,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	claudeSettings, err := hooks.Load()
 	if err == nil {
 		data.HooksInstalled = claudeSettings.IsInstalled()
+		data.PlannotatorIntegration = claudeSettings.IsPlannotatorIntegrated()
 	}
 	// Check service status (systemd on Linux, launchd on macOS)
 	data.ServiceInstalled = service.IsInstalled()

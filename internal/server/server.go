@@ -105,6 +105,11 @@ func (s *Server) routes() http.Handler {
 		s.handleTakeover(w, r, chi.URLParam(r, "sessionID"))
 	})
 
+	// Iframe panes
+	r.Post("/panes/iframe/open", s.handleOpenIframe)
+	r.Post("/api/panes/iframe", s.handleCreateIframePane)
+	r.Post("/settings/plannotator", s.handlePlannotatorIntegration)
+
 	// WebSocket
 	r.Get("/ws/notifications", s.handleNotificationWS)
 	r.Get("/ws/{sessionID}", func(w http.ResponseWriter, r *http.Request) {

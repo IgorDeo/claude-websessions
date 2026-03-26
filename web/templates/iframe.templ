@@ -1,0 +1,19 @@
+package templates
+
+templ IframePane(paneID string, title string, url string) {
+	<div class="iframe-pane" data-pane-id={ paneID }>
+		<div class="pane-header">
+			<span class="pane-title">{ title }</span>
+			<span class="pane-status">iframe</span>
+			<span class="pane-dir" title={ url }>{ url }</span>
+			<div class="pane-actions">
+				<button class="unsplit-btn" title="Close this pane" onclick={ closeIframeAction(paneID) }>&#10005;</button>
+			</div>
+		</div>
+		<iframe class="iframe-content" src={ url }></iframe>
+	</div>
+}
+
+script closeIframeAction(paneID string) {
+	window.websessions.unsplitPane(paneID);
+}

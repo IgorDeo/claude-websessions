@@ -420,6 +420,24 @@ window.websessions = (function() {
       });
   }
 
+  function loadPaneIframe(pane, paneID, iframeUrl, title) {
+    // Fetch server-rendered iframe pane HTML (same pattern as loadPaneSession — trusted server response)
+    fetch('/panes/iframe/open?url=' + encodeURIComponent(iframeUrl) + '&title=' + encodeURIComponent(title || 'Iframe'), { method: 'POST' })
+      .then(function(r) { return r.text(); })
+      .then(function(html) {
+        pane.innerHTML = html;
+        execInlineScripts(pane);
+        var iframePane = pane.querySelector('.iframe-pane[data-pane-id]');
+        if (iframePane) {
+          var header = iframePane.querySelector('.pane-header');
+          if (header) header.addEventListener('click', function(e) {
+            if (e.target.closest('button')) return;
+            focusPane(paneID);
+          });
+        }
+      });
+  }
+
   // Split direction: "horizontal" = horizontal divider (top/bottom), "vertical" = vertical divider (side by side)
   // Matches Terminator convention.
   function splitDirection(direction) {
@@ -431,37 +449,42 @@ window.websessions = (function() {
   }
 
   // -- Split tree helpers --
-  function treeFind(node, sessionID) {
+  // Leaf nodes: type === 'session' or type === 'iframe' (anything that's not 'split')
+  function isLeafNode(node) { return node && node.type !== 'split'; }
+
+  function treeFind(node, id) {
     if (!node) return null;
-    if (node.type === 'session') return node.id === sessionID ? node : null;
+    if (isLeafNode(node)) return node.id === id ? node : null;
     for (var i = 0; i < node.children.length; i++) {
-      var found = treeFind(node.children[i], sessionID);
+      var found = treeFind(node.children[i], id);
       if (found) return found;
     }
     return null;
   }
 
-  function treeFindParent(node, sessionID) {
-    if (!node || node.type === 'session') return null;
+  function treeFindParent(node, id) {
+    if (!node || isLeafNode(node)) return null;
     for (var i = 0; i < node.children.length; i++) {
-      if (node.children[i].type === 'session' && node.children[i].id === sessionID) return { parent: node, index: i };
-      var found = treeFindParent(node.children[i], sessionID);
+      if (isLeafNode(node.children[i]) && node.children[i].id === id) return { parent: node, index: i };
+      var found = treeFindParent(node.children[i], id);
       if (found) return found;
     }
     return null;
   }
 
-  function treeSessionIds(node) {
+  function treeLeafIds(node) {
     if (!node) return [];
-    if (node.type === 'session') return [node.id];
+    if (isLeafNode(node)) return [node.id];
     var ids = [];
-    node.children.forEach(function(c) { ids = ids.concat(treeSessionIds(c)); });
+    node.children.forEach(function(c) { ids = ids.concat(treeLeafIds(c)); });
     return ids;
   }
+  // Alias for backwards compatibility
+  var treeSessionIds = treeLeafIds;
 
-  function treeRemove(node, sessionID) {
-    if (!node || node.type === 'session') return node;
-    var info = treeFindParent(node, sessionID);
+  function treeRemove(node, id) {
+    if (!node || isLeafNode(node)) return node;
+    var info = treeFindParent(node, id);
     if (!info) return node;
     info.parent.children.splice(info.index, 1);
     // If only one child left, collapse
@@ -471,6 +494,7 @@ window.websessions = (function() {
       info.parent.children = remaining.children;
       info.parent.id = remaining.id;
       info.parent.name = remaining.name;
+      info.parent.url = remaining.url;
       info.parent.dir = remaining.dir;
     }
     return node;
@@ -856,6 +880,15 @@ window.websessions = (function() {
       return;
     }
 
+    // Iframe tab
+    if (tab && tab.type === 'iframe') {
+      var pane = document.createElement('div');
+      pane.className = 'split-pane';
+      area.appendChild(pane);
+      loadPaneIframe(pane, tab.id, tab.url, tab.name);
+      return;
+    }
+
     // Single session tab
     htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID) + '/open', {
       target: '#terminal-area',
@@ -869,6 +902,13 @@ window.websessions = (function() {
     if (!area || !tab.splitTree) return;
 
     function buildNode(node, container) {
+      if (node.type === 'iframe') {
+        var pane = document.createElement('div');
+        pane.className = 'split-pane';
+        container.appendChild(pane);
+        loadPaneIframe(pane, node.id, node.url, node.name);
+        return pane;
+      }
       if (node.type === 'session') {
         var pane = document.createElement('div');
         pane.className = 'split-pane';
@@ -890,6 +930,8 @@ window.websessions = (function() {
         panes.push(pane);
         if (child.type === 'split') {
           buildNode(child, pane);
+        } else if (child.type === 'iframe') {
+          loadPaneIframe(pane, child.id, child.url, child.name);
         } else {
           loadPaneSession(pane, child.id);
         }
@@ -899,6 +941,31 @@ window.websessions = (function() {
     }
 
     buildNode(tab.splitTree, area);
+  }
+
+  function openIframeTab(iframeUrl, title) {
+    var id = 'iframe-' + Date.now();
+    var name = title || 'Iframe';
+    var tab = { id: id, name: name, state: 'iframe', type: 'iframe', url: iframeUrl };
+    openTabs.push(tab);
+    activeTabId = id;
+    currentlyShowingTabId = id;
+    renderTabs();
+
+    var area = document.getElementById('terminal-area');
+    if (area) {
+      for (var sid in terminals) {
+        var el = document.getElementById('term-' + sid);
+        if (el && area.contains(el)) disconnectSession(sid);
+      }
+      while (area.firstChild) area.removeChild(area.firstChild);
+      area.style.flexDirection = '';
+      var pane = document.createElement('div');
+      pane.className = 'split-pane';
+      area.appendChild(pane);
+      loadPaneIframe(pane, id, iframeUrl, name);
+    }
+    saveTabState();
   }
 
   function closeTab(sessionID, e) {
@@ -1170,6 +1237,8 @@ window.websessions = (function() {
         (sessions || []).forEach(function(s) { activeIds[s.id] = true; });
         var changed = false;
         openTabs = openTabs.filter(function(tab) {
+          // Iframe tabs have no server-side session — keep them
+          if (tab.type === 'iframe') return true;
           // For split tabs, check if at least one session is alive
           if (tab.splitTree) {
             var ids = treeSessionIds(tab.splitTree);
@@ -1667,6 +1736,66 @@ window.websessions = (function() {
     });
   }
 
+  function managePlannotator(action) {
+    var feedback = document.getElementById('plannotator-feedback');
+    if (feedback) { feedback.textContent = action === 'enable' ? 'Enabling...' : 'Disabling...'; feedback.className = 'hooks-feedback'; }
+
+    fetch('/settings/plannotator', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: action }),
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(result) {
+      var status = document.getElementById('plannotator-status');
+      if (!status) return;
+      while (status.firstChild) status.removeChild(status.firstChild);
+
+      if (result.ok && result.data.enabled) {
+        var badge = document.createElement('span');
+        badge.className = 'hooks-badge hooks-active';
+        badge.textContent = 'Enabled';
+        status.appendChild(badge);
+
+        var disableBtn = document.createElement('button');
+        disableBtn.type = 'button';
+        disableBtn.className = 'btn-cancel btn-small';
+        disableBtn.textContent = 'Disable';
+        disableBtn.addEventListener('click', function() { managePlannotator('disable'); });
+        status.appendChild(disableBtn);
+      } else {
+        var badge2 = document.createElement('span');
+        badge2.className = 'hooks-badge hooks-inactive';
+        badge2.textContent = 'Disabled';
+        status.appendChild(badge2);
+
+        var enableBtn = document.createElement('button');
+        enableBtn.type = 'button';
+        enableBtn.className = 'btn-create btn-small';
+        enableBtn.textContent = 'Enable';
+        enableBtn.addEventListener('click', function() { managePlannotator('enable'); });
+        status.appendChild(enableBtn);
+      }
+
+      if (feedback) {
+        if (result.ok) {
+          feedback.textContent = action === 'enable' ? 'Plannotator integration enabled' : 'Plannotator integration disabled';
+          feedback.className = 'hooks-feedback hooks-feedback-ok';
+        } else {
+          feedback.textContent = 'Error: ' + (result.data.error || 'Unknown error');
+          feedback.className = 'hooks-feedback hooks-feedback-err';
+        }
+        setTimeout(function() { feedback.textContent = ''; feedback.className = ''; }, 4000);
+      }
+    })
+    .catch(function(err) {
+      if (feedback) {
+        feedback.textContent = 'Error: ' + err.message;
+        feedback.className = 'hooks-feedback hooks-feedback-err';
+      }
+    });
+  }
+
   // Settings page directory picker
   var settingsDirDebounce = null;
   function settingsDirAutocomplete(input) {
@@ -2143,6 +2272,9 @@ window.websessions = (function() {
           // Refresh sidebar to update session states
           refreshSidebar();
         }
+        if (msg.type === 'iframe-open') {
+          openIframeTab(msg.url, msg.title);
+        }
       } catch(e) {}
     };
     notifWs.onclose = function() {
@@ -2379,6 +2511,7 @@ window.websessions = (function() {
     connectSession: connectSession,
     disconnectSession: disconnectSession,
     openTab: openTab,
+    openIframeTab: openIframeTab,
     closeTab: closeTab,
     showDiff: showDiff,
     unsplitPane: unsplitPane,
@@ -2404,6 +2537,7 @@ window.websessions = (function() {
     switchSidebarTab: switchSidebarTab,
     filterSessions: filterSessions,
     manageHooks: manageHooks,
+    managePlannotator: managePlannotator,
     checkForUpdate: checkForUpdate,
     manageService: manageService,
     settingsDirAutocomplete: settingsDirAutocomplete,

@@ -203,6 +203,41 @@ func (s *ClaudeSettings) updateHookURLs(baseURL string) {
 	}
 }
 
+// IsPlannotatorIntegrated checks if PLANNOTATOR_BROWSER is set to ws-open-url.
+func (s *ClaudeSettings) IsPlannotatorIntegrated() bool {
+	env, ok := s.raw["env"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+	val, _ := env["PLANNOTATOR_BROWSER"].(string)
+	return contains(val, "ws-open-url")
+}
+
+// SetPlannotatorIntegration enables or disables the PLANNOTATOR_BROWSER env var.
+func SetPlannotatorIntegration(enable bool, scriptPath string) error {
+	settings, err := Load()
+	if err != nil {
+		return err
+	}
+
+	env, ok := settings.raw["env"].(map[string]interface{})
+	if !ok {
+		env = make(map[string]interface{})
+		settings.raw["env"] = env
+	}
+
+	if enable {
+		env["PLANNOTATOR_BROWSER"] = scriptPath
+	} else {
+		delete(env, "PLANNOTATOR_BROWSER")
+		if len(env) == 0 {
+			delete(settings.raw, "env")
+		}
+	}
+
+	return settings.Save()
+}
+
 // Uninstall removes websessions hooks from Claude's settings.
 func Uninstall() error {
 	settings, err := Load()
