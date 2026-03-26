@@ -378,18 +378,31 @@ window.websessions = (function() {
     });
   }
 
+  function execInlineScripts(container) {
+    container.querySelectorAll('script').forEach(function(oldScript) {
+      var newScript = document.createElement('script');
+      newScript.textContent = oldScript.textContent;
+      oldScript.parentNode.replaceChild(newScript, oldScript);
+    });
+  }
+
   function loadPaneSession(pane, sid) {
     fetch('/sessions/' + encodeURIComponent(sid) + '/open', { method: 'POST' })
       .then(function(r) { return r.text(); })
       .then(function(html) {
         pane.innerHTML = html;
+        execInlineScripts(pane);
         var termPane = pane.querySelector('.terminal-pane[data-session-id]');
         if (termPane) {
           var id = termPane.dataset.sessionId;
           if (terminals[id]) disconnectSession(id);
           connectSession(id, 'term-' + id);
-          // Focus on click anywhere in the pane
-          termPane.addEventListener('mousedown', function() { focusPane(id); });
+          // Focus on click on the pane header
+          var header = termPane.querySelector('.pane-header');
+          if (header) header.addEventListener('click', function(e) {
+            if (e.target.closest('button')) return;
+            focusPane(id);
+          });
         }
       });
   }
