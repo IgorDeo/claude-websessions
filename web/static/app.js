@@ -298,10 +298,10 @@ window.websessions = (function() {
     newSection.appendChild(newTermBtn);
     content.appendChild(newSection);
 
-    // Build set of session IDs already in ANY tab group
+    // Build set of session IDs already in ANY split group (not standalone tabs)
     var usedIds = {};
+    usedIds[currentSessionID] = true;
     openTabs.forEach(function(t) {
-      usedIds[t.id] = true;
       if (t.splitTree) {
         treeSessionIds(t.splitTree).forEach(function(id) { usedIds[id] = true; });
       }
