@@ -116,22 +116,22 @@ func NewSessionModal(defaultDir string, recentDirs []string, dockerAvailable boo
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" required autocomplete=\"off\" oninput=\"window.websessions.dirAutocomplete(this)\" onchange=\"window.websessions.loadClaudeSessions(this.value)\"><div id=\"dir-suggestions\" class=\"dir-suggestions\"></div></div><div id=\"claude-sessions-section\" class=\"claude-sessions-section\" style=\"display:none;\"><label class=\"recent-label\">Resume previous Claude session</label><div id=\"claude-sessions-list\" class=\"recent-list\"></div></div><div class=\"form-group\"><label for=\"prompt\">Initial Prompt (optional)</label> <textarea id=\"prompt\" name=\"prompt\" rows=\"3\" placeholder=\"What should Claude work on?\"></textarea></div><div class=\"form-group\"><label class=\"checkbox-label\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "\" required autocomplete=\"off\" oninput=\"window.websessions.dirAutocomplete(this)\" onchange=\"window.websessions.loadClaudeSessions(this.value)\"><div id=\"dir-suggestions\" class=\"dir-suggestions\"></div></div><div id=\"claude-sessions-section\" class=\"claude-sessions-section\" style=\"display:none;\"><label class=\"recent-label\">Resume previous Claude session</label><div id=\"claude-sessions-list\" class=\"recent-list\"></div></div><div class=\"form-group\"><label for=\"prompt\">Initial Prompt (optional)</label> <textarea id=\"prompt\" name=\"prompt\" rows=\"3\" placeholder=\"What should Claude work on?\"></textarea></div><div class=\"form-group\"><label style=\"display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-size:0.8rem; color:var(--text-secondary); font-weight:500;\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		if dockerAvailable {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<input type=\"checkbox\" name=\"sandbox\" value=\"true\"> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<input type=\"checkbox\" name=\"sandbox\" value=\"true\" style=\"width:16px; height:16px; flex-shrink:0; accent-color:var(--accent);\"> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		} else {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<input type=\"checkbox\" name=\"sandbox\" value=\"true\" disabled> ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<input type=\"checkbox\" name=\"sandbox\" value=\"true\" disabled style=\"width:16px; height:16px; flex-shrink:0;\"> ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "Run in Docker sandbox (VM-isolated, safe for autonomous mode)</label> ")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "Run in Docker sandbox</label> ")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
