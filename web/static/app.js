@@ -1133,8 +1133,18 @@ window.websessions = (function() {
         try {
           var serverTabs = JSON.parse(prefs['open-tabs']);
           if (serverTabs && serverTabs.length) {
+            // Merge: prefer local split trees over server ones (server may be stale)
+            var localMap = {};
+            openTabs.forEach(function(t) { localMap[t.id] = t; });
+            serverTabs.forEach(function(st) {
+              var local = localMap[st.id];
+              if (local && local.splitTree && !st.splitTree) {
+                st.splitTree = local.splitTree;
+              }
+            });
             openTabs = serverTabs;
-            try { localStorage.setItem('ws-open-tabs', prefs['open-tabs']); } catch(e) {}
+            // Push merged state back to server
+            saveTabState();
           }
         } catch(e) {}
       }
@@ -1144,7 +1154,7 @@ window.websessions = (function() {
       }
       renderTabs();
       if (activeTabId) {
-        currentlyShowingTabId = null; // force re-render
+        currentlyShowingTabId = null;
         openTab(activeTabId);
       }
     }).catch(function() {});
