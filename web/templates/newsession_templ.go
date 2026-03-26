@@ -103,7 +103,7 @@ func NewSessionModal(defaultDir string, recentDirs []string, dockerAvailable boo
 				return templ_7745c5c3_Err
 			}
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<form id=\"new-session-form\" hx-post=\"/sessions\" hx-target=\"#sidebar\" hx-swap=\"innerHTML\"><input type=\"hidden\" id=\"resume_id\" name=\"resume_id\" value=\"\"><div class=\"form-group\"><label for=\"name\">Session Name</label> <input type=\"text\" id=\"name\" name=\"name\" placeholder=\"my-session\" required></div><div class=\"form-group\" style=\"position:relative;\"><label for=\"work_dir\">Working Directory</label> <input type=\"text\" id=\"work_dir\" name=\"work_dir\" value=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "<form id=\"new-session-form\" hx-post=\"/sessions\" hx-swap=\"none\"><input type=\"hidden\" id=\"resume_id\" name=\"resume_id\" value=\"\"><div class=\"form-group\"><label for=\"name\">Session Name</label> <input type=\"text\" id=\"name\" name=\"name\" placeholder=\"my-session\" required></div><div class=\"form-group\" style=\"position:relative;\"><label for=\"work_dir\">Working Directory</label> <input type=\"text\" id=\"work_dir\" name=\"work_dir\" value=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

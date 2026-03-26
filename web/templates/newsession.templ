@@ -29,7 +29,7 @@ templ NewSessionModal(defaultDir string, recentDirs []string, dockerAvailable bo
 					<span>or create manually</span>
 				</div>
 			}
-			<form id="new-session-form" hx-post="/sessions" hx-target="#sidebar" hx-swap="innerHTML">
+			<form id="new-session-form" hx-post="/sessions" hx-swap="none">
 				<input type="hidden" id="resume_id" name="resume_id" value=""/>
 				<div class="form-group">
 					<label for="name">Session Name</label>
