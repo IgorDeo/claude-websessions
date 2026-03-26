@@ -88,7 +88,36 @@ func migrate(db *sql.DB) error {
 	// Migration: add sandbox columns
 	_, _ = db.Exec("ALTER TABLE sessions ADD COLUMN sandboxed BOOLEAN DEFAULT FALSE")
 	_, _ = db.Exec("ALTER TABLE sessions ADD COLUMN sandbox_name TEXT DEFAULT ''")
-	return nil
+
+	// Agent Teams tables
+	teamsSchema := `
+	CREATE TABLE IF NOT EXISTS teams (
+		name TEXT PRIMARY KEY,
+		state TEXT,
+		lead_session_id TEXT,
+		discovered_at DATETIME,
+		last_seen DATETIME
+	);
+	CREATE TABLE IF NOT EXISTS team_tasks (
+		id TEXT PRIMARY KEY,
+		team_name TEXT,
+		title TEXT,
+		description TEXT,
+		state TEXT,
+		assigned_to TEXT,
+		created_at DATETIME,
+		updated_at DATETIME
+	);
+	CREATE TABLE IF NOT EXISTS team_messages (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		team_name TEXT,
+		from_member TEXT,
+		to_member TEXT,
+		content TEXT,
+		timestamp DATETIME
+	);`
+	_, err = db.Exec(teamsSchema)
+	return err
 }
 
 func (s *Store) SaveSession(r SessionRecord) error {
@@ -334,4 +363,115 @@ func (s *Store) PruneMetrics(before time.Time) (int64, error) {
 		return 0, err
 	}
 	return result.RowsAffected()
+}
+
+// --- Agent Teams ---
+
+type TeamRecord struct {
+	Name          string
+	State         string
+	LeadSessionID string
+	DiscoveredAt  time.Time
+	LastSeen      time.Time
+}
+
+type TeamTaskRecord struct {
+	ID         string
+	TeamName   string
+	Title      string
+	Description string
+	State      string
+	AssignedTo string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
+type TeamMessageRecord struct {
+	ID         int64
+	TeamName   string
+	FromMember string
+	ToMember   string
+	Content    string
+	Timestamp  time.Time
+}
+
+func (s *Store) SaveTeam(r TeamRecord) error {
+	_, err := s.db.Exec(
+		`INSERT OR REPLACE INTO teams (name, state, lead_session_id, discovered_at, last_seen) VALUES (?, ?, ?, ?, ?)`,
+		r.Name, r.State, r.LeadSessionID, r.DiscoveredAt, r.LastSeen,
+	)
+	return err
+}
+
+func (s *Store) ListTeams() ([]TeamRecord, error) {
+	rows, err := s.db.Query(`SELECT name, state, lead_session_id, discovered_at, last_seen FROM teams ORDER BY last_seen DESC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck
+	var records []TeamRecord
+	for rows.Next() {
+		var r TeamRecord
+		if err := rows.Scan(&r.Name, &r.State, &r.LeadSessionID, &r.DiscoveredAt, &r.LastSeen); err != nil {
+			return nil, err
+		}
+		records = append(records, r)
+	}
+	return records, rows.Err()
+}
+
+func (s *Store) SaveTeamTask(r TeamTaskRecord) error {
+	_, err := s.db.Exec(
+		`INSERT OR REPLACE INTO team_tasks (id, team_name, title, description, state, assigned_to, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID, r.TeamName, r.Title, r.Description, r.State, r.AssignedTo, r.CreatedAt, r.UpdatedAt,
+	)
+	return err
+}
+
+func (s *Store) ListTeamTasks(teamName string) ([]TeamTaskRecord, error) {
+	rows, err := s.db.Query(
+		`SELECT id, team_name, title, description, state, assigned_to, created_at, updated_at FROM team_tasks WHERE team_name = ? ORDER BY created_at`,
+		teamName,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck
+	var records []TeamTaskRecord
+	for rows.Next() {
+		var r TeamTaskRecord
+		if err := rows.Scan(&r.ID, &r.TeamName, &r.Title, &r.Description, &r.State, &r.AssignedTo, &r.CreatedAt, &r.UpdatedAt); err != nil {
+			return nil, err
+		}
+		records = append(records, r)
+	}
+	return records, rows.Err()
+}
+
+func (s *Store) SaveTeamMessage(r TeamMessageRecord) error {
+	_, err := s.db.Exec(
+		`INSERT INTO team_messages (team_name, from_member, to_member, content, timestamp) VALUES (?, ?, ?, ?, ?)`,
+		r.TeamName, r.FromMember, r.ToMember, r.Content, r.Timestamp,
+	)
+	return err
+}
+
+func (s *Store) ListTeamMessages(teamName string, limit int) ([]TeamMessageRecord, error) {
+	rows, err := s.db.Query(
+		`SELECT id, team_name, from_member, to_member, content, timestamp FROM team_messages WHERE team_name = ? ORDER BY timestamp DESC LIMIT ?`,
+		teamName, limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck
+	var records []TeamMessageRecord
+	for rows.Next() {
+		var r TeamMessageRecord
+		if err := rows.Scan(&r.ID, &r.TeamName, &r.FromMember, &r.ToMember, &r.Content, &r.Timestamp); err != nil {
+			return nil, err
+		}
+		records = append(records, r)
+	}
+	return records, rows.Err()
 }

@@ -13,6 +13,8 @@ type SessionView struct {
 	GroupName string // non-empty if session is in a split tab group
 	Note      string
 	Color     string
+	TeamName  string // non-empty if session belongs to an agent team
+	TeamRole  string // "lead" or "teammate"
 }
 
 type NotificationView struct {

@@ -19,7 +19,7 @@ func newTestServer() *server.Server {
 	mgr := session.NewManager(1024)
 	bus := notification.NewBus()
 	sink := notification.NewInAppSink(100)
-	return server.New(cfg, mgr, bus, sink)
+	return server.New(cfg, mgr, bus, sink, nil)
 }
 
 func TestServer_IndexPage(t *testing.T) {

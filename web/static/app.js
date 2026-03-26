@@ -993,6 +993,66 @@ window.websessions = (function() {
     saveTabState();
   }
 
+  // Open agent team dashboard as an htmx-loaded tab
+  function openTeamDashboard(teamName) {
+    var id = 'team-' + teamName;
+    // If already open, just switch to it
+    for (var i = 0; i < openTabs.length; i++) {
+      if (openTabs[i].id === id) {
+        activeTabId = id;
+        currentlyShowingTabId = id;
+        renderTabs();
+        showTab(id);
+        return;
+      }
+    }
+    var tab = { id: id, name: 'Team: ' + teamName, state: 'team', type: 'team', teamName: teamName };
+    openTabs.push(tab);
+    activeTabId = id;
+    currentlyShowingTabId = id;
+    renderTabs();
+
+    var area = document.getElementById('terminal-area');
+    if (area) {
+      for (var sid in terminals) {
+        var el = document.getElementById('term-' + sid);
+        if (el && area.contains(el)) disconnectSession(sid);
+      }
+      while (area.firstChild) area.removeChild(area.firstChild);
+      area.style.flexDirection = '';
+      var pane = document.createElement('div');
+      pane.className = 'split-pane team-dashboard-pane';
+      pane.id = 'team-pane-' + teamName;
+      area.appendChild(pane);
+
+      // Load team dashboard via htmx (same trusted-server pattern as htmx partials)
+      if (window.htmx) {
+        htmx.ajax('GET', '/teams/' + encodeURIComponent(teamName), { target: pane, swap: 'innerHTML' });
+      }
+    }
+    saveTabState();
+  }
+
+  // Focus a session by switching to its tab (used by team member click)
+  function focusSession(sessionId) {
+    for (var i = 0; i < openTabs.length; i++) {
+      if (openTabs[i].id === sessionId) {
+        activeTabId = sessionId;
+        currentlyShowingTabId = sessionId;
+        renderTabs();
+        showTab(sessionId);
+        return;
+      }
+    }
+    // If not open, find the session name and open it
+    var items = document.querySelectorAll('.session-item[data-session-id="' + sessionId + '"]');
+    if (items.length > 0) {
+      var nameEl = items[0].querySelector('.session-name');
+      var name = nameEl ? nameEl.textContent : sessionId;
+      openTab(sessionId, name, 'running');
+    }
+  }
+
   function closeTab(sessionID, e) {
     if (e) { e.stopPropagation(); e.preventDefault(); }
     var tab = openTabs.find(function(t) { return t.id === sessionID; });
@@ -2659,6 +2719,8 @@ window.websessions = (function() {
     dragOver: dragOver,
     drop: drop,
     dragEnd: dragEnd,
+    openTeamDashboard: openTeamDashboard,
+    focusSession: focusSession,
     terminals: terminals,
     saveNote: saveNote,
     showColorPicker: function(sessionID, event) {

@@ -21,6 +21,8 @@ type SessionView struct {
 	GroupName string // non-empty if session is in a split tab group
 	Note      string
 	Color     string
+	TeamName  string // non-empty if session belongs to an agent team
+	TeamRole  string // "lead" or "teammate"
 }
 
 type NotificationView struct {
@@ -86,7 +88,7 @@ func Index(data PageData) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(data.UnreadCount))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/index.templ`, Line: 66, Col: 69}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/index.templ`, Line: 68, Col: 69}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {

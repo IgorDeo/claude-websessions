@@ -41,6 +41,8 @@ type Session struct {
 	TmuxSession  string // tmux session name (e.g. "ws-myproject")
 	Sandboxed    bool   // running inside Docker Desktop sandbox VM
 	SandboxName  string // docker sandbox name (e.g. "ws-myproject")
+	TeamName     string // non-empty if this session belongs to an agent team
+	TeamRole     string // "lead" or "teammate"
 
 	readerPTY *os.File // PTY for the tmux attach reader (for resize)
 	output    *RingBuf

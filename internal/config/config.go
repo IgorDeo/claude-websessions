@@ -16,12 +16,19 @@ type Config struct {
 	Notifications NotificationsConfig `yaml:"notifications"`
 	Docker        DockerConfig        `yaml:"docker"`
 	Metrics       MetricsConfig       `yaml:"metrics"`
+	Teams         TeamsConfig         `yaml:"teams"`
 }
 
 type MetricsConfig struct {
 	SampleInterval    time.Duration `yaml:"-"`
 	SampleIntervalRaw string        `yaml:"sample_interval"`
 	RetentionDays     int           `yaml:"retention_days"`
+}
+
+type TeamsConfig struct {
+	Enabled         bool          `yaml:"enabled"`
+	ScanInterval    time.Duration `yaml:"-"`
+	ScanIntervalRaw string        `yaml:"scan_interval"`
 }
 
 type DockerConfig struct {
@@ -64,6 +71,7 @@ func defaults() *Config {
 			SampleInterval: 60 * time.Second, SampleIntervalRaw: "60s",
 			RetentionDays: 7,
 		},
+		Teams:         TeamsConfig{Enabled: false, ScanInterval: 5 * time.Second, ScanIntervalRaw: "5s"},
 	}
 }
 
@@ -106,6 +114,13 @@ func (c *Config) parseRawFields() error {
 			return fmt.Errorf("parsing metrics sample_interval: %w", err)
 		}
 		c.Metrics.SampleInterval = d
+	}
+	if c.Teams.ScanIntervalRaw != "" {
+		d, err := time.ParseDuration(c.Teams.ScanIntervalRaw)
+		if err != nil {
+			return fmt.Errorf("parsing teams.scan_interval: %w", err)
+		}
+		c.Teams.ScanInterval = d
 	}
 	return nil
 }

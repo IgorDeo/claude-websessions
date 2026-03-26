@@ -19,6 +19,7 @@ import (
 	"github.com/IgorDeo/claude-websessions/internal/server"
 	"github.com/IgorDeo/claude-websessions/internal/session"
 	"github.com/IgorDeo/claude-websessions/internal/store"
+	"github.com/IgorDeo/claude-websessions/internal/teams"
 )
 
 
@@ -416,7 +417,23 @@ func main() {
 		}()
 	}
 
-	srv := server.New(cfg, mgr, bus, sink, st)
+	// Agent Teams integration (opt-in via config)
+	var teamMgr *teams.Manager
+	if cfg.Teams.Enabled {
+		teamMgr = teams.NewManager(mgr, bus)
+		go func() {
+			ticker := time.NewTicker(cfg.Teams.ScanInterval)
+			defer ticker.Stop()
+			for range ticker.C {
+				if err := teamMgr.Scan(); err != nil {
+					slog.Debug("team scan error", "error", err)
+				}
+			}
+		}()
+		slog.Info("agent teams integration enabled", "scan_interval", cfg.Teams.ScanInterval)
+	}
+
+	srv := server.New(cfg, mgr, bus, sink, st, teamMgr)
 	srv.SetVersion(version)
 
 	// Expose snooze function to the server for the snooze API
