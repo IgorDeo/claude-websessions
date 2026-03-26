@@ -407,10 +407,14 @@ window.websessions = (function() {
           var id = termPane.dataset.sessionId;
           if (terminals[id]) disconnectSession(id);
           connectSession(id, 'term-' + id);
-          // Focus on click on the pane header
+          // Focus on click on pane header or terminal area
           var header = termPane.querySelector('.pane-header');
           if (header) header.addEventListener('click', function(e) {
             if (e.target.closest('button')) return;
+            focusPane(id);
+          });
+          var termContainer = document.getElementById('term-' + id);
+          if (termContainer) termContainer.addEventListener('mousedown', function() {
             focusPane(id);
           });
         }
