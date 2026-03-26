@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -385,11 +386,22 @@ func (m *Manager) Kill(id string) error {
 	if s.Sandboxed && s.SandboxName != "" {
 		sandboxName := s.SandboxName
 		go func() {
-			if err := docker.SandboxStop(sandboxName); err != nil {
-				slog.Warn("failed to stop sandbox", "name", sandboxName, "error", err)
-			}
-			if err := docker.SandboxRemove(sandboxName); err != nil {
-				slog.Warn("failed to remove sandbox", "name", sandboxName, "error", err)
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			done := make(chan struct{})
+			go func() {
+				if err := docker.SandboxStop(sandboxName); err != nil {
+					slog.Warn("failed to stop sandbox", "name", sandboxName, "error", err)
+				}
+				if err := docker.SandboxRemove(sandboxName); err != nil {
+					slog.Warn("failed to remove sandbox", "name", sandboxName, "error", err)
+				}
+				close(done)
+			}()
+			select {
+			case <-done:
+			case <-ctx.Done():
+				slog.Warn("sandbox cleanup timed out", "name", sandboxName)
 			}
 		}()
 	}
