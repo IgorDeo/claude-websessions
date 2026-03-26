@@ -1215,50 +1215,40 @@ window.websessions = (function() {
     var area = document.getElementById('terminal-area');
     if (!area) return;
 
-    var panes = area.querySelectorAll('.split-pane');
-    // If not in a split layout, just close the tab
-    if (panes.length < 2) {
+    // Find which tab owns this session
+    var tab = openTabs.find(function(t) {
+      return t.splitTree && treeFind(t.splitTree, sessionID);
+    });
+
+    // Not in a split — just close the tab
+    if (!tab) {
       closeTab(sessionID);
       return;
     }
 
-    // Find the other pane(s) — keep those, remove this one
-    var keepSessionID = null;
-    panes.forEach(function(pane) {
-      var termPane = pane.querySelector('.terminal-pane[data-session-id]');
-      if (termPane) {
-        var sid = termPane.getAttribute('data-session-id');
-        if (sid === sessionID) {
-          // Disconnect this terminal
-          disconnectSession(sid);
-        } else {
-          keepSessionID = sid;
-        }
-      }
+    // Disconnect the terminal being removed
+    if (terminals[sessionID]) disconnectSession(sessionID);
+
+    // Remove from split tree
+    treeRemove(tab.splitTree, sessionID);
+
+    // If tree collapsed to a single session, clear it
+    if (tab.splitTree && tab.splitTree.type === 'session') {
+      tab.splitTree = null;
+    }
+    saveTabState();
+
+    // Disconnect all remaining terminals and rebuild the layout
+    var remainingIds = tab.splitTree ? treeSessionIds(tab.splitTree) : [tab.id];
+    remainingIds.forEach(function(sid) {
+      if (terminals[sid]) disconnectSession(sid);
     });
 
-    // Update the split tree — remove the closed session
-    var tab = openTabs.find(function(t) {
-      return t.splitTree && treeFind(t.splitTree, sessionID);
-    });
-    if (tab) {
-      treeRemove(tab.splitTree, sessionID);
-      // If tree collapsed to a single session, clear it
-      if (tab.splitTree && tab.splitTree.type === 'session') {
-        tab.splitTree = null;
-      }
-      saveTabState();
-      renderTabs();
-    }
-
-    // Rebuild area with just the remaining session
-    if (keepSessionID) {
-      area.style.flexDirection = '';
-      htmx.ajax('POST', '/sessions/' + encodeURIComponent(keepSessionID) + '/open', {
-        target: '#terminal-area',
-        swap: 'innerHTML'
-      });
-    }
+    // Clear and rebuild
+    while (area.firstChild) area.removeChild(area.firstChild);
+    area.style.flexDirection = '';
+    currentlyShowingTabId = null;
+    openTab(tab.id);
   }
 
   // Git diff viewer
