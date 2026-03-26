@@ -1,6 +1,7 @@
 package docker
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -39,7 +40,7 @@ func IsAvailable() (bool, string, error) {
 	cmd := exec.CommandContext(ctx, "docker", "sandbox", "version")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return false, "", nil
+		return false, "", fmt.Errorf("docker sandbox version: %s: %w", strings.TrimSpace(string(out)), err)
 	}
 	version := strings.TrimSpace(string(out))
 	return true, version, nil
@@ -120,10 +121,10 @@ func SandboxCopyCredentials(name string) error {
 		if err != nil {
 			continue // skip missing files
 		}
-		content := strings.ReplaceAll(string(data), "'", "'\\''")
 		dir := filepath.Dir(f.dst)
-		script := fmt.Sprintf("mkdir -p %s && echo '%s' > %s", dir, content, f.dst)
+		script := fmt.Sprintf("mkdir -p %s && cat > %s", dir, f.dst)
 		cmd := exec.Command("docker", "sandbox", "exec", name, "bash", "-c", script)
+		cmd.Stdin = bytes.NewReader(data)
 		if out, err := cmd.CombinedOutput(); err != nil {
 			return fmt.Errorf("copying %s: %s: %w", f.src, strings.TrimSpace(string(out)), err)
 		}

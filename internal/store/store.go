@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -72,10 +73,22 @@ func migrate(db *sql.DB) error {
 		return err
 	}
 	// Migration: add name column if it doesn't exist (for existing DBs)
-	db.Exec("ALTER TABLE sessions ADD COLUMN name TEXT DEFAULT ''")
+	if _, err := db.Exec("ALTER TABLE sessions ADD COLUMN name TEXT DEFAULT ''"); err != nil {
+		if !strings.Contains(err.Error(), "duplicate column") {
+			return fmt.Errorf("adding name column: %w", err)
+		}
+	}
 	// Migration: add sandbox columns
-	db.Exec("ALTER TABLE sessions ADD COLUMN sandboxed BOOLEAN DEFAULT FALSE")
-	db.Exec("ALTER TABLE sessions ADD COLUMN sandbox_name TEXT DEFAULT ''")
+	if _, err := db.Exec("ALTER TABLE sessions ADD COLUMN sandboxed BOOLEAN DEFAULT FALSE"); err != nil {
+		if !strings.Contains(err.Error(), "duplicate column") {
+			return fmt.Errorf("adding sandboxed column: %w", err)
+		}
+	}
+	if _, err := db.Exec("ALTER TABLE sessions ADD COLUMN sandbox_name TEXT DEFAULT ''"); err != nil {
+		if !strings.Contains(err.Error(), "duplicate column") {
+			return fmt.Errorf("adding sandbox_name column: %w", err)
+		}
+	}
 	return nil
 }
 

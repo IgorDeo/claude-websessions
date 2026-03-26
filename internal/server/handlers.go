@@ -588,7 +588,10 @@ func (s *Server) handleGitDiff(w http.ResponseWriter, r *http.Request, sessionID
 	// git status
 	statusCmd := exec.Command("git", "status", "--short")
 	statusCmd.Dir = workDir
-	statusOut, _ := statusCmd.Output()
+	statusOut, err := statusCmd.Output()
+	if err != nil {
+		slog.Warn("git status failed", "dir", workDir, "error", err)
+	}
 
 	// git diff (staged + unstaged)
 	diffCmd := exec.Command("git", "diff", "HEAD", "--no-color")
@@ -598,7 +601,10 @@ func (s *Server) handleGitDiff(w http.ResponseWriter, r *http.Request, sessionID
 		// Maybe no HEAD yet, try just git diff
 		diffCmd2 := exec.Command("git", "diff", "--no-color")
 		diffCmd2.Dir = workDir
-		diffOut, _ = diffCmd2.Output()
+		diffOut, err = diffCmd2.Output()
+		if err != nil {
+			slog.Warn("git diff failed", "dir", workDir, "error", err)
+		}
 	}
 
 	// Also get untracked/new files diff
