@@ -529,6 +529,8 @@ func stateClass(state string) string {
 		return "state-errored"
 	case "waiting":
 		return "state-waiting"
+	case "starting":
+		return "state-starting"
 	case "discovered":
 		return "state-discovered"
 	case "offline":

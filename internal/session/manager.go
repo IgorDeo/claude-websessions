@@ -64,40 +64,37 @@ func (m *Manager) Create(id, workDir, command string, args []string, opts ...*Cr
 		return nil, fmt.Errorf("working directory does not exist: %s", workDir)
 	}
 
-	var resolvedCmd string
-	var sandboxName string
-
 	if sandboxed {
-		// For sandbox mode, claude runs inside the VM — no need to resolve locally
-		// Check if a sandbox already exists for this workDir
-		existing, err := docker.FindSandboxForWorkDir(workDir)
-		if err != nil {
-			return nil, fmt.Errorf("checking sandbox: %w", err)
-		}
-		if existing != nil {
-			sandboxName = existing.Name
-		} else {
-			// Create a new sandbox — Docker Desktop assigns the name
-			name, err := docker.SandboxCreate(workDir)
-			if err != nil {
-				return nil, fmt.Errorf("creating sandbox: %w", err)
-			}
-			sandboxName = name
-			if err := docker.SandboxCopyCredentials(sandboxName); err != nil {
-				slog.Warn("failed to copy credentials to sandbox", "error", err)
-			}
+		// Sandbox mode: return session immediately in "starting" state,
+		// then provision the sandbox VM asynchronously to avoid blocking the UI.
+		s := &Session{
+			ID:          id,
+			Name:        id,
+			WorkDir:     workDir,
+			State:       StateStarting,
+			StartTime:   time.Now(),
+			Owned:       true,
+			Sandboxed:   true,
+			output:      NewRingBuf(int(m.bufferSize)),
 		}
 
-		// Command becomes "docker sandbox run <name> -- <agent_args>"
-		resolvedCmd = "docker"
-		args = append([]string{"sandbox", "run", sandboxName, "--"}, args...)
-	} else {
-		// Resolve command path (handles symlinks)
-		var err error
-		resolvedCmd, err = exec.LookPath(command)
-		if err != nil {
-			return nil, fmt.Errorf("command not found: %s", command)
+		m.mu.Lock()
+		m.sessions[id] = s
+		m.mu.Unlock()
+
+		if m.onStateChange != nil {
+			m.onStateChange(s, StateCreated, StateStarting)
 		}
+
+		go m.provisionSandbox(s, workDir, args)
+		return s, nil
+	}
+
+	// Non-sandbox path: resolve command and create tmux session synchronously
+	var resolvedCmd string
+	resolvedCmd, err := exec.LookPath(command)
+	if err != nil {
+		return nil, fmt.Errorf("command not found: %s", command)
 	}
 
 	tmuxName := TmuxSessionName(id)
@@ -120,8 +117,6 @@ func (m *Manager) Create(id, workDir, command string, args []string, opts ...*Cr
 		StartTime:   time.Now(),
 		Owned:       true,
 		TmuxSession: tmuxName,
-		Sandboxed:   sandboxed,
-		SandboxName: sandboxName,
 		output:      NewRingBuf(int(m.bufferSize)),
 	}
 
@@ -137,6 +132,73 @@ func (m *Manager) Create(id, workDir, command string, args []string, opts ...*Cr
 	m.startReader(s)
 
 	return s, nil
+}
+
+// provisionSandbox runs Docker sandbox setup asynchronously, then starts the tmux session.
+func (m *Manager) provisionSandbox(s *Session, workDir string, args []string) {
+	var sandboxName string
+
+	existing, err := docker.FindSandboxForWorkDir(workDir)
+	if err != nil {
+		slog.Error("sandbox: failed to check existing", "id", s.ID, "error", err)
+		m.failSession(s, fmt.Sprintf("checking sandbox: %v", err))
+		return
+	}
+	if existing != nil {
+		sandboxName = existing.Name
+	} else {
+		name, err := docker.SandboxCreate(workDir)
+		if err != nil {
+			slog.Error("sandbox: failed to create", "id", s.ID, "error", err)
+			m.failSession(s, fmt.Sprintf("creating sandbox: %v", err))
+			return
+		}
+		sandboxName = name
+		if err := docker.SandboxCopyCredentials(sandboxName); err != nil {
+			slog.Warn("sandbox: failed to copy credentials", "id", s.ID, "error", err)
+		}
+	}
+
+	s.mu.Lock()
+	s.SandboxName = sandboxName
+	s.mu.Unlock()
+
+	// Build the tmux command: docker sandbox run <name> -- <agent_args>
+	fullArgs := append([]string{"sandbox", "run", sandboxName, "--"}, args...)
+	tmuxName := TmuxSessionName(s.ID)
+
+	if tmuxSessionExists(tmuxName) {
+		tmuxKillSession(tmuxName)
+	}
+	if err := tmuxCreateSession(tmuxName, workDir, "docker", fullArgs); err != nil {
+		slog.Error("sandbox: failed to create tmux session", "id", s.ID, "error", err)
+		m.failSession(s, fmt.Sprintf("creating tmux session: %v", err))
+		return
+	}
+
+	s.mu.Lock()
+	s.TmuxSession = tmuxName
+	s.State = StateRunning
+	s.mu.Unlock()
+
+	if m.onStateChange != nil {
+		m.onStateChange(s, StateStarting, StateRunning)
+	}
+
+	m.startReader(s)
+}
+
+// failSession transitions a session to errored state.
+func (m *Manager) failSession(s *Session, errMsg string) {
+	from := s.GetState()
+	s.mu.Lock()
+	s.State = StateErrored
+	s.Error = errMsg
+	s.EndTime = time.Now()
+	s.mu.Unlock()
+	if m.onStateChange != nil {
+		m.onStateChange(s, from, StateErrored)
+	}
 }
 
 // startReader attaches to the tmux session and reads output.
@@ -319,11 +381,14 @@ func (m *Manager) Kill(id string) error {
 	if s.TmuxSession != "" {
 		tmuxKillSession(s.TmuxSession)
 	}
-	// Stop sandbox VM if sandboxed
+	// Stop sandbox VM asynchronously to avoid blocking the UI
 	if s.Sandboxed && s.SandboxName != "" {
-		if err := docker.SandboxStop(s.SandboxName); err != nil {
-			slog.Warn("failed to stop sandbox", "name", s.SandboxName, "error", err)
-		}
+		sandboxName := s.SandboxName
+		go func() {
+			if err := docker.SandboxStop(sandboxName); err != nil {
+				slog.Warn("failed to stop sandbox", "name", sandboxName, "error", err)
+			}
+		}()
 	}
 	// Set terminal state
 	from := s.GetState()
