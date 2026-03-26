@@ -1931,28 +1931,43 @@ window.websessions = (function() {
   });
 
   // Session search/filter
+  // Collapsed group state persisted in localStorage
+  function getCollapsedGroups() {
+    try { return JSON.parse(localStorage.getItem('ws-collapsed-groups') || '{}'); } catch(e) { return {}; }
+  }
+  function saveCollapsedGroups(collapsed) {
+    try { localStorage.setItem('ws-collapsed-groups', JSON.stringify(collapsed)); } catch(e) {}
+  }
+  function toggleGroupCollapsed(header) {
+    var group = header.parentElement;
+    group.classList.toggle('collapsed');
+    var name = group.querySelector('.session-group-name');
+    if (name) {
+      var collapsed = getCollapsedGroups();
+      if (group.classList.contains('collapsed')) {
+        collapsed[name.textContent] = true;
+      } else {
+        delete collapsed[name.textContent];
+      }
+      saveCollapsedGroups(collapsed);
+    }
+  }
+
   // Refresh sidebar using plain fetch + innerHTML (not htmx, which flattens nested groups)
   function refreshSidebar() {
-    // Save collapsed state before refresh
-    var collapsedGroups = {};
-    document.querySelectorAll('.session-group.collapsed').forEach(function(g) {
-      var name = g.querySelector('.session-group-name');
-      if (name) collapsedGroups[name.textContent] = true;
-    });
-
     fetch('/sidebar').then(function(r) { return r.text(); }).then(function(html) {
       var sidebar = document.getElementById('sidebar');
       if (sidebar) {
         sidebar.innerHTML = html;
-        htmx.process(sidebar); // re-init htmx attributes on new elements
-        // Restore collapsed state
+        htmx.process(sidebar);
+        // Restore collapsed state from localStorage
+        var collapsed = getCollapsedGroups();
         sidebar.querySelectorAll('.session-group').forEach(function(g) {
           var name = g.querySelector('.session-group-name');
-          if (name && collapsedGroups[name.textContent]) {
+          if (name && collapsed[name.textContent]) {
             g.classList.add('collapsed');
           }
         });
-        // Restore sidebar tab if history was active
         restoreSidebarTab();
       }
     }).catch(function() {});
@@ -2372,6 +2387,8 @@ window.websessions = (function() {
     toggleShortcuts: toggleShortcuts,
     killAllSessions: killAllSessions,
     focusPane: focusPane,
+    toggleGroupCollapsed: toggleGroupCollapsed,
+    refreshSidebar: refreshSidebar,
     killSession: killSession,
     startRename: startRename,
     dirAutocomplete: dirAutocomplete,

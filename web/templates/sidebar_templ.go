@@ -176,7 +176,7 @@ func sidebarSessions(sessions []SessionView) templ.Component {
 		}
 		ctx = templ.ClearChildren(ctx)
 		for _, gn := range uniqueGroups(sessions) {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"session-group\"><div class=\"session-group-header\" onclick=\"this.parentElement.classList.toggle('collapsed')\"><span class=\"session-group-chevron\">&#9662;</span> <span class=\"session-group-name\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"session-group\"><div class=\"session-group-header\" onclick=\"window.websessions.toggleGroupCollapsed(this)\"><span class=\"session-group-chevron\">&#9662;</span> <span class=\"session-group-name\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

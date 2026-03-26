@@ -46,7 +46,7 @@ templ Sidebar(sessions []SessionView, history []SessionView) {
 templ sidebarSessions(sessions []SessionView) {
 	for _, gn := range uniqueGroups(sessions) {
 		<div class="session-group">
-			<div class="session-group-header" onclick="this.parentElement.classList.toggle('collapsed')">
+			<div class="session-group-header" onclick="window.websessions.toggleGroupCollapsed(this)">
 				<span class="session-group-chevron">&#9662;</span>
 				<span class="session-group-name">{ gn }</span>
 				<span class="session-group-count">{ itoa(countInGroup(gn, sessions)) }</span>
