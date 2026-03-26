@@ -474,6 +474,10 @@ html, body {
 .gutter { flex-shrink: 0; background: var(--border); }
 .gutter:hover { background: var(--accent); }
 
+.terminal-pane.pane-focused > .pane-header {
+  border-bottom: 2px solid var(--accent);
+}
+
 .pane-header {
   display: flex; align-items: center; gap: 0.5rem;
   padding: 0.3rem 0.6rem;
