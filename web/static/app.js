@@ -895,13 +895,20 @@ window.websessions = (function() {
   function closeTab(sessionID, e) {
     if (e) { e.stopPropagation(); e.preventDefault(); }
     var tab = openTabs.find(function(t) { return t.id === sessionID; });
+    var hadGroup = tab && tab.splitTree;
     // Disconnect all sessions in the group
-    if (tab && tab.splitTree) {
+    if (hadGroup) {
       treeSessionIds(tab.splitTree).forEach(function(sid) { if (terminals[sid]) disconnectSession(sid); });
     }
     openTabs = openTabs.filter(function(t) { return t.id !== sessionID; });
     if (terminals[sessionID]) disconnectSession(sessionID);
     saveTabState();
+    // Refresh sidebar to update group tree
+    if (hadGroup) {
+      setTimeout(function() {
+        htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+      }, 300);
+    }
     if (activeTabId === sessionID) {
       if (openTabs.length > 0) {
         openTab(openTabs[openTabs.length - 1].id, openTabs[openTabs.length - 1].name, openTabs[openTabs.length - 1].state);
