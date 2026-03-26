@@ -32,6 +32,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	for i, sess := range sessions {
 		views[i] = sessionToView(sess)
 	}
+	s.applyTabGroups(views)
 	data := templates.PageData{Sessions: views, UnreadCount: s.sink.UnreadCount()}
 	data.History = s.loadHistory(views)
 	templates.Index(data).Render(r.Context(), w)
@@ -43,7 +44,85 @@ func (s *Server) handleSidebar(w http.ResponseWriter, r *http.Request) {
 	for i, sess := range sessions {
 		views[i] = sessionToView(sess)
 	}
+	s.applyTabGroups(views)
 	templates.Sidebar(views, s.loadHistory(views)).Render(r.Context(), w)
+}
+
+// applyTabGroups reads saved tab state and sets GroupName for sessions in split groups.
+func (s *Server) applyTabGroups(views []templates.SessionView) {
+	if s.store == nil {
+		return
+	}
+	tabsJSON, err := s.store.GetPreference("open-tabs")
+	if err != nil || tabsJSON == "" {
+		return
+	}
+	var tabs []struct {
+		ID        string `json:"id"`
+		Name      string `json:"name"`
+		SplitTree *struct {
+			Type string `json:"type"`
+		} `json:"splitTree"`
+	}
+	if json.Unmarshal([]byte(tabsJSON), &tabs) != nil {
+		return
+	}
+
+	// Parse the full JSON to extract session IDs from split trees
+	var rawTabs []json.RawMessage
+	if json.Unmarshal([]byte(tabsJSON), &rawTabs) != nil {
+		return
+	}
+
+	groupMap := make(map[string]string) // sessionID -> group name
+	for i, tab := range tabs {
+		if tab.SplitTree == nil {
+			continue
+		}
+		// Extract all session IDs from the tree
+		ids := extractTreeIDs(rawTabs[i])
+		if len(ids) < 2 {
+			continue
+		}
+		for _, id := range ids {
+			groupMap[id] = tab.Name
+		}
+	}
+
+	for i := range views {
+		if gn, ok := groupMap[views[i].ID]; ok {
+			views[i].GroupName = gn
+		}
+	}
+}
+
+func extractTreeIDs(raw json.RawMessage) []string {
+	var node struct {
+		SplitTree *json.RawMessage `json:"splitTree"`
+	}
+	if json.Unmarshal(raw, &node) == nil && node.SplitTree != nil {
+		return extractNodeIDs(*node.SplitTree)
+	}
+	return nil
+}
+
+func extractNodeIDs(raw json.RawMessage) []string {
+	var node struct {
+		Type     string            `json:"type"`
+		ID       string            `json:"id"`
+		Children []json.RawMessage `json:"children"`
+	}
+	if json.Unmarshal(raw, &node) != nil {
+		return nil
+	}
+	if node.Type == "session" && node.ID != "" {
+		return []string{node.ID}
+	}
+	var ids []string
+	for _, child := range node.Children {
+		ids = append(ids, extractNodeIDs(child)...)
+	}
+	return ids
 }
 
 func (s *Server) loadHistory(activeViews []templates.SessionView) []templates.SessionView {

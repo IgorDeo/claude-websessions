@@ -310,6 +310,33 @@ html, body {
 
 /* Session Items */
 .session-list { padding: 0.25rem 0; }
+
+/* Session groups (split tab tree view) */
+.session-group {
+  margin: 0.15rem 0.35rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.session-group-header {
+  display: flex; align-items: center; gap: 0.3rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--bg-tertiary);
+  font-size: 0.65rem; font-weight: 600;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+.session-group-icon { font-size: 0.7rem; color: var(--accent); }
+.session-group-name { font-family: var(--font-mono); }
+.session-item-grouped {
+  border-left: 2px solid var(--accent);
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
+.session-item-grouped + .session-item-grouped {
+  border-top: 1px solid var(--border-subtle);
+}
+
 .session-item {
   display: flex; align-items: center; gap: 0.4rem;
   padding: 0.45rem 0.6rem;

@@ -3,12 +3,13 @@ package templates
 import "fmt"
 
 type SessionView struct {
-	ID      string
-	Name    string
-	WorkDir string
-	State   string
-	Type    string // "claude", "terminal", "discovered"
-	Owned   bool
+	ID        string
+	Name      string
+	WorkDir   string
+	State     string
+	Type      string // "claude", "terminal", "discovered"
+	Owned     bool
+	GroupName string // non-empty if session is in a split tab group
 }
 
 type NotificationView struct {
