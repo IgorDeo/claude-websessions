@@ -635,15 +635,19 @@ window.websessions = (function() {
       if (sid) {
         // Add tab without reloading terminal (openTab would clear the area)
         var existing = openTabs.find(function(t) { return t.id === sid; });
-        if (!existing) {
+        var isNew = !existing;
+        if (isNew) {
           openTabs.push({ id: sid, name: sname || sid, state: 'running' });
         }
         activeTabId = sid;
         currentlyShowingTabId = sid;
         saveTabState();
         renderTabs();
+        // Only refresh sidebar for new sessions (takeover/create), not regular opens
+        if (isNew) {
+          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+        }
       }
-      htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
     }
   });
 
