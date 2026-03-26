@@ -3,7 +3,11 @@ go = "1.26.1"
 
 [tasks.setup]
 description = "Install development tools"
-run = "go install github.com/a-h/templ/cmd/templ@latest"
+run = "go install github.com/a-h/templ/cmd/templ@v0.3.1001"
+
+[tasks."check-go-version"]
+description = "Verify Go version matches go.mod"
+run = "MOD_GO=$(awk '/^go / {print $2; exit}' go.mod) && MISE_GO=$(awk -F'\"' '/^go = / {print $2; exit}' mise.toml) && [ \"$MOD_GO\" = \"$MISE_GO\" ] || { echo \"Go version mismatch: go.mod=$MOD_GO, mise.toml=$MISE_GO\"; exit 1; }"
 
 [tasks.generate]
 description = "Regenerate templ templates"
@@ -14,10 +18,20 @@ description = "Build the websessions binary"
 depends = ["generate"]
 run = "go build -o bin/websessions ./cmd/websessions"
 
+[tasks."build-release"]
+description = "Build release binary using VERSION and SUFFIX"
+depends = ["generate"]
+run = "go build -ldflags=\"-s -w -X main.version=${VERSION}\" -o websessions-${SUFFIX} ./cmd/websessions"
+
 [tasks."build-gui"]
 description = "Build with GUI support (requires GTK/WebKit)"
 depends = ["generate", "build-webview-helper"]
 run = "go build -tags gui -o bin/websessions ./cmd/websessions"
+
+[tasks."build-release-gui"]
+description = "Build GUI release binary using VERSION"
+depends = ["generate", "build-webview-helper"]
+run = "go build -tags gui -ldflags=\"-s -w -X main.version=${VERSION}\" -o websessions-gui-linux-amd64 ./cmd/websessions"
 
 [tasks."build-webview-helper"]
 description = "Compile the webview helper (requires gtk+-3.0 and webkit2gtk-4.1)"
