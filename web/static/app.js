@@ -298,10 +298,20 @@ window.websessions = (function() {
     newSection.appendChild(newTermBtn);
     content.appendChild(newSection);
 
+    // Build set of session IDs already in this tab group
+    var groupTab = openTabs.find(function(t) {
+      return t.id === currentSessionID || (t.splitTree && treeFind(t.splitTree, currentSessionID));
+    });
+    var groupIds = {};
+    if (groupTab && groupTab.splitTree) {
+      treeSessionIds(groupTab.splitTree).forEach(function(id) { groupIds[id] = true; });
+    }
+    groupIds[currentSessionID] = true;
+
     // Existing sessions
     var hasOthers = false;
     sessions.forEach(function(s) {
-      if (s.id === currentSessionID) return;
+      if (groupIds[s.id]) return;
       hasOthers = true;
       var btn = document.createElement('button');
       btn.className = 'recent-item';
@@ -338,6 +348,22 @@ window.websessions = (function() {
     document.body.appendChild(overlay);
   }
 
+  var focusedSessionId = null;
+
+  function focusPane(sessionID) {
+    focusedSessionId = sessionID;
+    document.querySelectorAll('.terminal-pane.pane-focused').forEach(function(el) {
+      el.classList.remove('pane-focused');
+    });
+    var area = document.getElementById('terminal-area');
+    if (!area) return;
+    area.querySelectorAll('.terminal-pane[data-session-id]').forEach(function(el) {
+      if (el.dataset.sessionId === sessionID) {
+        el.classList.add('pane-focused');
+      }
+    });
+  }
+
   function refitAllTerminals() {
     Object.keys(terminals).forEach(function(id) {
       var t = terminals[id];
@@ -362,16 +388,35 @@ window.websessions = (function() {
     });
   }
 
+  function execInlineScripts(container) {
+    container.querySelectorAll('script').forEach(function(oldScript) {
+      var newScript = document.createElement('script');
+      newScript.textContent = oldScript.textContent;
+      oldScript.parentNode.replaceChild(newScript, oldScript);
+    });
+  }
+
   function loadPaneSession(pane, sid) {
     fetch('/sessions/' + encodeURIComponent(sid) + '/open', { method: 'POST' })
       .then(function(r) { return r.text(); })
       .then(function(html) {
         pane.innerHTML = html;
+        execInlineScripts(pane);
         var termPane = pane.querySelector('.terminal-pane[data-session-id]');
         if (termPane) {
           var id = termPane.dataset.sessionId;
           if (terminals[id]) disconnectSession(id);
           connectSession(id, 'term-' + id);
+          // Focus on click on pane header or terminal area
+          var header = termPane.querySelector('.pane-header');
+          if (header) header.addEventListener('click', function(e) {
+            if (e.target.closest('button')) return;
+            focusPane(id);
+          });
+          var termContainer = document.getElementById('term-' + id);
+          if (termContainer) termContainer.addEventListener('mousedown', function() {
+            focusPane(id);
+          });
         }
       });
   }
@@ -749,6 +794,18 @@ window.websessions = (function() {
   var currentlyShowingTabId = null;
 
   function openTab(sessionID, name, state) {
+    var focusTarget = sessionID; // remember which session to focus
+
+    // Check if session is inside an existing split group — focus that tab instead
+    var groupTab = openTabs.find(function(t) {
+      return t.splitTree && treeFind(t.splitTree, sessionID);
+    });
+    if (groupTab && groupTab.id !== sessionID) {
+      sessionID = groupTab.id;
+      name = groupTab.name;
+      state = groupTab.state;
+    }
+
     // Add to tabs if not already open
     var existing = openTabs.find(function(t) { return t.id === sessionID; });
     if (!existing) {
@@ -756,8 +813,11 @@ window.websessions = (function() {
       saveTabState();
     }
 
-    // Skip if already showing this tab (prevents re-split on double click)
-    if (sessionID === currentlyShowingTabId) return;
+    // If already showing this tab, just focus the target pane
+    if (sessionID === currentlyShowingTabId) {
+      focusPane(focusTarget);
+      return;
+    }
 
     activeTabId = sessionID;
     currentlyShowingTabId = sessionID;
@@ -779,6 +839,8 @@ window.websessions = (function() {
     // If this tab has a split tree, rebuild the split layout
     if (tab && tab.splitTree) {
       rebuildSplitLayout(tab);
+      // Focus the target pane after a short delay for DOM to settle
+      setTimeout(function() { focusPane(focusTarget); }, 300);
       return;
     }
 
@@ -787,6 +849,7 @@ window.websessions = (function() {
       target: '#terminal-area',
       swap: 'innerHTML'
     });
+    setTimeout(function() { focusPane(focusTarget); }, 300);
   }
 
   function rebuildSplitLayout(tab) {
@@ -1201,8 +1264,15 @@ window.websessions = (function() {
     fetch('/sessions/' + encodeURIComponent(sessionID) + '/kill', { method: 'POST' })
       .then(function(r) {
         if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
-        closeTab(sessionID);
-        // Small delay to let mgr.Wait() finish removing from active list
+        // If session is in a split group, remove the pane; otherwise close the tab
+        var groupTab = openTabs.find(function(t) {
+          return t.splitTree && treeFind(t.splitTree, sessionID);
+        });
+        if (groupTab) {
+          unsplitPane(sessionID);
+        } else {
+          closeTab(sessionID);
+        }
         setTimeout(function() {
           htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
         }, 500);
@@ -1215,50 +1285,40 @@ window.websessions = (function() {
     var area = document.getElementById('terminal-area');
     if (!area) return;
 
-    var panes = area.querySelectorAll('.split-pane');
-    // If not in a split layout, just close the tab
-    if (panes.length < 2) {
+    // Find which tab owns this session
+    var tab = openTabs.find(function(t) {
+      return t.splitTree && treeFind(t.splitTree, sessionID);
+    });
+
+    // Not in a split — just close the tab
+    if (!tab) {
       closeTab(sessionID);
       return;
     }
 
-    // Find the other pane(s) — keep those, remove this one
-    var keepSessionID = null;
-    panes.forEach(function(pane) {
-      var termPane = pane.querySelector('.terminal-pane[data-session-id]');
-      if (termPane) {
-        var sid = termPane.getAttribute('data-session-id');
-        if (sid === sessionID) {
-          // Disconnect this terminal
-          disconnectSession(sid);
-        } else {
-          keepSessionID = sid;
-        }
-      }
+    // Disconnect the terminal being removed
+    if (terminals[sessionID]) disconnectSession(sessionID);
+
+    // Remove from split tree
+    treeRemove(tab.splitTree, sessionID);
+
+    // If tree collapsed to a single session, clear it
+    if (tab.splitTree && tab.splitTree.type === 'session') {
+      tab.splitTree = null;
+    }
+    saveTabState();
+
+    // Disconnect all remaining terminals and rebuild the layout
+    var remainingIds = tab.splitTree ? treeSessionIds(tab.splitTree) : [tab.id];
+    remainingIds.forEach(function(sid) {
+      if (terminals[sid]) disconnectSession(sid);
     });
 
-    // Update the split tree — remove the closed session
-    var tab = openTabs.find(function(t) {
-      return t.splitTree && treeFind(t.splitTree, sessionID);
-    });
-    if (tab) {
-      treeRemove(tab.splitTree, sessionID);
-      // If tree collapsed to a single session, clear it
-      if (tab.splitTree && tab.splitTree.type === 'session') {
-        tab.splitTree = null;
-      }
-      saveTabState();
-      renderTabs();
-    }
-
-    // Rebuild area with just the remaining session
-    if (keepSessionID) {
-      area.style.flexDirection = '';
-      htmx.ajax('POST', '/sessions/' + encodeURIComponent(keepSessionID) + '/open', {
-        target: '#terminal-area',
-        swap: 'innerHTML'
-      });
-    }
+    // Clear and rebuild
+    while (area.firstChild) area.removeChild(area.firstChild);
+    area.style.flexDirection = '';
+    currentlyShowingTabId = null;
+    openTab(tab.id);
   }
 
   // Git diff viewer
@@ -2244,6 +2304,7 @@ window.websessions = (function() {
     toggleTheme: toggleTheme,
     toggleShortcuts: toggleShortcuts,
     killAllSessions: killAllSessions,
+    focusPane: focusPane,
     killSession: killSession,
     startRename: startRename,
     dirAutocomplete: dirAutocomplete,
