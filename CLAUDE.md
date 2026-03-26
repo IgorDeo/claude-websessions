@@ -59,6 +59,11 @@ When modifying code that changes a documented flow, **update the corresponding d
 | Doc | Covers | Update when changing... |
 |-----|--------|------------------------|
 | `docs/notifications-system.md` | Notification bus, sinks, hooks, WebSocket push, reminder/snooze, UI components | `internal/notification/`, hook callbacks in `handlers.go`, notification WS in `ws.go`, notification JS/templates, reminder logic in `main.go` |
+| `docs/session-lifecycle.md` | State machine, session types, creation, kill/restart, tmux, PTY, ring buffer, auto-cleanup, offline recovery | `internal/session/`, session handlers in `handlers.go`, `internal/docker/`, state change wiring in `main.go` |
+| `docs/terminal-streaming.md` | WebSocket hub, xterm.js, resize, ring buffer replay, alt screen filtering, theming | `internal/server/ws.go`, terminal JS in `app.js` (connectSession, openWS), `internal/session/ringbuf.go` |
+| `docs/tabs-and-splits.md` | Tab bar, split tree, persistence, drag-drop, iframe panes, focus management | Split/tab JS in `app.js`, `web/templates/terminal.templ`, `web/templates/iframe.templ`, `web/templates/tabs.templ`, tab-related handlers |
+| `docs/discovery-and-takeover.md` | Process scanning, Claude project discovery, hook session resolution, takeover | `internal/discovery/`, discovery loop in `main.go`, `handleHookCallback`/`handleTakeover`/`handleClaudeSessions` in `handlers.go` |
+| `docs/configuration-and-platform.md` | Config, SQLite store, hooks install, service management, self-update, Docker sandbox, doctor checks | `internal/config/`, `internal/store/`, `internal/hooks/`, `internal/service/`, `internal/updater/`, `internal/doctor/`, `install.sh`, settings handlers |
 
 ## Browser Testing (Claude-in-Chrome)
 
