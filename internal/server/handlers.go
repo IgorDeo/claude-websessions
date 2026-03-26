@@ -17,6 +17,7 @@ import (
 
 	"github.com/IgorDeo/claude-websessions/internal/doctor"
 	"github.com/IgorDeo/claude-websessions/internal/discovery"
+	"github.com/IgorDeo/claude-websessions/internal/docker"
 	"github.com/IgorDeo/claude-websessions/internal/hooks"
 	"github.com/IgorDeo/claude-websessions/internal/updater"
 	"github.com/IgorDeo/claude-websessions/internal/service"
@@ -144,11 +145,12 @@ func (s *Server) loadHistory(activeViews []templates.SessionView) []templates.Se
 			name = rec.ID
 		}
 		history = append(history, templates.SessionView{
-			ID:      rec.ID,
-			Name:    name,
-			WorkDir: rec.WorkDir,
-			State:   rec.Status,
-			Type:    sessionType(rec.ID),
+			ID:        rec.ID,
+			Name:      name,
+			WorkDir:   rec.WorkDir,
+			State:     rec.Status,
+			Type:      sessionType(rec.ID),
+			Sandboxed: rec.Sandboxed,
 		})
 	}
 	return history
@@ -174,7 +176,19 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	if prompt != "" {
 		args = append(args, "-p", prompt)
 	}
-	sess, err := s.mgr.Create(name, workDir, "claude", args)
+
+	// Sandbox support
+	var opts *session.CreateOptions
+	if r.FormValue("sandbox") == "true" {
+		available, _, _ := docker.IsAvailable()
+		if !available {
+			http.Error(w, "Docker Desktop is not available for sandbox mode", http.StatusBadRequest)
+			return
+		}
+		opts = &session.CreateOptions{Sandboxed: true}
+	}
+
+	sess, err := s.mgr.Create(name, workDir, "claude", args, opts)
 	if err != nil {
 		slog.Error("failed to create session", "error", err)
 		http.Error(w, "failed to create session: "+err.Error(), http.StatusInternalServerError)
@@ -185,6 +199,7 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		s.store.SaveSession(store.SessionRecord{
 			ID: sess.ID, Name: sess.Name, ClaudeID: sess.ClaudeID, WorkDir: sess.WorkDir,
 			StartTime: sess.StartTime, Status: "running", PID: sess.PID,
+			Sandboxed: sess.Sandboxed, SandboxName: sess.SandboxName,
 		})
 	}
 	// Tell the client to auto-open this session
@@ -280,7 +295,8 @@ func (s *Server) handleNewSessionModal(w http.ResponseWriter, r *http.Request) {
 			recentDirs = append(recentDirs, sess.WorkDir)
 		}
 	}
-	templates.NewSessionModal(s.cfg.Sessions.DefaultDir, recentDirs).Render(r.Context(), w)
+	dockerAvailable, _, _ := docker.IsAvailable()
+	templates.NewSessionModal(s.cfg.Sessions.DefaultDir, recentDirs, dockerAvailable).Render(r.Context(), w)
 }
 
 func (s *Server) handleRecentProjects(w http.ResponseWriter, r *http.Request) {
@@ -377,6 +393,7 @@ func sessionToView(s *session.Session) templates.SessionView {
 	return templates.SessionView{
 		ID: s.ID, Name: s.Name, WorkDir: s.WorkDir,
 		State: string(s.GetState()), Type: sessionType(s.ID), Owned: s.Owned,
+		Sandboxed: s.Sandboxed,
 	}
 }
 
@@ -520,7 +537,12 @@ func (s *Server) handleRestartSession(w http.ResponseWriter, r *http.Request, se
 					if claudeID != "" {
 						args = append(args, "--resume", claudeID)
 					}
-					newSess, err = s.mgr.Create(sessionID, rec.WorkDir, "claude", args)
+					// Preserve sandbox flag from history
+					var opts *session.CreateOptions
+					if rec.Sandboxed {
+						opts = &session.CreateOptions{Sandboxed: true}
+					}
+					newSess, err = s.mgr.Create(sessionID, rec.WorkDir, "claude", args, opts)
 					if err == nil {
 						newSess.Name = name
 					}
@@ -539,6 +561,7 @@ func (s *Server) handleRestartSession(w http.ResponseWriter, r *http.Request, se
 		s.store.SaveSession(store.SessionRecord{
 			ID: newSess.ID, Name: newSess.Name, ClaudeID: newSess.ClaudeID, WorkDir: newSess.WorkDir,
 			StartTime: newSess.StartTime, Status: "running", PID: newSess.PID,
+			Sandboxed: newSess.Sandboxed, SandboxName: newSess.SandboxName,
 		})
 	}
 	v := sessionToView(newSess)

@@ -13,6 +13,7 @@ import (
 
 	"github.com/IgorDeo/claude-websessions/internal/config"
 	"github.com/IgorDeo/claude-websessions/internal/discovery"
+	"github.com/IgorDeo/claude-websessions/internal/docker"
 	"github.com/IgorDeo/claude-websessions/internal/notification"
 	"github.com/IgorDeo/claude-websessions/internal/server"
 	"github.com/IgorDeo/claude-websessions/internal/session"
@@ -167,6 +168,7 @@ func main() {
 				ID: s.ID, Name: s.Name, ClaudeID: s.ClaudeID, WorkDir: s.WorkDir,
 				StartTime: s.StartTime, EndTime: s.EndTime,
 				ExitCode: s.ExitCode, Status: "killed", PID: s.PID,
+				Sandboxed: s.Sandboxed, SandboxName: s.SandboxName,
 			})
 			return
 		}
@@ -188,6 +190,7 @@ func main() {
 			ID: s.ID, Name: s.Name, ClaudeID: s.ClaudeID, WorkDir: s.WorkDir,
 			StartTime: s.StartTime, EndTime: s.EndTime,
 			ExitCode: s.ExitCode, Status: string(to), PID: s.PID,
+			Sandboxed: s.Sandboxed, SandboxName: s.SandboxName,
 		})
 		st.SaveNotification(store.NotificationRecord{
 			SessionID: s.ID, EventType: string(eventType), Timestamp: time.Now(),
@@ -421,10 +424,17 @@ func main() {
 	printShutdown()
 
 	for _, s := range mgr.List() {
+		// Stop sandboxed sessions (don't remove — user might restart server)
+		if s.Sandboxed && s.SandboxName != "" {
+			if err := docker.SandboxStop(s.SandboxName); err != nil {
+				slog.Warn("failed to stop sandbox on shutdown", "name", s.SandboxName, "error", err)
+			}
+		}
 		st.SaveSession(store.SessionRecord{
 			ID: s.ID, Name: s.Name, ClaudeID: s.ClaudeID, WorkDir: s.WorkDir,
 			StartTime: s.StartTime, EndTime: s.EndTime,
 			ExitCode: s.ExitCode, Status: string(s.GetState()), PID: s.PID,
+			Sandboxed: s.Sandboxed, SandboxName: s.SandboxName,
 		})
 	}
 

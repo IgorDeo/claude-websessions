@@ -91,6 +91,9 @@ templ sessionItem(s SessionView, grouped bool) {
 					<div class="session-name-row">
 						<span class="session-name">{ s.Name }</span>
 						<span class={ "session-type-badge", "type-" + s.Type }>{ s.Type }</span>
+						if s.Sandboxed {
+							<span class="sandbox-badge" title="Running in Docker sandbox VM">&#128737;</span>
+						}
 					</div>
 					<span class="session-dir">{ s.WorkDir }</span>
 				</div>
@@ -102,6 +105,9 @@ templ sessionItem(s SessionView, grouped bool) {
 					<div class="session-name-row">
 						<span class="session-name">{ s.Name }</span>
 						<span class={ "session-type-badge", "type-" + s.Type }>{ s.Type }</span>
+						if s.Sandboxed {
+							<span class="sandbox-badge" title="Running in Docker sandbox VM">&#128737;</span>
+						}
 					</div>
 					<span class="session-dir">{ s.WorkDir }</span>
 				</div>

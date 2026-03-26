@@ -151,6 +151,7 @@ make build
 |-----------|----------|-------|
 | **tmux** | Yes | Session management runtime |
 | **Claude Code CLI** | Yes | `claude` command in PATH |
+| **[Docker Desktop 4.40+](https://www.docker.com/products/docker-desktop/)** | Optional | Required for Docker sandbox mode (`docker sandbox` CLI) |
 | **[Maple Mono Normal NF](https://github.com/subframe7536/maple-font)** | Recommended | Monospace font with ligatures and Nerd Font icons |
 | **Go 1.26+** | Build only | Not needed for binary installs |
 | **templ** | Build only | `go install github.com/a-h/templ/cmd/templ@latest` |
@@ -281,7 +282,19 @@ make clean          # Remove build artifacts
 ./bin/websessions --gui                            # Native window (GUI build only)
 ```
 
-### Docker
+### Docker Sandbox Mode
+
+Run Claude Code sessions inside a VM-isolated Docker sandbox — safe for autonomous mode where Claude has unrestricted shell access without affecting your host system.
+
+**Requires [Docker Desktop 4.40+](https://www.docker.com/products/docker-desktop/)** with the `docker sandbox` CLI. Check availability:
+
+```bash
+docker sandbox version
+```
+
+When creating a new session, check **"Run in Docker sandbox"** to launch it inside a sandbox VM. The checkbox is only enabled when Docker Desktop with sandbox support is detected.
+
+### Docker (containerized websessions)
 
 ```bash
 docker build -t websessions .
