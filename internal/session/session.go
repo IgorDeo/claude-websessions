@@ -96,7 +96,7 @@ func (s *Session) Resize(rows, cols uint16) error {
 	}
 	// Resize the reader PTY first (so tmux sees the new client size)
 	if s.readerPTY != nil {
-		pty.Setsize(s.readerPTY, &pty.Winsize{Rows: rows, Cols: cols})
+		_ = pty.Setsize(s.readerPTY, &pty.Winsize{Rows: rows, Cols: cols})
 	}
 	// Then resize the tmux window
 	return tmuxResizeWindow(s.TmuxSession, int(cols), int(rows))

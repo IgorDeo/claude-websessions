@@ -1,7 +1,6 @@
 package session
 
 import (
-	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -26,14 +25,14 @@ type Manager struct {
 	bufferSize    int64
 	onStateChange StateChangeFunc
 	onOutput      OutputFunc
-	stopReaders   map[string]context.CancelFunc // signal to stop reading for a session
+	stopReaders   map[string]chan struct{} // signal to stop reading for a session
 }
 
 func NewManager(bufferSize int64) *Manager {
 	return &Manager{
 		sessions:    make(map[string]*Session),
 		bufferSize:  bufferSize,
-		stopReaders: make(map[string]context.CancelFunc),
+		stopReaders: make(map[string]chan struct{}),
 	}
 }
 
@@ -102,7 +101,7 @@ func (m *Manager) Create(id, workDir, command string, args []string, opts ...*Cr
 
 	// Kill any existing tmux session with this name
 	if tmuxSessionExists(tmuxName) {
-		tmuxKillSession(tmuxName)
+		_ = tmuxKillSession(tmuxName)
 	}
 
 	// Create tmux session
@@ -169,7 +168,7 @@ func (m *Manager) provisionSandbox(s *Session, workDir string, args []string) {
 	tmuxName := TmuxSessionName(s.ID)
 
 	if tmuxSessionExists(tmuxName) {
-		tmuxKillSession(tmuxName)
+		_ = tmuxKillSession(tmuxName)
 	}
 	if err := tmuxCreateSession(tmuxName, workDir, "docker", fullArgs); err != nil {
 		slog.Error("sandbox: failed to create tmux session", "id", s.ID, "error", err)
@@ -205,9 +204,9 @@ func (m *Manager) failSession(s *Session, errMsg string) {
 // startReader attaches to the tmux session and reads output.
 // Uses `tmux pipe-pane` to stream output, or attaches a reader PTY.
 func (m *Manager) startReader(s *Session) {
-	ctx, cancel := context.WithCancel(context.Background())
+	stop := make(chan struct{})
 	m.mu.Lock()
-	m.stopReaders[s.ID] = cancel
+	m.stopReaders[s.ID] = stop
 	m.mu.Unlock()
 
 	go func() {
@@ -222,22 +221,21 @@ func (m *Manager) startReader(s *Session) {
 		s.SetReaderPTY(ptmx)
 		defer func() {
 			s.SetReaderPTY(nil)
-			ptmx.Close()
-			cmd.Process.Kill()
-			cmd.Wait() // reap zombie process
+			_ = ptmx.Close()
+			_ = cmd.Process.Kill()
 		}()
 
 		buf := make([]byte, 4096)
 		for {
 			select {
-			case <-ctx.Done():
+			case <-stop:
 				return
 			default:
 			}
 
 			n, err := ptmx.Read(buf)
 			if n > 0 {
-				s.Output().Write(buf[:n])
+				_, _ = s.Output().Write(buf[:n])
 				if m.onOutput != nil {
 					m.onOutput(s.ID, buf[:n])
 				}
@@ -269,8 +267,8 @@ func (m *Manager) startReader(s *Session) {
 // stopReader stops the output reader for a session.
 func (m *Manager) stopReader(id string) {
 	m.mu.Lock()
-	if cancel, ok := m.stopReaders[id]; ok {
-		cancel()
+	if ch, ok := m.stopReaders[id]; ok {
+		close(ch)
 		delete(m.stopReaders, id)
 	}
 	m.mu.Unlock()
@@ -381,28 +379,17 @@ func (m *Manager) Kill(id string) error {
 	}
 	m.stopReader(id)
 	if s.TmuxSession != "" {
-		tmuxKillSession(s.TmuxSession)
+		_ = tmuxKillSession(s.TmuxSession)
 	}
 	// Stop sandbox VM asynchronously to avoid blocking the UI
 	if s.Sandboxed && s.SandboxName != "" {
 		sandboxName := s.SandboxName
 		go func() {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			done := make(chan struct{})
-			go func() {
-				if err := docker.SandboxStop(sandboxName); err != nil {
-					slog.Warn("failed to stop sandbox", "name", sandboxName, "error", err)
-				}
-				if err := docker.SandboxRemove(sandboxName); err != nil {
-					slog.Warn("failed to remove sandbox", "name", sandboxName, "error", err)
-				}
-				close(done)
-			}()
-			select {
-			case <-done:
-			case <-ctx.Done():
-				slog.Warn("sandbox cleanup timed out", "name", sandboxName)
+			if err := docker.SandboxStop(sandboxName); err != nil {
+				slog.Warn("failed to stop sandbox", "name", sandboxName, "error", err)
+			}
+			if err := docker.SandboxRemove(sandboxName); err != nil {
+				slog.Warn("failed to remove sandbox", "name", sandboxName, "error", err)
 			}
 		}()
 	}

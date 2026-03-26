@@ -126,11 +126,11 @@ func (s *Server) routes() http.Handler {
 			s.snoozeFn(payload.SessionID, payload.Minutes)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{"ok": true, "minutes": payload.Minutes})
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": true, "minutes": payload.Minutes})
 	})
 	r.Post("/notifications/clear", func(w http.ResponseWriter, r *http.Request) {
 		if s.store != nil {
-			s.store.MarkAllNotificationsRead()
+			_ = s.store.MarkAllNotificationsRead()
 		}
 		s.sink.Clear()
 		w.WriteHeader(http.StatusOK)
@@ -143,7 +143,7 @@ func (s *Server) routes() http.Handler {
 			return
 		}
 		if s.store != nil {
-			s.store.MarkNotificationRead(id)
+			_ = s.store.MarkNotificationRead(id)
 		}
 		w.WriteHeader(http.StatusOK)
 	})

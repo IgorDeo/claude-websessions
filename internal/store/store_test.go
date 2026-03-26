@@ -12,7 +12,7 @@ func TestStore_SaveAndListSessions(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	rec := store.SessionRecord{
 		ID: "s1", Name: "my-session", ClaudeID: "claude-abc", WorkDir: "/home/user/project",
 		StartTime: time.Now().Add(-5 * time.Minute), EndTime: time.Now(),
@@ -38,7 +38,7 @@ func TestStore_SaveAndListNotifications(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	n := store.NotificationRecord{
 		SessionID: "s1", EventType: "completed", Timestamp: time.Now(), Read: false,
 	}
@@ -62,7 +62,7 @@ func TestStore_MarkNotificationRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer func() { _ = s.Close() }()
 	n := store.NotificationRecord{
 		SessionID: "s1", EventType: "errored", Timestamp: time.Now(), Read: false,
 	}
@@ -84,7 +84,7 @@ func TestStore_SaveAuditLog(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s.Close()
+	defer s.Close() //nolint:errcheck
 	err = s.LogAudit("create_session", "s1", "192.168.1.1")
 	if err != nil {
 		t.Fatal(err)

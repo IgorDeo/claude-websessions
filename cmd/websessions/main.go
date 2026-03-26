@@ -138,7 +138,10 @@ func main() {
 
 	homeDir, _ := os.UserHomeDir()
 	dbDir := homeDir + "/.websessions"
-	os.MkdirAll(dbDir, 0755)
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		slog.Error("failed to create data directory", "path", dbDir, "error", err)
+		os.Exit(1)
+	}
 	dbPath := dbDir + "/websessions.db"
 
 	st, err := store.Open(dbPath)
@@ -146,7 +149,7 @@ func main() {
 		slog.Error("failed to open database", "error", err)
 		os.Exit(1)
 	}
-	defer st.Close()
+	defer st.Close() //nolint:errcheck
 
 	// Print banner early
 	printBanner("", cfg.Server.Host, cfg.Server.Port)
@@ -164,7 +167,7 @@ func main() {
 		// Skip notification for intentionally killed sessions
 		if s.Killed && to == session.StateErrored {
 			// Still save to DB but don't notify
-			st.SaveSession(store.SessionRecord{
+			_ = st.SaveSession(store.SessionRecord{
 				ID: s.ID, Name: s.Name, ClaudeID: s.ClaudeID, WorkDir: s.WorkDir,
 				StartTime: s.StartTime, EndTime: s.EndTime,
 				ExitCode: s.ExitCode, Status: "killed", PID: s.PID,
@@ -186,13 +189,13 @@ func main() {
 		}
 		event := notification.SessionEvent{SessionID: s.ID, Type: eventType, Timestamp: time.Now()}
 		bus.Publish(event)
-		st.SaveSession(store.SessionRecord{
+		_ = st.SaveSession(store.SessionRecord{
 			ID: s.ID, Name: s.Name, ClaudeID: s.ClaudeID, WorkDir: s.WorkDir,
 			StartTime: s.StartTime, EndTime: s.EndTime,
 			ExitCode: s.ExitCode, Status: string(to), PID: s.PID,
 			Sandboxed: s.Sandboxed, SandboxName: s.SandboxName,
 		})
-		st.SaveNotification(store.NotificationRecord{
+		_ = st.SaveNotification(store.NotificationRecord{
 			SessionID: s.ID, EventType: string(eventType), Timestamp: time.Now(),
 		})
 	})
@@ -262,7 +265,7 @@ func main() {
 			}
 			id := fmt.Sprintf("discovered-%d", p.PID)
 			s := mgr.AddDiscovered(id, p.ClaudeID, p.WorkDir, p.PID, p.StartTime)
-			st.SaveSession(store.SessionRecord{
+			_ = st.SaveSession(store.SessionRecord{
 				ID: id, Name: s.Name, ClaudeID: p.ClaudeID, WorkDir: p.WorkDir,
 				StartTime: p.StartTime, Status: "discovered", PID: p.PID,
 			})
@@ -283,7 +286,7 @@ func main() {
 					}
 					if s.PID > 0 && !isProcessAlive(s.PID) {
 						slog.Info("discovered session process died, removing", "id", s.ID, "pid", s.PID)
-						st.SaveSession(store.SessionRecord{
+						_ = st.SaveSession(store.SessionRecord{
 							ID: s.ID, Name: s.Name, ClaudeID: s.ClaudeID, WorkDir: s.WorkDir,
 							StartTime: s.StartTime, EndTime: time.Now(),
 							Status: "completed", PID: s.PID,
@@ -321,7 +324,7 @@ func main() {
 					}
 					id := fmt.Sprintf("discovered-%d", p.PID)
 					s := mgr.AddDiscovered(id, p.ClaudeID, p.WorkDir, p.PID, p.StartTime)
-					st.SaveSession(store.SessionRecord{
+					_ = st.SaveSession(store.SessionRecord{
 						ID: id, Name: s.Name, ClaudeID: p.ClaudeID, WorkDir: p.WorkDir,
 						StartTime: p.StartTime, Status: "discovered", PID: p.PID,
 					})
@@ -378,7 +381,7 @@ func main() {
 					}
 					bus.Publish(event)
 					if st != nil {
-						st.SaveNotification(store.NotificationRecord{
+						_ = st.SaveNotification(store.NotificationRecord{
 							SessionID: s.ID,
 							EventType: "waiting",
 							Timestamp: time.Now(),
@@ -430,7 +433,7 @@ func main() {
 				slog.Warn("failed to stop sandbox on shutdown", "name", s.SandboxName, "error", err)
 			}
 		}
-		st.SaveSession(store.SessionRecord{
+		_ = st.SaveSession(store.SessionRecord{
 			ID: s.ID, Name: s.Name, ClaudeID: s.ClaudeID, WorkDir: s.WorkDir,
 			StartTime: s.StartTime, EndTime: s.EndTime,
 			ExitCode: s.ExitCode, Status: string(s.GetState()), PID: s.PID,
@@ -440,6 +443,8 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	httpServer.Shutdown(ctx)
+	if err := httpServer.Shutdown(ctx); err != nil {
+		slog.Error("HTTP server shutdown error", "error", err)
+	}
 	printStopped()
 }

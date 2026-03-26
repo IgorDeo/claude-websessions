@@ -24,8 +24,8 @@ func TestRingBuf_WriteAndRead(t *testing.T) {
 
 func TestRingBuf_Overflow(t *testing.T) {
 	rb := session.NewRingBuf(10)
-	rb.Write([]byte("abcdefghij")) // fills buffer
-	rb.Write([]byte("XYZ"))        // overwrites first 3 bytes
+	_, _ = rb.Write([]byte("abcdefghij")) // fills buffer
+	_, _ = rb.Write([]byte("XYZ"))        // overwrites first 3 bytes
 	got := rb.Bytes()
 	if string(got) != "defghijXYZ" {
 		t.Errorf("got %q, want %q", got, "defghijXYZ")
@@ -42,7 +42,7 @@ func TestRingBuf_Empty(t *testing.T) {
 
 func TestRingBuf_ExactFill(t *testing.T) {
 	rb := session.NewRingBuf(5)
-	rb.Write([]byte("abcde"))
+	_, _ = rb.Write([]byte("abcde"))
 	got := rb.Bytes()
 	if string(got) != "abcde" {
 		t.Errorf("got %q, want %q", got, "abcde")
@@ -51,11 +51,11 @@ func TestRingBuf_ExactFill(t *testing.T) {
 
 func TestRingBuf_MultipleSmallWrites(t *testing.T) {
 	rb := session.NewRingBuf(10)
-	rb.Write([]byte("abc"))
-	rb.Write([]byte("def"))
-	rb.Write([]byte("ghij"))
+	_, _ = rb.Write([]byte("abc"))
+	_, _ = rb.Write([]byte("def"))
+	_, _ = rb.Write([]byte("ghij"))
 	// buffer is full: "abcdefghij"
-	rb.Write([]byte("kl"))
+	_, _ = rb.Write([]byte("kl"))
 	// overwrites: "cdefghijkl"
 	got := rb.Bytes()
 	if string(got) != "cdefghijkl" {

@@ -18,7 +18,7 @@ func TestManager_CreateSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer mgr.Kill(s.ID)
+	defer func() { _ = mgr.Kill(s.ID) }()
 
 	if s.ID != "test-create" {
 		t.Errorf("expected ID test-create, got %s", s.ID)
@@ -37,10 +37,10 @@ func TestManager_ListSessions(t *testing.T) {
 	}
 	mgr := session.NewManager(10 * 1024 * 1024)
 
-	mgr.Create("test-list-1", "/tmp", "bash", []string{"-c", "sleep 5"})
-	mgr.Create("test-list-2", "/tmp", "bash", []string{"-c", "sleep 5"})
-	defer mgr.Kill("test-list-1")
-	defer mgr.Kill("test-list-2")
+	_, _ = mgr.Create("test-list-1", "/tmp", "bash", []string{"-c", "sleep 5"})
+	_, _ = mgr.Create("test-list-2", "/tmp", "bash", []string{"-c", "sleep 5"})
+	defer func() { _ = mgr.Kill("test-list-1") }()
+	defer func() { _ = mgr.Kill("test-list-2") }()
 
 	sessions := mgr.List()
 	if len(sessions) < 2 {
@@ -54,8 +54,8 @@ func TestManager_GetSession(t *testing.T) {
 	}
 	mgr := session.NewManager(10 * 1024 * 1024)
 
-	mgr.Create("test-get", "/tmp", "bash", []string{"-c", "sleep 5"})
-	defer mgr.Kill("test-get")
+	_, _ = mgr.Create("test-get", "/tmp", "bash", []string{"-c", "sleep 5"})
+	defer func() { _ = mgr.Kill("test-get") }()
 
 	s, ok := mgr.Get("test-get")
 	if !ok {

@@ -165,7 +165,7 @@ func checkConfigDir() Check {
 			sizeMB := info.Size() / 1024 / 1024
 			if sizeMB > 0 {
 				c.Detail += " (db: " + strings.TrimRight(strings.TrimRight(
-					strings.Replace(string(rune('0'+sizeMB)), "\x00", "", -1), "0"), ".") + "MB)"
+					strings.ReplaceAll(string(rune('0'+sizeMB)), "\x00", ""), "0"), ".") + "MB)"
 			}
 		}
 	} else {

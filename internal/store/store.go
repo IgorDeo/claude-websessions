@@ -3,7 +3,6 @@ package store
 import (
 	"database/sql"
 	"fmt"
-	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -38,9 +37,9 @@ func Open(path string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
-	db.Exec("PRAGMA journal_mode=WAL")
+	_, _ = db.Exec("PRAGMA journal_mode=WAL")
 	if err := migrate(db); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("migrating database: %w", err)
 	}
 	return &Store{db: db}, nil
@@ -73,22 +72,10 @@ func migrate(db *sql.DB) error {
 		return err
 	}
 	// Migration: add name column if it doesn't exist (for existing DBs)
-	if _, err := db.Exec("ALTER TABLE sessions ADD COLUMN name TEXT DEFAULT ''"); err != nil {
-		if !strings.Contains(err.Error(), "duplicate column") {
-			return fmt.Errorf("adding name column: %w", err)
-		}
-	}
+	_, _ = db.Exec("ALTER TABLE sessions ADD COLUMN name TEXT DEFAULT ''")
 	// Migration: add sandbox columns
-	if _, err := db.Exec("ALTER TABLE sessions ADD COLUMN sandboxed BOOLEAN DEFAULT FALSE"); err != nil {
-		if !strings.Contains(err.Error(), "duplicate column") {
-			return fmt.Errorf("adding sandboxed column: %w", err)
-		}
-	}
-	if _, err := db.Exec("ALTER TABLE sessions ADD COLUMN sandbox_name TEXT DEFAULT ''"); err != nil {
-		if !strings.Contains(err.Error(), "duplicate column") {
-			return fmt.Errorf("adding sandbox_name column: %w", err)
-		}
-	}
+	_, _ = db.Exec("ALTER TABLE sessions ADD COLUMN sandboxed BOOLEAN DEFAULT FALSE")
+	_, _ = db.Exec("ALTER TABLE sessions ADD COLUMN sandbox_name TEXT DEFAULT ''")
 	return nil
 }
 
@@ -108,7 +95,7 @@ func (s *Store) ListSessions(limit int) ([]SessionRecord, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 	var records []SessionRecord
 	for rows.Next() {
 		var r SessionRecord
@@ -138,7 +125,7 @@ func (s *Store) ListNotifications(limit int, includeRead bool) ([]NotificationRe
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 	var records []NotificationRecord
 	for rows.Next() {
 		var r NotificationRecord
@@ -179,7 +166,7 @@ func (s *Store) RecentDirs(limit int) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 	var dirs []string
 	for rows.Next() {
 		var d string
@@ -213,7 +200,7 @@ func (s *Store) GetAllPreferences() (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer rows.Close() //nolint:errcheck
 	prefs := make(map[string]string)
 	for rows.Next() {
 		var k, v string
