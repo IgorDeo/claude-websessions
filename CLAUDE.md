@@ -52,6 +52,14 @@ Key patterns:
 - Ring buffer in `internal/session/ringbuf.go` — replayed to new WS clients on connect
 - State changes fire through notification.Bus → sinks + SQLite persistence
 
+## Documentation
+
+When modifying code that changes a documented flow, **update the corresponding doc** in the same PR. Stale docs are worse than no docs.
+
+| Doc | Covers | Update when changing... |
+|-----|--------|------------------------|
+| `docs/notifications-system.md` | Notification bus, sinks, hooks, WebSocket push, reminder/snooze, UI components | `internal/notification/`, hook callbacks in `handlers.go`, notification WS in `ws.go`, notification JS/templates, reminder logic in `main.go` |
+
 ## Browser Testing (Claude-in-Chrome)
 
 When a Chrome browser session is available (claude-in-chrome MCP tools), **always verify UI changes in the browser after implementing them**:
