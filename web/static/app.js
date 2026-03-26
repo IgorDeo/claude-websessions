@@ -338,6 +338,22 @@ window.websessions = (function() {
     document.body.appendChild(overlay);
   }
 
+  var focusedSessionId = null;
+
+  function focusPane(sessionID) {
+    focusedSessionId = sessionID;
+    document.querySelectorAll('.terminal-pane.pane-focused').forEach(function(el) {
+      el.classList.remove('pane-focused');
+    });
+    var area = document.getElementById('terminal-area');
+    if (!area) return;
+    area.querySelectorAll('.terminal-pane[data-session-id]').forEach(function(el) {
+      if (el.dataset.sessionId === sessionID) {
+        el.classList.add('pane-focused');
+      }
+    });
+  }
+
   function refitAllTerminals() {
     Object.keys(terminals).forEach(function(id) {
       var t = terminals[id];
@@ -372,6 +388,8 @@ window.websessions = (function() {
           var id = termPane.dataset.sessionId;
           if (terminals[id]) disconnectSession(id);
           connectSession(id, 'term-' + id);
+          // Focus on click anywhere in the pane
+          termPane.addEventListener('mousedown', function() { focusPane(id); });
         }
       });
   }
@@ -749,6 +767,8 @@ window.websessions = (function() {
   var currentlyShowingTabId = null;
 
   function openTab(sessionID, name, state) {
+    var focusTarget = sessionID; // remember which session to focus
+
     // Check if session is inside an existing split group — focus that tab instead
     var groupTab = openTabs.find(function(t) {
       return t.splitTree && treeFind(t.splitTree, sessionID);
@@ -789,6 +809,8 @@ window.websessions = (function() {
     // If this tab has a split tree, rebuild the split layout
     if (tab && tab.splitTree) {
       rebuildSplitLayout(tab);
+      // Focus the target pane after a short delay for DOM to settle
+      setTimeout(function() { focusPane(focusTarget); }, 300);
       return;
     }
 
@@ -797,6 +819,7 @@ window.websessions = (function() {
       target: '#terminal-area',
       swap: 'innerHTML'
     });
+    setTimeout(function() { focusPane(focusTarget); }, 300);
   }
 
   function rebuildSplitLayout(tab) {
@@ -2251,6 +2274,7 @@ window.websessions = (function() {
     toggleTheme: toggleTheme,
     toggleShortcuts: toggleShortcuts,
     killAllSessions: killAllSessions,
+    focusPane: focusPane,
     killSession: killSession,
     startRename: startRename,
     dirAutocomplete: dirAutocomplete,
