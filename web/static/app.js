@@ -291,7 +291,7 @@ window.websessions = (function() {
         .then(function(r) {
           var sid = r.headers.get('X-Session-ID');
           if (sid) doSplit(currentSessionID, sid, direction);
-          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+          refreshSidebar();
           return r.text();
         });
     });
@@ -544,7 +544,7 @@ window.websessions = (function() {
       renderTabs();
       // Save and refresh sidebar after persistence completes
       saveTabState().then(function() {
-        htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+        refreshSidebar();
       });
     }
   }
@@ -644,7 +644,7 @@ window.websessions = (function() {
         renderTabs();
         // Only refresh sidebar for new sessions (takeover/create), not regular opens
         if (isNew) {
-          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+          refreshSidebar();
         }
       }
     }
@@ -769,7 +769,7 @@ window.websessions = (function() {
       body: 'name=' + encodeURIComponent(newName),
     }).then(function() {
       // Refresh sidebar to show new name
-      htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+      refreshSidebar();
     });
   }
 
@@ -913,7 +913,7 @@ window.websessions = (function() {
     // Refresh sidebar to update group tree
     if (hadGroup) {
       saveTabState().then(function() {
-        htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+        refreshSidebar();
       });
     } else {
       saveTabState();
@@ -1219,7 +1219,7 @@ window.websessions = (function() {
         if (sid) {
           openTab(sid, sname || 'terminal', 'running');
         }
-        htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+        refreshSidebar();
         return r.text(); // consume body
       });
   }
@@ -1274,7 +1274,7 @@ window.websessions = (function() {
           saveTabState();
           renderTabs();
           document.getElementById('terminal-area').innerHTML = '<div class="empty-state"><p>All sessions killed</p></div>';
-          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+          refreshSidebar();
           showToast('Sessions killed', data.killed + ' session(s) terminated.', 'completed');
         });
     };
@@ -1305,7 +1305,7 @@ window.websessions = (function() {
           closeTab(sessionID);
         }
         setTimeout(function() {
-          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+          refreshSidebar();
         }, 500);
       })
       .catch(function(err) { console.error('kill failed:', err); });
@@ -1351,7 +1351,7 @@ window.websessions = (function() {
     currentlyShowingTabId = null;
     // Save then refresh sidebar after persistence
     saveTabState().then(function() {
-      htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+      refreshSidebar();
     });
     openTab(tab.id);
   }
@@ -1929,6 +1929,36 @@ window.websessions = (function() {
   });
 
   // Session search/filter
+  // Refresh sidebar using plain fetch + innerHTML (not htmx, which flattens nested groups)
+  function refreshSidebar() {
+    // Save collapsed state before refresh
+    var collapsedGroups = {};
+    document.querySelectorAll('.session-group.collapsed').forEach(function(g) {
+      var name = g.querySelector('.session-group-name');
+      if (name) collapsedGroups[name.textContent] = true;
+    });
+
+    fetch('/sidebar').then(function(r) { return r.text(); }).then(function(html) {
+      var sidebar = document.getElementById('sidebar');
+      if (sidebar) {
+        sidebar.innerHTML = html;
+        htmx.process(sidebar); // re-init htmx attributes on new elements
+        // Restore collapsed state
+        sidebar.querySelectorAll('.session-group').forEach(function(g) {
+          var name = g.querySelector('.session-group-name');
+          if (name && collapsedGroups[name.textContent]) {
+            g.classList.add('collapsed');
+          }
+        });
+        // Restore sidebar tab if history was active
+        restoreSidebarTab();
+      }
+    }).catch(function() {});
+  }
+
+  // Periodic sidebar refresh
+  setInterval(refreshSidebar, 30000);
+
   function filterSessions(query) {
     var q = (query || '').toLowerCase();
     var items = document.querySelectorAll('.session-item');
@@ -2093,7 +2123,7 @@ window.websessions = (function() {
             showToast(notifTitle, notifBody, msg.event);
           }
           // Refresh sidebar to update session states
-          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+          refreshSidebar();
         }
       } catch(e) {}
     };

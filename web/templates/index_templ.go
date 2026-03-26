@@ -94,7 +94,7 @@ func Index(data PageData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</button><div id=\"notification-dropdown\" class=\"dropdown\"></div></div></div></header><div class=\"main\"><aside id=\"sidebar\" class=\"sidebar\" hx-get=\"/sidebar\" hx-trigger=\"every 30s\" hx-swap=\"innerHTML\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</button><div id=\"notification-dropdown\" class=\"dropdown\"></div></div></div></header><div class=\"main\"><aside id=\"sidebar\" class=\"sidebar\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
