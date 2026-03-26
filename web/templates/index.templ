@@ -33,6 +33,7 @@ type PageData struct {
 	History       []SessionView
 	Notifications []NotificationView
 	UnreadCount   int
+	TeamsEnabled  bool
 }
 
 templ Index(data PageData) {
@@ -102,6 +103,9 @@ templ Index(data PageData) {
 			</div>
 			<footer class="footer">
 				<button class="new-session-btn" hx-get="/sessions/new" hx-target="#modal" hx-swap="innerHTML">+ New Session</button>
+				if data.TeamsEnabled {
+					<button class="new-team-btn" hx-get="/teams/new" hx-target="#modal" hx-swap="innerHTML">&#x1F46B; New Team</button>
+				}
 				<button class="new-terminal-btn" onclick="window.websessions.openTerminal()">&#9002; Terminal</button>
 				<div class="footer-spacer"></div>
 				<button class="kill-all-btn" onclick="window.websessions.killAllSessions()" title="Kill all running sessions">&#9632; Kill All</button>

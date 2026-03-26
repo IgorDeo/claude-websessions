@@ -127,6 +127,14 @@ func (s *Server) routes() http.Handler {
 		r.Get("/teams/{name}", s.handleTeamDashboard)
 		r.Get("/teams/{name}/tasks", s.handleTeamTasks)
 		r.Get("/teams/{name}/messages", s.handleTeamMessages)
+		r.Get("/teams/new", s.handleNewTeamModal)
+		r.Post("/teams", s.handleCreateTeam)
+		r.Post("/teams/{name}/messages", s.handleSendTeamMessage)
+		r.Post("/api/hook/team", s.handleTeamHookCallback)
+		r.Post("/teams/install-hooks", s.handleInstallTeamHooks)
+		r.Get("/ws/teams/{name}", func(w http.ResponseWriter, r *http.Request) {
+			s.handleTeamWS(w, r, chi.URLParam(r, "name"))
+		})
 	}
 
 	// Iframe panes

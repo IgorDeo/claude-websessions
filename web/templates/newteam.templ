@@ -1,0 +1,39 @@
+package templates
+
+templ NewTeamModal(defaultDir string, recentDirs []string) {
+	<div class="modal-overlay" onclick="this.remove()">
+		<div class="modal-content" onclick="event.stopPropagation()">
+			<h2>Create Agent Team</h2>
+			<p class="modal-hint">Spawn a Claude Code session as team lead with agent teams enabled. The lead will create and coordinate teammates based on your prompt.</p>
+			<form id="new-team-form" hx-post="/teams" hx-swap="none">
+				<div class="form-group">
+					<label for="team-name">Team Name</label>
+					<input type="text" id="team-name" name="name" placeholder="my-refactor-team" required/>
+				</div>
+				<div class="form-group" style="position:relative;">
+					<label for="team-work-dir">Working Directory</label>
+					<input type="text" id="team-work-dir" name="work_dir" value={ defaultDir } required autocomplete="off"
+						oninput="window.websessions.dirAutocomplete(this)"/>
+					<div id="team-dir-suggestions" class="dir-suggestions"></div>
+				</div>
+				<div class="form-group">
+					<label for="team-prompt">Team Prompt</label>
+					<textarea id="team-prompt" name="prompt" rows="5" placeholder="Create an agent team to... (describe the task, team structure, and roles)" required></textarea>
+				</div>
+				<div class="form-group">
+					<label for="team-model">Teammate Model (optional)</label>
+					<select id="team-model" name="model">
+						<option value="">Default (same as lead)</option>
+						<option value="sonnet">Sonnet</option>
+						<option value="opus">Opus</option>
+						<option value="haiku">Haiku</option>
+					</select>
+				</div>
+				<div class="form-actions">
+					<button type="button" class="btn-cancel" onclick="this.closest('.modal-overlay').remove()">Cancel</button>
+					<button type="submit" class="btn-create">Create Team</button>
+				</div>
+			</form>
+		</div>
+	</div>
+}
