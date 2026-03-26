@@ -1211,8 +1211,15 @@ window.websessions = (function() {
     fetch('/sessions/' + encodeURIComponent(sessionID) + '/kill', { method: 'POST' })
       .then(function(r) {
         if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
-        closeTab(sessionID);
-        // Small delay to let mgr.Wait() finish removing from active list
+        // If session is in a split group, remove the pane; otherwise close the tab
+        var groupTab = openTabs.find(function(t) {
+          return t.splitTree && treeFind(t.splitTree, sessionID);
+        });
+        if (groupTab) {
+          unsplitPane(sessionID);
+        } else {
+          closeTab(sessionID);
+        }
         setTimeout(function() {
           htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
         }, 500);
