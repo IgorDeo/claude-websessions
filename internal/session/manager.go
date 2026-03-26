@@ -388,6 +388,9 @@ func (m *Manager) Kill(id string) error {
 			if err := docker.SandboxStop(sandboxName); err != nil {
 				slog.Warn("failed to stop sandbox", "name", sandboxName, "error", err)
 			}
+			if err := docker.SandboxRemove(sandboxName); err != nil {
+				slog.Warn("failed to remove sandbox", "name", sandboxName, "error", err)
+			}
 		}()
 	}
 	// Set terminal state
