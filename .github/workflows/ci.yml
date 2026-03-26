@@ -52,4 +52,27 @@ jobs:
         run: templ generate ./web/templates/
 
       - name: Run tests
-        run: go test ./... -v
+        run: go test ./... -v -coverprofile=coverage.out -covermode=atomic
+      - name: Show coverage
+        run: go tool cover -func=coverage.out
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: golangci/golangci-lint-action@v7
+
+  vulncheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+      - name: Run govulncheck
+        run: govulncheck ./...

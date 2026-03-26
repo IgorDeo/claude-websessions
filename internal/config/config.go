@@ -99,7 +99,9 @@ func (c *Config) applyEnvOverrides() {
 func (c *Config) Save() error {
 	homeDir, _ := os.UserHomeDir()
 	dir := homeDir + "/.websessions"
-	os.MkdirAll(dir, 0755)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("creating config dir: %w", err)
+	}
 	path := dir + "/config.yaml"
 
 	data, err := yaml.Marshal(c)

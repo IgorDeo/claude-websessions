@@ -56,11 +56,11 @@ func tmuxCreateSession(name, workDir, command string, args []string) error {
 	}
 
 	// Configure tmux session for clean embedded use
-	tmuxRun("set-option", "-t", name, "status", "off")
-	tmuxRun("set-option", "-t", name, "mouse", "off")
-	tmuxRun("set-option", "-t", name, "default-terminal", "xterm-256color")
+	_, _ = tmuxRun("set-option", "-t", name, "status", "off")
+	_, _ = tmuxRun("set-option", "-t", name, "mouse", "off")
+	_, _ = tmuxRun("set-option", "-t", name, "default-terminal", "xterm-256color")
 	// Use the largest client size (not smallest) so the window expands to fill
-	tmuxRun("set-window-option", "-t", name, "aggressive-resize", "on")
+	_, _ = tmuxRun("set-window-option", "-t", name, "aggressive-resize", "on")
 
 	return nil
 }
@@ -82,12 +82,6 @@ func tmuxSendKeys(name string, keys string) error {
 func tmuxResizeWindow(name string, cols, rows int) error {
 	_, err := tmuxRun("resize-window", "-t", name, "-x", fmt.Sprintf("%d", cols), "-y", fmt.Sprintf("%d", rows))
 	return err
-}
-
-// tmuxCapturePane captures the current visible content of the pane.
-func tmuxCapturePane(name string, historyLines int) (string, error) {
-	return tmuxRun("capture-pane", "-t", name, "-p",
-		"-S", fmt.Sprintf("-%d", historyLines))
 }
 
 // tmuxListSessions lists all tmux sessions with the ws- prefix.

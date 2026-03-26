@@ -36,7 +36,9 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	s.applyTabGroups(views)
 	data := templates.PageData{Sessions: views, UnreadCount: s.sink.UnreadCount()}
 	data.History = s.loadHistory(views)
-	templates.Index(data).Render(r.Context(), w)
+	if err := templates.Index(data).Render(r.Context(), w); err != nil {
+		slog.Error("failed to render index", "error", err)
+	}
 }
 
 func (s *Server) handleSidebar(w http.ResponseWriter, r *http.Request) {
@@ -46,7 +48,9 @@ func (s *Server) handleSidebar(w http.ResponseWriter, r *http.Request) {
 		views[i] = sessionToView(sess)
 	}
 	s.applyTabGroups(views)
-	templates.Sidebar(views, s.loadHistory(views)).Render(r.Context(), w)
+	if err := templates.Sidebar(views, s.loadHistory(views)).Render(r.Context(), w); err != nil {
+		slog.Error("failed to render sidebar", "error", err)
+	}
 }
 
 // applyTabGroups reads saved tab state and sets GroupName for sessions in split groups.
@@ -196,7 +200,7 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	}
 	// Persist to SQLite immediately so it survives restarts
 	if s.store != nil {
-		s.store.SaveSession(store.SessionRecord{
+		_ = s.store.SaveSession(store.SessionRecord{
 			ID: sess.ID, Name: sess.Name, ClaudeID: sess.ClaudeID, WorkDir: sess.WorkDir,
 			StartTime: sess.StartTime, Status: "running", PID: sess.PID,
 			Sandboxed: sess.Sandboxed, SandboxName: sess.SandboxName,
@@ -247,7 +251,7 @@ func (s *Server) handleCreateTerminal(w http.ResponseWriter, r *http.Request) {
 	}
 	sess.Name = name
 	if s.store != nil {
-		s.store.SaveSession(store.SessionRecord{
+		_ = s.store.SaveSession(store.SessionRecord{
 			ID: sess.ID, Name: sess.Name, WorkDir: sess.WorkDir,
 			StartTime: sess.StartTime, Status: "running",
 		})
@@ -261,7 +265,9 @@ func (s *Server) handleOpenSession(w http.ResponseWriter, r *http.Request, sessi
 	sess, ok := s.mgr.Get(sessionID)
 	if ok {
 		v := sessionToView(sess)
-		templates.Terminal(v.ID, v.Name, v.WorkDir, v.State).Render(r.Context(), w)
+		if err := templates.Terminal(v.ID, v.Name, v.WorkDir, v.State).Render(r.Context(), w); err != nil {
+			slog.Error("failed to render terminal", "error", err)
+		}
 		return
 	}
 	// Session not in active manager — check SQLite for history
@@ -271,7 +277,9 @@ func (s *Server) handleOpenSession(w http.ResponseWriter, r *http.Request, sessi
 			if name == "" {
 				name = sessionID
 			}
-			templates.Terminal(rec.ID, name, rec.WorkDir, rec.Status).Render(r.Context(), w)
+			if err := templates.Terminal(rec.ID, name, rec.WorkDir, rec.Status).Render(r.Context(), w); err != nil {
+				slog.Error("failed to render terminal", "error", err)
+			}
 			return
 		}
 	}
@@ -297,7 +305,9 @@ func (s *Server) handleNewSessionModal(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	dockerAvailable, _, _ := docker.IsAvailable()
-	templates.NewSessionModal(s.cfg.Sessions.DefaultDir, recentDirs, dockerAvailable).Render(r.Context(), w)
+	if err := templates.NewSessionModal(s.cfg.Sessions.DefaultDir, recentDirs, dockerAvailable).Render(r.Context(), w); err != nil {
+		slog.Error("failed to render new session modal", "error", err)
+	}
 }
 
 func (s *Server) handleRecentProjects(w http.ResponseWriter, r *http.Request) {
@@ -306,7 +316,9 @@ func (s *Server) handleRecentProjects(w http.ResponseWriter, r *http.Request) {
 		dirs, _ = s.store.RecentDirs(10)
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(dirs)
+	if err := json.NewEncoder(w).Encode(dirs); err != nil {
+		slog.Error("failed to encode recent projects", "error", err)
+	}
 }
 
 func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
@@ -336,7 +348,7 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 			views = append(views, v)
 		}
 	}
-	templates.Notifications(views).Render(r.Context(), w)
+	_ = templates.Notifications(views).Render(r.Context(), w)
 }
 
 func timeAgo(t time.Time) string {
@@ -439,7 +451,7 @@ func (s *Server) handleTakeover(w http.ResponseWriter, r *http.Request, sessionI
 	v := sessionToView(newSess)
 	w.Header().Set("X-Session-ID", v.ID)
 	w.Header().Set("X-Session-Name", v.Name)
-	templates.Terminal(v.ID, v.Name, v.WorkDir, v.State).Render(r.Context(), w)
+	_ = templates.Terminal(v.ID, v.Name, v.WorkDir, v.State).Render(r.Context(), w)
 }
 
 // handleListSessions returns a JSON list of all sessions for the split picker.
@@ -460,7 +472,9 @@ func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	if err := json.NewEncoder(w).Encode(result); err != nil {
+		slog.Error("failed to encode sessions list", "error", err)
+	}
 }
 
 // handleRenameSession renames a session.
@@ -482,7 +496,7 @@ func (s *Server) handleRenameSession(w http.ResponseWriter, r *http.Request, ses
 	sess.Name = name
 	// Persist rename to SQLite
 	if s.store != nil {
-		s.store.SaveSession(store.SessionRecord{
+		_ = s.store.SaveSession(store.SessionRecord{
 			ID: sess.ID, Name: name, ClaudeID: sess.ClaudeID, WorkDir: sess.WorkDir,
 			StartTime: sess.StartTime, EndTime: sess.EndTime,
 			ExitCode: sess.ExitCode, Status: string(sess.GetState()), PID: sess.PID,
@@ -501,7 +515,7 @@ func (s *Server) handleKillSession(w http.ResponseWriter, r *http.Request, sessi
 
 	// Save to SQLite as killed
 	if s.store != nil {
-		s.store.SaveSession(store.SessionRecord{
+		_ = s.store.SaveSession(store.SessionRecord{
 			ID: sess.ID, Name: sess.Name, ClaudeID: sess.ClaudeID, WorkDir: sess.WorkDir,
 			StartTime: sess.StartTime, EndTime: time.Now(),
 			ExitCode: -1, Status: "killed", PID: sess.PID,
@@ -559,14 +573,16 @@ func (s *Server) handleRestartSession(w http.ResponseWriter, r *http.Request, se
 	}
 	// Save to DB
 	if s.store != nil {
-		s.store.SaveSession(store.SessionRecord{
+		_ = s.store.SaveSession(store.SessionRecord{
 			ID: newSess.ID, Name: newSess.Name, ClaudeID: newSess.ClaudeID, WorkDir: newSess.WorkDir,
 			StartTime: newSess.StartTime, Status: "running", PID: newSess.PID,
 			Sandboxed: newSess.Sandboxed, SandboxName: newSess.SandboxName,
 		})
 	}
 	v := sessionToView(newSess)
-	templates.Terminal(v.ID, v.Name, v.WorkDir, v.State).Render(r.Context(), w)
+	if err := templates.Terminal(v.ID, v.Name, v.WorkDir, v.State).Render(r.Context(), w); err != nil {
+		slog.Error("failed to render terminal", "error", err)
+	}
 }
 
 // handleGitDiff returns git diff and status for a session's working directory.
@@ -625,7 +641,9 @@ func (s *Server) handleGitDiff(w http.ResponseWriter, r *http.Request, sessionID
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(resp)
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		slog.Error("failed to encode git diff response", "error", err)
+	}
 }
 
 // handleClaudeSessions lists claude sessions available for a given project directory.
@@ -654,7 +672,7 @@ func (s *Server) handleClaudeSessions(w http.ResponseWriter, r *http.Request) {
 	entries, err := os.ReadDir(sessionsDir)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]interface{}{})
+		_ = json.NewEncoder(w).Encode([]interface{}{})
 		return
 	}
 
@@ -719,7 +737,7 @@ func (s *Server) handleClaudeSessions(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 			}
-			f.Close()
+			f.Close() //nolint:errcheck
 		}
 
 		sessions = append(sessions, claudeSession{
@@ -736,7 +754,9 @@ func (s *Server) handleClaudeSessions(w http.ResponseWriter, r *http.Request) {
 	})
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(sessions)
+	if err := json.NewEncoder(w).Encode(sessions); err != nil {
+		slog.Error("failed to encode claude sessions", "error", err)
+	}
 }
 
 // handleHookCallback receives notifications from Claude Code hooks.
@@ -757,7 +777,7 @@ func (s *Server) handleHookCallback(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	var eventType notification.EventType = notification.EventWaiting
+	eventType := notification.EventWaiting
 
 	// Map the hook's project path to a websessions session ID.
 	// The hook sends Claude's internal UUID as session_id and the cwd as project.
@@ -800,7 +820,7 @@ func (s *Server) handleHookCallback(w http.ResponseWriter, r *http.Request) {
 						}
 						sess := s.mgr.AddDiscovered(id, claudeID, p.WorkDir, p.PID, p.StartTime)
 						if s.store != nil {
-							s.store.SaveSession(store.SessionRecord{
+							_ = s.store.SaveSession(store.SessionRecord{
 								ID: id, Name: sess.Name, ClaudeID: claudeID, WorkDir: p.WorkDir,
 								StartTime: p.StartTime, Status: "discovered", PID: p.PID,
 							})
@@ -836,7 +856,7 @@ func (s *Server) handleHookCallback(w http.ResponseWriter, r *http.Request) {
 
 	// Persist to store
 	if s.store != nil {
-		s.store.SaveNotification(store.NotificationRecord{
+		_ = s.store.SaveNotification(store.NotificationRecord{
 			SessionID: resolvedSessionID,
 			EventType: string(eventType),
 			Timestamp: time.Now(),
@@ -890,12 +910,12 @@ func (s *Server) handleService(w http.ResponseWriter, r *http.Request) {
 		slog.Error("service action failed", "action", payload.Action, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"ok":        true,
 		"action":    payload.Action,
 		"status":    service.Status(),
@@ -911,11 +931,11 @@ func (s *Server) handleCheckUpdate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(info)
+	_ = json.NewEncoder(w).Encode(info)
 }
 
 // handleSelfUpdate downloads and replaces the current binary.
@@ -924,22 +944,22 @@ func (s *Server) handleSelfUpdate(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 	if !info.UpdateAvail {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]string{"message": "already up to date"})
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "already up to date"})
 		return
 	}
 	if err := updater.SelfUpdate(info.DownloadURL); err != nil {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"ok":      true,
 		"version": info.LatestVersion,
 		"message": "Updated to " + info.LatestVersion + ". Restart the server to use the new version.",
@@ -976,7 +996,7 @@ func (s *Server) handleInstallHooks(w http.ResponseWriter, r *http.Request) {
 		slog.Error("hook action failed", "action", payload.Action, "error", err)
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
 
@@ -988,7 +1008,7 @@ func (s *Server) handleInstallHooks(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
 		"ok":        true,
 		"action":    payload.Action,
 		"installed": installed,
@@ -998,9 +1018,9 @@ func (s *Server) handleInstallHooks(w http.ResponseWriter, r *http.Request) {
 func (s *Server) setupNotificationBridge() {
 	desktopSink := notification.NewDesktopSink()
 	s.bus.Subscribe(func(e notification.SessionEvent) {
-		s.sink.Send(e)
-		desktopSink.Send(e)
-		s.sound.Send(e)
+		_ = s.sink.Send(e)
+		_ = desktopSink.Send(e)
+		_ = s.sound.Send(e)
 		// Push to all connected notification WebSocket clients
 		msg, _ := json.Marshal(map[string]string{
 			"type":      "notification",
@@ -1020,7 +1040,7 @@ func (s *Server) handleKillAll(w http.ResponseWriter, r *http.Request) {
 		if state == session.StateRunning || state == session.StateWaiting || state == session.StateCreated {
 			sess.Killed = true
 			if s.store != nil {
-				s.store.SaveSession(store.SessionRecord{
+				_ = s.store.SaveSession(store.SessionRecord{
 					ID: sess.ID, Name: sess.Name, ClaudeID: sess.ClaudeID, WorkDir: sess.WorkDir,
 					StartTime: sess.StartTime, EndTime: time.Now(),
 					ExitCode: -1, Status: "killed", PID: sess.PID,
@@ -1033,22 +1053,22 @@ func (s *Server) handleKillAll(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]int{"killed": killed})
+	_ = json.NewEncoder(w).Encode(map[string]int{"killed": killed})
 }
 
 func (s *Server) handleGetPreferences(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if s.store == nil {
-		json.NewEncoder(w).Encode(map[string]string{})
+		_ = json.NewEncoder(w).Encode(map[string]string{})
 		return
 	}
 	prefs, err := s.store.GetAllPreferences()
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
+		_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
 		return
 	}
-	json.NewEncoder(w).Encode(prefs)
+	_ = json.NewEncoder(w).Encode(prefs)
 }
 
 func (s *Server) handleSetPreference(w http.ResponseWriter, r *http.Request) {
@@ -1061,14 +1081,14 @@ func (s *Server) handleSetPreference(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if s.store != nil {
-		s.store.SetPreference(payload.Key, payload.Value)
+		_ = s.store.SetPreference(payload.Key, payload.Value)
 	}
 	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) handleAudioDevices(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(notification.ListAudioDevices())
+	_ = json.NewEncoder(w).Encode(notification.ListAudioDevices())
 }
 
 func (s *Server) handleSetAudioDevice(w http.ResponseWriter, r *http.Request) {
@@ -1082,7 +1102,7 @@ func (s *Server) handleSetAudioDevice(w http.ResponseWriter, r *http.Request) {
 	s.sound.SetAudioDevice(payload.Device)
 	s.cfg.Notifications.AudioDevice = payload.Device
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"ok": "true", "device": payload.Device})
+	_ = json.NewEncoder(w).Encode(map[string]string{"ok": "true", "device": payload.Device})
 }
 
 func (s *Server) handleTestSound(w http.ResponseWriter, r *http.Request) {
@@ -1093,7 +1113,7 @@ func (s *Server) handleTestSound(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
-	s.sound.Send(notification.SessionEvent{Type: notification.EventType(payload.Event)})
+	_ = s.sound.Send(notification.SessionEvent{Type: notification.EventType(payload.Event)})
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -1144,7 +1164,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 			Name: c.Name, Status: c.Status, Version: c.Version, Detail: c.Detail,
 		})
 	}
-	templates.Settings(data).Render(r.Context(), w)
+	_ = templates.Settings(data).Render(r.Context(), w)
 }
 
 func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
@@ -1184,7 +1204,7 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	if s.cfg.Server.Port != oldPort || s.cfg.Server.Host != oldHost {
 		claudeSettings, err := hooks.Load()
 		if err == nil && claudeSettings.IsInstalled() {
-			hooks.Uninstall()
+			_ = hooks.Uninstall()
 			slog.Info("hooks uninstalled due to server address change — reinstall from settings")
 		}
 	}
@@ -1222,7 +1242,7 @@ func (s *Server) handleListDirs(w http.ResponseWriter, r *http.Request) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]string{})
+		_ = json.NewEncoder(w).Encode([]string{})
 		return
 	}
 
@@ -1244,5 +1264,5 @@ func (s *Server) handleListDirs(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(dirs)
+	_ = json.NewEncoder(w).Encode(dirs)
 }
