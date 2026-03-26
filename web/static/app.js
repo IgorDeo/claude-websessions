@@ -192,6 +192,13 @@ window.websessions = (function() {
       ws.onclose = function() {
         if (session.closed) return;
         session.retries++;
+        if (session.retries > 5) {
+          term.write('\r\n\x1b[31m[Session unavailable — connection closed]\x1b[0m\r\n');
+          session.closed = true;
+          // Auto-close the tab after a brief delay
+          setTimeout(function() { closeTab(sessionID); }, 2000);
+          return;
+        }
         var delay = Math.min(1000 * Math.pow(2, session.retries - 1), 15000);
         term.write('\r\n\x1b[33m[Reconnecting in ' + Math.round(delay / 1000) + 's...]\x1b[0m\r\n');
         setTimeout(openWS, delay);
@@ -567,8 +574,27 @@ window.websessions = (function() {
       connectSession(sessionID, containerID);
     });
 
-    // If a terminal was loaded into the terminal area, refresh sidebar to update states
+    // If a terminal was loaded into the terminal area, ensure a tab exists and refresh sidebar
     if (event.detail.target.id === 'terminal-area' && panes.length > 0) {
+      var xhr = event.detail.xhr;
+      var sid = xhr ? xhr.getResponseHeader('X-Session-ID') : null;
+      var sname = xhr ? xhr.getResponseHeader('X-Session-Name') : null;
+      if (!sid) {
+        sid = panes[0].dataset.sessionId;
+        var titleEl = panes[0].querySelector('.pane-title');
+        sname = titleEl ? titleEl.textContent : sid;
+      }
+      if (sid) {
+        // Add tab without reloading terminal (openTab would clear the area)
+        var existing = openTabs.find(function(t) { return t.id === sid; });
+        if (!existing) {
+          openTabs.push({ id: sid, name: sname || sid, state: 'running' });
+        }
+        activeTabId = sid;
+        currentlyShowingTabId = sid;
+        saveTabState();
+        renderTabs();
+      }
       htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
     }
   });
@@ -1040,10 +1066,45 @@ window.websessions = (function() {
     }).catch(function() {});
   }
 
+  // Prune tabs whose sessions no longer exist on the server
+  function pruneDeadTabs() {
+    fetch('/api/sessions')
+      .then(function(r) { return r.json(); })
+      .then(function(sessions) {
+        var activeIds = {};
+        (sessions || []).forEach(function(s) { activeIds[s.id] = true; });
+        var changed = false;
+        openTabs = openTabs.filter(function(tab) {
+          // For split tabs, check if at least one session is alive
+          if (tab.splitTree) {
+            var ids = treeSessionIds(tab.splitTree);
+            var anyAlive = ids.some(function(id) { return activeIds[id]; });
+            if (!anyAlive) { changed = true; return false; }
+            return true;
+          }
+          if (!activeIds[tab.id]) { changed = true; return false; }
+          return true;
+        });
+        if (changed) {
+          if (activeTabId && !openTabs.find(function(t) { return t.id === activeTabId; })) {
+            activeTabId = openTabs.length > 0 ? openTabs[0].id : null;
+          }
+          saveTabState();
+          renderTabs();
+          if (activeTabId) {
+            currentlyShowingTabId = null;
+            openTab(activeTabId);
+          }
+        }
+      }).catch(function() {});
+  }
+
   // Load tabs on page load (localStorage for instant render, then sync from server)
   loadTabState();
   document.addEventListener('DOMContentLoaded', function() {
     renderTabs();
+    // Prune dead tabs first, then restore active tab
+    pruneDeadTabs();
     // Reopen the active tab (handles both single and split tabs)
     if (activeTabId) {
       currentlyShowingTabId = null; // force re-render
