@@ -83,6 +83,18 @@ func (s *Session) GetError() string {
 	return s.Error
 }
 
+func (s *Session) SetKilled(v bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.Killed = v
+}
+
+func (s *Session) IsKilled() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.Killed
+}
+
 func (s *Session) Output() *RingBuf {
 	return s.output
 }

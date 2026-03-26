@@ -571,7 +571,7 @@ func (s *Server) handleKillSession(w http.ResponseWriter, r *http.Request, sessi
 		http.Error(w, "session not found", http.StatusNotFound)
 		return
 	}
-	sess.Killed = true
+	sess.SetKilled(true)
 
 	// Save to SQLite as killed
 	if s.store != nil {
@@ -1140,7 +1140,7 @@ func (s *Server) handleKillAll(w http.ResponseWriter, r *http.Request) {
 	for _, sess := range s.mgr.List() {
 		state := sess.GetState()
 		if state == session.StateRunning || state == session.StateWaiting || state == session.StateCreated {
-			sess.Killed = true
+			sess.SetKilled(true)
 			if s.store != nil {
 				_ = s.store.SaveSession(store.SessionRecord{
 					ID: sess.ID, Name: sess.Name, ClaudeID: sess.ClaudeID, WorkDir: sess.WorkDir,

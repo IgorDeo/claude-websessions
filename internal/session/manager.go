@@ -246,12 +246,16 @@ func (m *Manager) startReader(s *Session) {
 			}
 		}
 
-		// Reader stopped — check if tmux session is still alive
+		// Reader stopped — check if we were explicitly stopped by Kill
+		select {
+		case <-stop:
+			return // Kill handles state transition and cleanup
+		default:
+		}
+
+		// Natural exit — check if tmux session is still alive
 		if !tmuxSessionExists(s.TmuxSession) {
 			from := s.GetState()
-			if s.Killed {
-				return
-			}
 			s.mu.Lock()
 			s.State = StateCompleted
 			s.EndTime = time.Now()

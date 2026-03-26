@@ -85,7 +85,11 @@ func (h *wsHub) remove(sessionID string, conn *websocket.Conn) {
 
 func (h *wsHub) broadcast(sessionID string, data []byte) {
 	h.mu.RLock()
-	conns := h.clients[sessionID]
+	src := h.clients[sessionID]
+	conns := make(map[*websocket.Conn]bool, len(src))
+	for c := range src {
+		conns[c] = true
+	}
 	h.mu.RUnlock()
 	for conn := range conns {
 		_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))

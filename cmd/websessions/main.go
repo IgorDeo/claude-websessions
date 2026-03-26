@@ -165,7 +165,7 @@ func main() {
 		}
 
 		// Skip notification for intentionally killed sessions
-		if s.Killed && to == session.StateErrored {
+		if s.IsKilled() && to == session.StateErrored {
 			// Still save to DB but don't notify
 			_ = st.SaveSession(store.SessionRecord{
 				ID: s.ID, Name: s.Name, ClaudeID: s.ClaudeID, WorkDir: s.WorkDir,
