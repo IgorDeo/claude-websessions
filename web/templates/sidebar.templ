@@ -44,21 +44,22 @@ templ Sidebar(sessions []SessionView, history []SessionView) {
 }
 
 templ sidebarSessions(sessions []SessionView) {
-	for _, s := range sessions {
-		if s.GroupName != "" && isFirstInGroup(s, sessions) {
-			<div class="session-group">
-				<div class="session-group-header" onclick="this.parentElement.classList.toggle('collapsed')">
-					<span class="session-group-chevron">&#9662;</span>
-					<span class="session-group-name">{ s.GroupName }</span>
-					<span class="session-group-count">{ itoa(countInGroup(s.GroupName, sessions)) }</span>
-				</div>
-				<div class="session-group-body">
-					for _, gs := range sessionsInGroup(s.GroupName, sessions) {
-						@sessionItem(gs, true)
-					}
-				</div>
+	for _, gn := range uniqueGroups(sessions) {
+		<div class="session-group">
+			<div class="session-group-header" onclick="this.parentElement.classList.toggle('collapsed')">
+				<span class="session-group-chevron">&#9662;</span>
+				<span class="session-group-name">{ gn }</span>
+				<span class="session-group-count">{ itoa(countInGroup(gn, sessions)) }</span>
 			</div>
-		} else if s.GroupName == "" {
+			<div class="session-group-body">
+				for _, gs := range sessionsInGroup(gn, sessions) {
+					@sessionItem(gs, true)
+				}
+			</div>
+		</div>
+	}
+	for _, s := range sessions {
+		if s.GroupName == "" {
 			@sessionItem(s, false)
 		}
 	}
@@ -132,13 +133,16 @@ func stateClass(state string) string {
 	}
 }
 
-func isFirstInGroup(s SessionView, sessions []SessionView) bool {
-	for _, other := range sessions {
-		if other.GroupName == s.GroupName {
-			return other.ID == s.ID
+func uniqueGroups(sessions []SessionView) []string {
+	seen := make(map[string]bool)
+	var groups []string
+	for _, s := range sessions {
+		if s.GroupName != "" && !seen[s.GroupName] {
+			seen[s.GroupName] = true
+			groups = append(groups, s.GroupName)
 		}
 	}
-	return false
+	return groups
 }
 
 func sessionsInGroup(groupName string, sessions []SessionView) []SessionView {
