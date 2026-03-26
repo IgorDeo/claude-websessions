@@ -1197,6 +1197,8 @@ window.websessions = (function() {
   loadTabState();
   document.addEventListener('DOMContentLoaded', function() {
     renderTabs();
+    // Fix sidebar nesting (browser parser breaks it on initial load due to inline scripts)
+    refreshSidebar();
     // Prune dead tabs first, then restore active tab
     pruneDeadTabs();
     // Reopen the active tab (handles both single and split tabs)
