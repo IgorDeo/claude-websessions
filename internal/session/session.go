@@ -77,6 +77,12 @@ func (s *Session) GetState() State {
 	return s.State
 }
 
+func (s *Session) GetError() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.Error
+}
+
 func (s *Session) Output() *RingBuf {
 	return s.output
 }

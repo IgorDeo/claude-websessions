@@ -127,6 +127,30 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request, sessionID stri
 		return
 	}
 	defer conn.Close()
+
+	// If session is still provisioning (e.g. Docker sandbox), wait for it
+	if sess.GetState() == session.StateStarting {
+		conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+		conn.WriteMessage(websocket.BinaryMessage, []byte("\x1b[36mProvisioning Docker sandbox...\x1b[0m\r\n"))
+		for i := 0; i < 120; i++ { // wait up to 2 minutes
+			time.Sleep(1 * time.Second)
+			state := sess.GetState()
+			if state == session.StateRunning {
+				conn.WriteMessage(websocket.BinaryMessage, []byte("\x1b[32mSandbox ready!\x1b[0m\r\n"))
+				break
+			}
+			if state == session.StateErrored {
+				errMsg := sess.GetError()
+				conn.WriteMessage(websocket.BinaryMessage, []byte("\x1b[31mSandbox failed: "+errMsg+"\x1b[0m\r\n"))
+				return
+			}
+		}
+		if sess.GetState() == session.StateStarting {
+			conn.WriteMessage(websocket.BinaryMessage, []byte("\x1b[31mSandbox provisioning timed out\x1b[0m\r\n"))
+			return
+		}
+	}
+
 	s.hub.add(sessionID, conn)
 	defer s.hub.remove(sessionID, conn)
 	// Replay ring buffer
