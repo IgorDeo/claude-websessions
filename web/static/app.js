@@ -749,6 +749,16 @@ window.websessions = (function() {
   var currentlyShowingTabId = null;
 
   function openTab(sessionID, name, state) {
+    // Check if session is inside an existing split group — focus that tab instead
+    var groupTab = openTabs.find(function(t) {
+      return t.splitTree && treeFind(t.splitTree, sessionID);
+    });
+    if (groupTab && groupTab.id !== sessionID) {
+      sessionID = groupTab.id;
+      name = groupTab.name;
+      state = groupTab.state;
+    }
+
     // Add to tabs if not already open
     var existing = openTabs.find(function(t) { return t.id === sessionID; });
     if (!existing) {
