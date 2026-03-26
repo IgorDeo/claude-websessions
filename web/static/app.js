@@ -298,10 +298,20 @@ window.websessions = (function() {
     newSection.appendChild(newTermBtn);
     content.appendChild(newSection);
 
+    // Build set of session IDs already in this tab group
+    var groupTab = openTabs.find(function(t) {
+      return t.id === currentSessionID || (t.splitTree && treeFind(t.splitTree, currentSessionID));
+    });
+    var groupIds = {};
+    if (groupTab && groupTab.splitTree) {
+      treeSessionIds(groupTab.splitTree).forEach(function(id) { groupIds[id] = true; });
+    }
+    groupIds[currentSessionID] = true;
+
     // Existing sessions
     var hasOthers = false;
     sessions.forEach(function(s) {
-      if (s.id === currentSessionID) return;
+      if (groupIds[s.id]) return;
       hasOthers = true;
       var btn = document.createElement('button');
       btn.className = 'recent-item';
