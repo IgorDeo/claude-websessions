@@ -19,7 +19,8 @@ type SettingsData struct {
 	SoundEnabled     bool
 	AudioDevice      string
 	AudioDevices     []AudioDeviceView
-	HooksInstalled   bool
+	HooksInstalled           bool
+	PlannotatorIntegration   bool
 	ServiceInstalled bool
 	ServiceActive    bool
 	ServiceEnabled   bool
@@ -207,6 +208,24 @@ templ Settings(data SettingsData) {
 							<li><strong>Notification</strong> (permission_prompt) — fires when Claude needs you to approve a tool use</li>
 						</ul>
 					</div>
+				</div>
+				<div class="settings-section" id="plannotator-section">
+					<h3>Integrations</h3>
+					<p class="hooks-description">
+						Open <strong>Plannotator</strong> plan reviews inside websessions tabs instead of a separate browser tab.
+						This sets <code>PLANNOTATOR_BROWSER</code> in <code>~/.claude/settings.json</code>.
+					</p>
+					<div class="settings-row hooks-status" id="plannotator-status">
+						if data.PlannotatorIntegration {
+							<span class="hooks-badge hooks-active">Enabled</span>
+							<button type="button" class="btn-cancel btn-small" onclick="window.websessions.managePlannotator('disable')">Disable</button>
+						} else {
+							<span class="hooks-badge hooks-inactive">Disabled</span>
+							<button type="button" class="btn-create btn-small" onclick="window.websessions.managePlannotator('enable')">Enable</button>
+						}
+					</div>
+					<div id="plannotator-feedback"></div>
+					<p class="settings-note">Takes effect for new Claude sessions. Restart existing sessions for them to use this.</p>
 				</div>
 				<div class="settings-section" id="service-section">
 					<h3>Background Service</h3>

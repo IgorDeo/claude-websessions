@@ -6,6 +6,7 @@ HELPER=webview-helper
 
 build: generate
 	go build -o $(BUILD_DIR)/$(BINARY) ./cmd/websessions
+	cp scripts/ws-open-url $(BUILD_DIR)/ws-open-url
 
 build-gui: generate build-webview-helper
 	go build -tags gui -o $(BUILD_DIR)/$(BINARY) ./cmd/websessions

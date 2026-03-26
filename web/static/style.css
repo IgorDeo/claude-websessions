@@ -374,6 +374,8 @@ html, body {
 .state-starting .status-dot { background: var(--blue); animation: pulse 2s ease-in-out infinite; }
 .state-discovered .status-dot { background: var(--blue); }
 .state-offline .status-dot { background: none; border: 1.5px dashed var(--text-muted); }
+.state-iframe { background: var(--accent); }
+.state-iframe .status-dot { background: var(--accent); }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
 
 .session-info { display: flex; flex-direction: column; overflow: hidden; gap: 0.05rem; }
@@ -518,6 +520,10 @@ html, body {
 .terminal-pane.pane-focused > .pane-header {
   border-bottom: 2px solid var(--accent);
 }
+
+.iframe-pane { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
+.iframe-pane .iframe-content { flex: 1; border: none; width: 100%; height: 100%; }
+.iframe-pane.pane-focused > .pane-header { border-bottom: 2px solid var(--accent); }
 
 .pane-header {
   display: flex; align-items: center; gap: 0.5rem;
