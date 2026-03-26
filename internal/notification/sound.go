@@ -24,7 +24,7 @@ func NewSoundSink(enabled bool, audioDevice string) *SoundSink {
 	// Use a fixed path so sounds persist and don't leak temp dirs
 	home, _ := os.UserHomeDir()
 	s.wavDir = filepath.Join(home, ".websessions", "sounds")
-	os.MkdirAll(s.wavDir, 0755)
+	_ = os.MkdirAll(s.wavDir, 0755)
 	s.generateWAVs()
 	return s
 }
@@ -82,10 +82,10 @@ func (s *SoundSink) play(path, device string) {
 		args = append(args, path)
 		// Try paplay first (PulseAudio/PipeWire), fall back to aplay (ALSA)
 		if err := exec.Command("paplay", args...).Run(); err != nil {
-			exec.Command("aplay", path).Run()
+			_ = exec.Command("aplay", path).Run()
 		}
 	case "darwin":
-		exec.Command("afplay", path).Run()
+		_ = exec.Command("afplay", path).Run()
 	}
 }
 
@@ -159,13 +159,13 @@ func (s *SoundSink) writeWAV(name string, samples []byte) {
 	if err != nil {
 		return
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 
 	// WAV header
-	f.Write([]byte("RIFF"))
+	_, _ = f.Write([]byte("RIFF"))
 	writeLE32(f, uint32(fileSize))
-	f.Write([]byte("WAVE"))
-	f.Write([]byte("fmt "))
+	_, _ = f.Write([]byte("WAVE"))
+	_, _ = f.Write([]byte("fmt "))
 	writeLE32(f, 16)           // chunk size
 	writeLE16(f, 1)            // PCM
 	writeLE16(f, 1)            // mono
@@ -173,9 +173,9 @@ func (s *SoundSink) writeWAV(name string, samples []byte) {
 	writeLE32(f, uint32(sampleRate*2)) // byte rate
 	writeLE16(f, 2)            // block align
 	writeLE16(f, 16)           // bits per sample
-	f.Write([]byte("data"))
+	_, _ = f.Write([]byte("data"))
 	writeLE32(f, uint32(dataSize))
-	f.Write(samples)
+	_, _ = f.Write(samples)
 }
 
 func generateTone(freqs []float64, durations []float64, volume float64) []byte {
@@ -206,9 +206,9 @@ func generateTone(freqs []float64, durations []float64, volume float64) []byte {
 }
 
 func writeLE16(f *os.File, v uint16) {
-	f.Write([]byte{byte(v), byte(v >> 8)})
+	_, _ = f.Write([]byte{byte(v), byte(v >> 8)})
 }
 
 func writeLE32(f *os.File, v uint32) {
-	f.Write([]byte{byte(v), byte(v >> 8), byte(v >> 16), byte(v >> 24)})
+	_, _ = f.Write([]byte{byte(v), byte(v >> 8), byte(v >> 16), byte(v >> 24)})
 }

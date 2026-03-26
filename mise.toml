@@ -1,6 +1,9 @@
 [tools]
 go = "1.26.1"
 
+[env]
+BUILD_DIR = "./bin"
+
 [tasks.setup]
 description = "Install development tools"
 run = "go install github.com/a-h/templ/cmd/templ@v0.3.1001"
@@ -16,7 +19,10 @@ run = "templ generate"
 [tasks.build]
 description = "Build the websessions binary"
 depends = ["generate"]
-run = "go build -o bin/websessions ./cmd/websessions"
+run = """
+go build -o bin/websessions ./cmd/websessions
+cp scripts/ws-open-url ${BUILD_DIR}/ws-open-url
+"""
 
 [tasks."build-release"]
 description = "Build release binary using VERSION and SUFFIX"

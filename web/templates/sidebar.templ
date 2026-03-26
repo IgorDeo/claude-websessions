@@ -15,54 +15,7 @@ templ Sidebar(sessions []SessionView, history []SessionView) {
 	</div>
 	<div id="sidebar-active" class="sidebar-panel sidebar-panel-visible">
 		<div class="session-list" id="session-list">
-			for _, s := range sessions {
-				<div
-					class={ "session-item", stateClass(s.State) }
-					data-session-id={ s.ID }
-					draggable="true"
-					ondragstart="window.websessions.dragStart(event)"
-					ondragover="window.websessions.dragOver(event)"
-					ondrop="window.websessions.drop(event)"
-					ondragend="window.websessions.dragEnd(event)"
-				>
-					<div class="drag-handle" title="Drag to reorder">&#8801;</div>
-					if s.State != "offline" {
-						<div
-							class="session-clickable"
-							onclick={ openSession(s.ID, s.Name, s.State) }
-						>
-							<span class="status-dot"></span>
-							<div class="session-info">
-								<div class="session-name-row">
-									<span class="session-name">{ s.Name }</span>
-									<span class={ "session-type-badge", "type-" + s.Type }>{ s.Type }</span>
-								</div>
-								<span class="session-dir">{ s.WorkDir }</span>
-							</div>
-						</div>
-					} else {
-						<div class="session-clickable">
-							<span class="status-dot"></span>
-							<div class="session-info">
-								<div class="session-name-row">
-									<span class="session-name">{ s.Name }</span>
-									<span class={ "session-type-badge", "type-" + s.Type }>{ s.Type }</span>
-								</div>
-								<span class="session-dir">{ s.WorkDir }</span>
-							</div>
-						</div>
-					}
-					if s.State == "discovered" {
-						<button class="takeover-btn" hx-post={ "/sessions/" + s.ID + "/takeover" } hx-target="#terminal-area" hx-swap="innerHTML">Take Over</button>
-					}
-					if s.State == "offline" {
-						<button class="restart-btn" hx-post={ "/sessions/" + s.ID + "/restart" } hx-target="#terminal-area" hx-swap="innerHTML">Restart</button>
-					}
-				</div>
-			}
-			if len(sessions) == 0 {
-				<div class="sidebar-empty">No active sessions</div>
-			}
+			@sidebarSessions(sessions)
 		</div>
 	</div>
 	<div id="sidebar-history" class="sidebar-panel">
@@ -90,6 +43,85 @@ templ Sidebar(sessions []SessionView, history []SessionView) {
 	</div>
 }
 
+templ sidebarSessions(sessions []SessionView) {
+	for _, gn := range uniqueGroups(sessions) {
+		<div class="session-group">
+			<div class="session-group-header" onclick="window.websessions.toggleGroupCollapsed(this)">
+				<span class="session-group-chevron">&#9662;</span>
+				<span class="session-group-name">{ gn }</span>
+				<span class="session-group-count">{ itoa(countInGroup(gn, sessions)) }</span>
+			</div>
+			<div class="session-group-body">
+				for _, gs := range sessionsInGroup(gn, sessions) {
+					@sessionItem(gs, true)
+				}
+			</div>
+		</div>
+	}
+	for _, s := range sessions {
+		if s.GroupName == "" {
+			@sessionItem(s, false)
+		}
+	}
+	if len(sessions) == 0 {
+		<div class="sidebar-empty">No active sessions</div>
+	}
+}
+
+templ sessionItem(s SessionView, grouped bool) {
+	<div
+		class={ "session-item", stateClass(s.State), templ.KV("session-item-grouped", grouped) }
+		data-session-id={ s.ID }
+		draggable="true"
+		ondragstart="window.websessions.dragStart(event)"
+		ondragover="window.websessions.dragOver(event)"
+		ondrop="window.websessions.drop(event)"
+		ondragend="window.websessions.dragEnd(event)"
+	>
+		if !grouped {
+			<div class="drag-handle" title="Drag to reorder">&#8801;</div>
+		}
+		if s.State != "offline" {
+			<div
+				class="session-clickable"
+				onclick={ openSession(s.ID, s.Name, s.State) }
+			>
+				<span class="status-dot"></span>
+				<div class="session-info">
+					<div class="session-name-row">
+						<span class="session-name">{ s.Name }</span>
+						<span class={ "session-type-badge", "type-" + s.Type }>{ s.Type }</span>
+						if s.Sandboxed {
+							<span class="sandbox-badge" title="Running in Docker sandbox VM">&#128737;</span>
+						}
+					</div>
+					<span class="session-dir">{ s.WorkDir }</span>
+				</div>
+			</div>
+		} else {
+			<div class="session-clickable">
+				<span class="status-dot"></span>
+				<div class="session-info">
+					<div class="session-name-row">
+						<span class="session-name">{ s.Name }</span>
+						<span class={ "session-type-badge", "type-" + s.Type }>{ s.Type }</span>
+						if s.Sandboxed {
+							<span class="sandbox-badge" title="Running in Docker sandbox VM">&#128737;</span>
+						}
+					</div>
+					<span class="session-dir">{ s.WorkDir }</span>
+				</div>
+			</div>
+		}
+		if s.State == "discovered" {
+			<button class="takeover-btn" hx-post={ "/sessions/" + s.ID + "/takeover" } hx-target="#terminal-area" hx-swap="innerHTML">Take Over</button>
+		}
+		if s.State == "offline" {
+			<button class="restart-btn" hx-post={ "/sessions/" + s.ID + "/restart" } hx-target="#terminal-area" hx-swap="innerHTML">Restart</button>
+		}
+	</div>
+}
+
 script openSession(id string, name string, state string) {
 	window.websessions.openTab(id, name, state);
 }
@@ -100,9 +132,42 @@ func stateClass(state string) string {
 	case "completed": return "state-completed"
 	case "errored": return "state-errored"
 	case "waiting": return "state-waiting"
+	case "starting": return "state-starting"
 	case "discovered": return "state-discovered"
 	case "offline": return "state-offline"
 	case "killed": return "state-errored"
 	default: return ""
 	}
+}
+
+func uniqueGroups(sessions []SessionView) []string {
+	seen := make(map[string]bool)
+	var groups []string
+	for _, s := range sessions {
+		if s.GroupName != "" && !seen[s.GroupName] {
+			seen[s.GroupName] = true
+			groups = append(groups, s.GroupName)
+		}
+	}
+	return groups
+}
+
+func sessionsInGroup(groupName string, sessions []SessionView) []SessionView {
+	var result []SessionView
+	for _, s := range sessions {
+		if s.GroupName == groupName {
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
+func countInGroup(groupName string, sessions []SessionView) int {
+	count := 0
+	for _, s := range sessions {
+		if s.GroupName == groupName {
+			count++
+		}
+	}
+	return count
 }

@@ -15,6 +15,7 @@ const (
 	StateDiscovered State = "discovered"
 	StateTakeover   State = "takeover"
 	StateCreated    State = "created"
+	StateStarting   State = "starting"
 	StateRunning    State = "running"
 	StateWaiting    State = "waiting"
 	StateCompleted  State = "completed"
@@ -38,6 +39,8 @@ type Session struct {
 	Owned        bool
 	Killed       bool   // true if intentionally killed by user
 	TmuxSession  string // tmux session name (e.g. "ws-myproject")
+	Sandboxed    bool   // running inside Docker Desktop sandbox VM
+	SandboxName  string // docker sandbox name (e.g. "ws-myproject")
 
 	readerPTY *os.File // PTY for the tmux attach reader (for resize)
 	output    *RingBuf
@@ -46,7 +49,8 @@ type Session struct {
 var validTransitions = map[State][]State{
 	StateDiscovered: {StateTakeover},
 	StateTakeover:   {StateRunning, StateErrored},
-	StateCreated:    {StateRunning},
+	StateCreated:    {StateRunning, StateStarting},
+	StateStarting:   {StateRunning, StateErrored},
 	StateRunning:    {StateWaiting, StateCompleted, StateErrored},
 	StateWaiting:    {StateRunning, StateCompleted, StateErrored},
 }
@@ -73,6 +77,12 @@ func (s *Session) GetState() State {
 	return s.State
 }
 
+func (s *Session) GetError() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.Error
+}
+
 func (s *Session) Output() *RingBuf {
 	return s.output
 }
@@ -86,7 +96,7 @@ func (s *Session) Resize(rows, cols uint16) error {
 	}
 	// Resize the reader PTY first (so tmux sees the new client size)
 	if s.readerPTY != nil {
-		pty.Setsize(s.readerPTY, &pty.Winsize{Rows: rows, Cols: cols})
+		_ = pty.Setsize(s.readerPTY, &pty.Winsize{Rows: rows, Cols: cols})
 	}
 	// Then resize the tmux window
 	return tmuxResizeWindow(s.TmuxSession, int(cols), int(rows))

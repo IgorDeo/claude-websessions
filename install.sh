@@ -194,6 +194,25 @@ main() {
     mkdir -p "$install_to"
     mv "${tmp}/${BINARY}" "${install_to}/${BINARY}"
 
+    # Install the ws-open-url helper script for plannotator integration
+    ws_open_url="${install_to}/ws-open-url"
+    cat > "$ws_open_url" << 'SCRIPT'
+#!/bin/sh
+# ws-open-url: Opens a URL in a websessions iframe pane.
+# Used as PLANNOTATOR_BROWSER to embed plannotator plans in websessions.
+URL="$1"
+WS_HOST="${WEBSESSIONS_HOST:-localhost:8080}"
+if [ -z "$URL" ]; then
+  echo "Usage: ws-open-url <url>" >&2
+  exit 1
+fi
+curl -s -X POST "http://${WS_HOST}/api/panes/iframe" \
+  -H "Content-Type: application/json" \
+  -d "{\"url\":\"$URL\",\"title\":\"Plan Review\"}" \
+  -o /dev/null -w "" 2>/dev/null || true
+SCRIPT
+    chmod +x "$ws_open_url"
+
     say ""
     say "Installed websessions to ${install_to}/${BINARY}"
 

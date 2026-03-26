@@ -14,6 +14,11 @@ type Config struct {
 	Server        ServerConfig        `yaml:"server"`
 	Sessions      SessionsConfig      `yaml:"sessions"`
 	Notifications NotificationsConfig `yaml:"notifications"`
+	Docker        DockerConfig        `yaml:"docker"`
+}
+
+type DockerConfig struct {
+	CopyCredentials bool `yaml:"copy_credentials"`
 }
 
 type ServerConfig struct {
@@ -47,6 +52,7 @@ func defaults() *Config {
 			DefaultDir: "~/projects",
 		},
 		Notifications: NotificationsConfig{Desktop: true, Sound: true, Events: []string{"completed", "errored", "waiting"}, ReminderMinutes: 5},
+		Docker:        DockerConfig{CopyCredentials: true},
 	}
 }
 
@@ -93,7 +99,9 @@ func (c *Config) applyEnvOverrides() {
 func (c *Config) Save() error {
 	homeDir, _ := os.UserHomeDir()
 	dir := homeDir + "/.websessions"
-	os.MkdirAll(dir, 0755)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("creating config dir: %w", err)
+	}
 	path := dir + "/config.yaml"
 
 	data, err := yaml.Marshal(c)

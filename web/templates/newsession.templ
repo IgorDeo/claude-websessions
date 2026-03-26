@@ -2,7 +2,7 @@ package templates
 
 import "path/filepath"
 
-templ NewSessionModal(defaultDir string, recentDirs []string) {
+templ NewSessionModal(defaultDir string, recentDirs []string, dockerAvailable bool) {
 	<div class="modal-overlay" onclick="this.remove()">
 		<div class="modal-content" onclick="event.stopPropagation()">
 			<h2>New Session</h2>
@@ -29,7 +29,7 @@ templ NewSessionModal(defaultDir string, recentDirs []string) {
 					<span>or create manually</span>
 				</div>
 			}
-			<form id="new-session-form" hx-post="/sessions" hx-target="#sidebar" hx-swap="innerHTML">
+			<form id="new-session-form" hx-post="/sessions" hx-swap="none">
 				<input type="hidden" id="resume_id" name="resume_id" value=""/>
 				<div class="form-group">
 					<label for="name">Session Name</label>
@@ -49,6 +49,19 @@ templ NewSessionModal(defaultDir string, recentDirs []string) {
 				<div class="form-group">
 					<label for="prompt">Initial Prompt (optional)</label>
 					<textarea id="prompt" name="prompt" rows="3" placeholder="What should Claude work on?"></textarea>
+				</div>
+				<div class="form-group">
+				<label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-size:0.8rem; color:var(--text-secondary); font-weight:500;">
+						if dockerAvailable {
+							<input type="checkbox" name="sandbox" value="true" style="width:16px; height:16px; flex-shrink:0; accent-color:var(--accent);"/>
+						} else {
+							<input type="checkbox" name="sandbox" value="true" disabled style="width:16px; height:16px; flex-shrink:0;"/>
+						}
+						Run in Docker sandbox
+					</label>
+					if !dockerAvailable {
+						<span class="settings-hint">Docker Desktop is required for sandbox mode</span>
+					}
 				</div>
 				<div class="form-actions">
 					<button type="button" class="btn-cancel" onclick="this.closest('.modal-overlay').remove()">Cancel</button>

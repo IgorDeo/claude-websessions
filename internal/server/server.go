@@ -105,6 +105,11 @@ func (s *Server) routes() http.Handler {
 		s.handleTakeover(w, r, chi.URLParam(r, "sessionID"))
 	})
 
+	// Iframe panes
+	r.Post("/panes/iframe/open", s.handleOpenIframe)
+	r.Post("/api/panes/iframe", s.handleCreateIframePane)
+	r.Post("/settings/plannotator", s.handlePlannotatorIntegration)
+
 	// WebSocket
 	r.Get("/ws/notifications", s.handleNotificationWS)
 	r.Get("/ws/{sessionID}", func(w http.ResponseWriter, r *http.Request) {
@@ -126,11 +131,11 @@ func (s *Server) routes() http.Handler {
 			s.snoozeFn(payload.SessionID, payload.Minutes)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{"ok": true, "minutes": payload.Minutes})
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"ok": true, "minutes": payload.Minutes})
 	})
 	r.Post("/notifications/clear", func(w http.ResponseWriter, r *http.Request) {
 		if s.store != nil {
-			s.store.MarkAllNotificationsRead()
+			_ = s.store.MarkAllNotificationsRead()
 		}
 		s.sink.Clear()
 		w.WriteHeader(http.StatusOK)
@@ -143,7 +148,7 @@ func (s *Server) routes() http.Handler {
 			return
 		}
 		if s.store != nil {
-			s.store.MarkNotificationRead(id)
+			_ = s.store.MarkNotificationRead(id)
 		}
 		w.WriteHeader(http.StatusOK)
 	})

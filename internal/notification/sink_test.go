@@ -21,8 +21,8 @@ func TestInAppSink_StoresEvents(t *testing.T) {
 
 func TestInAppSink_UnreadCount(t *testing.T) {
 	sink := notification.NewInAppSink(100)
-	sink.Send(notification.SessionEvent{SessionID: "s1", Type: notification.EventCompleted, Timestamp: time.Now()})
-	sink.Send(notification.SessionEvent{SessionID: "s2", Type: notification.EventErrored, Timestamp: time.Now()})
+	_ = sink.Send(notification.SessionEvent{SessionID: "s1", Type: notification.EventCompleted, Timestamp: time.Now()})
+	_ = sink.Send(notification.SessionEvent{SessionID: "s2", Type: notification.EventErrored, Timestamp: time.Now()})
 	if sink.UnreadCount() != 2 {
 		t.Errorf("expected 2 unread, got %d", sink.UnreadCount())
 	}

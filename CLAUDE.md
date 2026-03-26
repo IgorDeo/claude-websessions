@@ -52,3 +52,29 @@ Key patterns:
 - WebSocket hub in `internal/server/ws.go` — multiplexes PTY output to multiple browser clients
 - Ring buffer in `internal/session/ringbuf.go` — replayed to new WS clients on connect
 - State changes fire through notification.Bus → sinks + SQLite persistence
+
+## Browser Testing (Claude-in-Chrome)
+
+When a Chrome browser session is available (claude-in-chrome MCP tools), **always verify UI changes in the browser after implementing them**:
+
+1. **Run the server** — Start the server in the background before testing:
+   ```bash
+   make build && ./bin/websessions &
+   # or for GUI mode:
+   make build-gui && ./bin/websessions --gui &
+   ```
+
+2. **Restart after changes** — After modifying code, rebuild and restart:
+   ```bash
+   kill %1 2>/dev/null; sleep 1; make build && ./bin/websessions &
+   ```
+
+3. **Navigate and inspect** — Use chrome tools to navigate to `http://localhost:8080`, read the DOM, execute JavaScript, and verify the rendered output matches expectations.
+
+4. **Test the fix** — Don't just build and commit. Verify the change works by:
+   - Navigating to the page
+   - Reading the relevant DOM elements with `read_page` or `javascript_tool`
+   - Checking computed styles, element counts, nesting, event handlers
+   - Testing interactive behavior (clicks, toggles, etc.)
+
+5. **Iterate** — If the browser shows the fix didn't work, investigate in the browser (check raw HTML, computed styles, event handlers) before making more code changes.

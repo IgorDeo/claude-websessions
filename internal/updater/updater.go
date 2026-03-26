@@ -54,7 +54,7 @@ func CheckForUpdate(currentVersion string) (*UpdateInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("fetching latest release: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("GitHub API returned %d", resp.StatusCode)
@@ -101,7 +101,7 @@ func SelfUpdate(downloadURL string) error {
 	if err != nil {
 		return fmt.Errorf("downloading update: %w", err)
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("download returned %d", resp.StatusCode)
@@ -121,29 +121,29 @@ func SelfUpdate(downloadURL string) error {
 	}
 
 	_, err = io.Copy(tmpFile, resp.Body)
-	tmpFile.Close()
+	_ = tmpFile.Close()
 	if err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("writing update: %w", err)
 	}
 
 	// Replace the current binary: rename old to .bak, rename new to current
 	bakPath := exePath + ".bak"
-	os.Remove(bakPath) // clean up any previous backup
+	_ = os.Remove(bakPath) // clean up any previous backup
 
 	if err := os.Rename(exePath, bakPath); err != nil {
-		os.Remove(tmpPath)
+		_ = os.Remove(tmpPath)
 		return fmt.Errorf("backing up current binary: %w", err)
 	}
 
 	if err := os.Rename(tmpPath, exePath); err != nil {
 		// Try to restore backup
-		os.Rename(bakPath, exePath)
+		_ = os.Rename(bakPath, exePath)
 		return fmt.Errorf("installing update: %w", err)
 	}
 
 	// Clean up backup
-	os.Remove(bakPath)
+	_ = os.Remove(bakPath)
 
 	return nil
 }

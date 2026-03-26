@@ -16,7 +16,10 @@
 window.websessions = (function() {
   const terminals = {};
   const splitInstances = [];
-  var openTabs = []; // [{id, name, state}]
+  // splitTree: null for single session, or:
+  // { type:'split', dir:'horizontal'|'vertical', children: [node, node] }
+  // leaf: { type:'session', id:'...', name:'...' }
+  var openTabs = []; // [{id, name, state, splitTree: node|null}]
   var activeTabId = null;
 
   var darkTermTheme = {
@@ -38,7 +41,7 @@ window.websessions = (function() {
   }
 
   function savePref(key, value) {
-    fetch('/api/preferences', {
+    return fetch('/api/preferences', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: key, value: value }),
@@ -189,6 +192,13 @@ window.websessions = (function() {
       ws.onclose = function() {
         if (session.closed) return;
         session.retries++;
+        if (session.retries > 5) {
+          term.write('\r\n\x1b[31m[Session unavailable — connection closed]\x1b[0m\r\n');
+          session.closed = true;
+          // Auto-close the tab after a brief delay
+          setTimeout(function() { closeTab(sessionID); }, 2000);
+          return;
+        }
         var delay = Math.min(1000 * Math.pow(2, session.retries - 1), 15000);
         term.write('\r\n\x1b[33m[Reconnecting in ' + Math.round(delay / 1000) + 's...]\x1b[0m\r\n');
         setTimeout(openWS, delay);
@@ -281,29 +291,42 @@ window.websessions = (function() {
         .then(function(r) {
           var sid = r.headers.get('X-Session-ID');
           if (sid) doSplit(currentSessionID, sid, direction);
-          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+          refreshSidebar();
           return r.text();
         });
     });
     newSection.appendChild(newTermBtn);
     content.appendChild(newSection);
 
+    // Build set of session IDs already in ANY split group (not standalone tabs)
+    var usedIds = {};
+    usedIds[currentSessionID] = true;
+    openTabs.forEach(function(t) {
+      if (t.splitTree) {
+        treeSessionIds(t.splitTree).forEach(function(id) { usedIds[id] = true; });
+      }
+    });
+
     // Existing sessions
     var hasOthers = false;
     sessions.forEach(function(s) {
-      if (s.id === currentSessionID) return;
+      if (usedIds[s.id]) return;
       hasOthers = true;
       var btn = document.createElement('button');
       btn.className = 'recent-item';
       btn.style.width = '100%';
       btn.style.marginBottom = '0.25rem';
-      var nameSpan = document.createElement('span');
-      nameSpan.className = 'recent-name';
-      nameSpan.textContent = s.name;
+      var nameRow = document.createElement('span');
+      nameRow.className = 'recent-name';
+      nameRow.textContent = s.name + ' ';
+      var typeBadge = document.createElement('span');
+      typeBadge.className = 'session-type-badge type-' + (s.type || 'claude');
+      typeBadge.textContent = s.type || 'claude';
+      nameRow.appendChild(typeBadge);
       var pathSpan = document.createElement('span');
       pathSpan.className = 'recent-path';
-      pathSpan.textContent = s.state + ' - ' + s.work_dir;
-      btn.appendChild(nameSpan);
+      pathSpan.textContent = s.work_dir;
+      btn.appendChild(nameRow);
       btn.appendChild(pathSpan);
       btn.addEventListener('click', function() {
         overlay.remove();
@@ -324,51 +347,230 @@ window.websessions = (function() {
     document.body.appendChild(overlay);
   }
 
-  function doSplit(sessionID1, sessionID2, direction) {
+  var focusedSessionId = null;
+
+  function focusPane(sessionID) {
+    focusedSessionId = sessionID;
+    document.querySelectorAll('.terminal-pane.pane-focused').forEach(function(el) {
+      el.classList.remove('pane-focused');
+    });
     var area = document.getElementById('terminal-area');
     if (!area) return;
-
-    // Disconnect existing terminals in the area
-    for (var sid in terminals) {
-      var el = document.getElementById('term-' + sid);
-      if (el && area.contains(el)) {
-        disconnectSession(sid);
+    area.querySelectorAll('.terminal-pane[data-session-id]').forEach(function(el) {
+      if (el.dataset.sessionId === sessionID) {
+        el.classList.add('pane-focused');
       }
+    });
+  }
+
+  function refitAllTerminals() {
+    Object.keys(terminals).forEach(function(id) {
+      var t = terminals[id];
+      if (t && t.fitAddon) t.fitAddon.fit();
+    });
+  }
+
+  var refitTimer = null;
+  function debouncedRefit() {
+    if (refitTimer) clearTimeout(refitTimer);
+    refitTimer = setTimeout(refitAllTerminals, 16);
+  }
+
+  function createSplit(panes, direction) {
+    return Split(panes, {
+      direction: splitDirection(direction),
+      sizes: panes.map(function() { return 100 / panes.length; }),
+      minSize: 80,
+      gutterSize: 4,
+      onDrag: debouncedRefit,
+      onDragEnd: refitAllTerminals,
+    });
+  }
+
+  function execInlineScripts(container) {
+    container.querySelectorAll('script').forEach(function(oldScript) {
+      var newScript = document.createElement('script');
+      newScript.textContent = oldScript.textContent;
+      oldScript.parentNode.replaceChild(newScript, oldScript);
+    });
+  }
+
+  function loadPaneSession(pane, sid) {
+    fetch('/sessions/' + encodeURIComponent(sid) + '/open', { method: 'POST' })
+      .then(function(r) { return r.text(); })
+      .then(function(html) {
+        pane.innerHTML = html;
+        execInlineScripts(pane);
+        var termPane = pane.querySelector('.terminal-pane[data-session-id]');
+        if (termPane) {
+          var id = termPane.dataset.sessionId;
+          if (terminals[id]) disconnectSession(id);
+          connectSession(id, 'term-' + id);
+          // Focus on click on pane header or terminal area
+          var header = termPane.querySelector('.pane-header');
+          if (header) header.addEventListener('click', function(e) {
+            if (e.target.closest('button')) return;
+            focusPane(id);
+          });
+          var termContainer = document.getElementById('term-' + id);
+          if (termContainer) termContainer.addEventListener('mousedown', function() {
+            focusPane(id);
+          });
+        }
+      });
+  }
+
+  function loadPaneIframe(pane, paneID, iframeUrl, title) {
+    // Fetch server-rendered iframe pane HTML (same pattern as loadPaneSession — trusted server response)
+    fetch('/panes/iframe/open?url=' + encodeURIComponent(iframeUrl) + '&title=' + encodeURIComponent(title || 'Iframe'), { method: 'POST' })
+      .then(function(r) { return r.text(); })
+      .then(function(html) {
+        pane.innerHTML = html;
+        execInlineScripts(pane);
+        var iframePane = pane.querySelector('.iframe-pane[data-pane-id]');
+        if (iframePane) {
+          var header = iframePane.querySelector('.pane-header');
+          if (header) header.addEventListener('click', function(e) {
+            if (e.target.closest('button')) return;
+            focusPane(paneID);
+          });
+        }
+      });
+  }
+
+  // Split direction: "horizontal" = horizontal divider (top/bottom), "vertical" = vertical divider (side by side)
+  // Matches Terminator convention.
+  function splitDirection(direction) {
+    // Split.js 'vertical' = top/bottom, 'horizontal' = side by side
+    return direction === 'horizontal' ? 'vertical' : 'horizontal';
+  }
+  function splitFlex(direction) {
+    return direction === 'horizontal' ? 'column' : 'row';
+  }
+
+  // -- Split tree helpers --
+  // Leaf nodes: type === 'session' or type === 'iframe' (anything that's not 'split')
+  function isLeafNode(node) { return node && node.type !== 'split'; }
+
+  function treeFind(node, id) {
+    if (!node) return null;
+    if (isLeafNode(node)) return node.id === id ? node : null;
+    for (var i = 0; i < node.children.length; i++) {
+      var found = treeFind(node.children[i], id);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function treeFindParent(node, id) {
+    if (!node || isLeafNode(node)) return null;
+    for (var i = 0; i < node.children.length; i++) {
+      if (isLeafNode(node.children[i]) && node.children[i].id === id) return { parent: node, index: i };
+      var found = treeFindParent(node.children[i], id);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  function treeLeafIds(node) {
+    if (!node) return [];
+    if (isLeafNode(node)) return [node.id];
+    var ids = [];
+    node.children.forEach(function(c) { ids = ids.concat(treeLeafIds(c)); });
+    return ids;
+  }
+  // Alias for backwards compatibility
+  var treeSessionIds = treeLeafIds;
+
+  function treeRemove(node, id) {
+    if (!node || isLeafNode(node)) return node;
+    var info = treeFindParent(node, id);
+    if (!info) return node;
+    info.parent.children.splice(info.index, 1);
+    // If only one child left, collapse
+    if (info.parent.children.length === 1) {
+      var remaining = info.parent.children[0];
+      info.parent.type = remaining.type;
+      info.parent.children = remaining.children;
+      info.parent.id = remaining.id;
+      info.parent.name = remaining.name;
+      info.parent.url = remaining.url;
+      info.parent.dir = remaining.dir;
+    }
+    return node;
+  }
+
+  function doSplit(sessionID1, sessionID2, direction) {
+    var termEl = document.getElementById('term-' + sessionID1);
+    var existingPane = termEl ? termEl.closest('.split-pane') : null;
+
+    if (!existingPane) {
+      // First split — replace terminal-area
+      var area = document.getElementById('terminal-area');
+      if (!area) return;
+      if (terminals[sessionID1]) disconnectSession(sessionID1);
+      while (area.firstChild) area.removeChild(area.firstChild);
+      area.style.flexDirection = splitFlex(direction);
+
+      var p1 = document.createElement('div');
+      p1.className = 'split-pane';
+      var p2 = document.createElement('div');
+      p2.className = 'split-pane';
+      area.appendChild(p1);
+      area.appendChild(p2);
+      createSplit([p1, p2], direction);
+      loadPaneSession(p1, sessionID1);
+      loadPaneSession(p2, sessionID2);
+    } else {
+      // Nested split — replace the specific pane
+      var parent = existingPane.parentElement;
+      if (terminals[sessionID1]) disconnectSession(sessionID1);
+
+      var container = document.createElement('div');
+      container.className = 'split-pane';
+      container.style.display = 'flex';
+      container.style.flexDirection = splitFlex(direction);
+      container.style.overflow = 'hidden';
+
+      var p1 = document.createElement('div');
+      p1.className = 'split-pane';
+      var p2 = document.createElement('div');
+      p2.className = 'split-pane';
+      container.appendChild(p1);
+      container.appendChild(p2);
+      parent.replaceChild(container, existingPane);
+      createSplit([p1, p2], direction);
+      loadPaneSession(p1, sessionID1);
+      loadPaneSession(p2, sessionID2);
     }
 
-    // Create two pane containers (no IDs with session names — use data attributes)
-    var pane1 = document.createElement('div');
-    pane1.className = 'split-pane';
-    pane1.setAttribute('data-split-session', sessionID1);
-    var pane2 = document.createElement('div');
-    pane2.className = 'split-pane';
-    pane2.setAttribute('data-split-session', sessionID2);
-
-    // Clear area and add panes
-    while (area.firstChild) area.removeChild(area.firstChild);
-    area.appendChild(pane1);
-    area.appendChild(pane2);
-
-    // Set flex direction based on split direction
-    area.style.flexDirection = direction === 'horizontal' ? 'row' : 'column';
-
-    // Use Split.js with DOM elements directly (not CSS selectors)
-    Split([pane1, pane2], {
-      direction: direction === 'horizontal' ? 'horizontal' : 'vertical',
-      sizes: [50, 50],
-      minSize: 100,
-      gutterSize: 4,
+    // Update split tree
+    var tab = openTabs.find(function(t) {
+      return t.id === sessionID1 || (t.splitTree && treeFind(t.splitTree, sessionID1));
     });
-
-    // Load terminal content into each pane via htmx
-    htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID1) + '/open', {
-      target: pane1,
-      swap: 'innerHTML'
-    });
-    htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID2) + '/open', {
-      target: pane2,
-      swap: 'innerHTML'
-    });
+    if (tab) {
+      var newNode = { type: 'split', dir: direction, children: [
+        { type: 'session', id: sessionID1, name: sessionID1 },
+        { type: 'session', id: sessionID2, name: sessionID2 }
+      ]};
+      if (!tab.splitTree) {
+        tab.splitTree = newNode;
+      } else {
+        var info = treeFindParent(tab.splitTree, sessionID1);
+        if (info) {
+          info.parent.children[info.index] = newNode;
+        } else if (tab.splitTree.type === 'session' && tab.splitTree.id === sessionID1) {
+          tab.splitTree = newNode;
+        }
+      }
+      // Remove sessionID2 from top-level tabs
+      openTabs = openTabs.filter(function(t) { return t.id !== sessionID2; });
+      renderTabs();
+      // Save and refresh sidebar after persistence completes
+      saveTabState().then(function() {
+        refreshSidebar();
+      });
+    }
   }
 
   function showToast(title, body, event) {
@@ -443,9 +645,32 @@ window.websessions = (function() {
       connectSession(sessionID, containerID);
     });
 
-    // If a terminal was loaded into the terminal area, refresh sidebar to update states
+    // If a terminal was loaded into the terminal area, ensure a tab exists and refresh sidebar
     if (event.detail.target.id === 'terminal-area' && panes.length > 0) {
-      htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+      var xhr = event.detail.xhr;
+      var sid = xhr ? xhr.getResponseHeader('X-Session-ID') : null;
+      var sname = xhr ? xhr.getResponseHeader('X-Session-Name') : null;
+      if (!sid) {
+        sid = panes[0].dataset.sessionId;
+        var titleEl = panes[0].querySelector('.pane-title');
+        sname = titleEl ? titleEl.textContent : sid;
+      }
+      if (sid) {
+        // Add tab without reloading terminal (openTab would clear the area)
+        var existing = openTabs.find(function(t) { return t.id === sid; });
+        var isNew = !existing;
+        if (isNew) {
+          openTabs.push({ id: sid, name: sname || sid, state: 'running' });
+        }
+        activeTabId = sid;
+        currentlyShowingTabId = sid;
+        saveTabState();
+        renderTabs();
+        // Only refresh sidebar for new sessions (takeover/create), not regular opens
+        if (isNew) {
+          refreshSidebar();
+        }
+      }
     }
   });
 
@@ -464,6 +689,7 @@ window.websessions = (function() {
           openTab(sessionID, sessionName || sessionID, 'running');
         }
       }
+      refreshSidebar();
     }
   });
 
@@ -568,7 +794,7 @@ window.websessions = (function() {
       body: 'name=' + encodeURIComponent(newName),
     }).then(function() {
       // Refresh sidebar to show new name
-      htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+      refreshSidebar();
     });
   }
 
@@ -596,39 +822,170 @@ window.websessions = (function() {
   }
 
   // Tab management
+  var currentlyShowingTabId = null;
+
   function openTab(sessionID, name, state) {
+    var focusTarget = sessionID; // remember which session to focus
+
+    // Check if session is inside an existing split group — focus that tab instead
+    var groupTab = openTabs.find(function(t) {
+      return t.splitTree && treeFind(t.splitTree, sessionID);
+    });
+    if (groupTab && groupTab.id !== sessionID) {
+      sessionID = groupTab.id;
+      name = groupTab.name;
+      state = groupTab.state;
+    }
+
     // Add to tabs if not already open
     var existing = openTabs.find(function(t) { return t.id === sessionID; });
     if (!existing) {
       openTabs.push({ id: sessionID, name: name || sessionID, state: state || 'running' });
       saveTabState();
     }
-    activeTabId = sessionID;
-    renderTabs();
-    // Only load terminal from server if not already connected
-    if (!terminals[sessionID]) {
-      htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID) + '/open', {
-        target: '#terminal-area',
-        swap: 'innerHTML'
-      });
-    } else {
-      // Show the already-connected terminal pane
-      var area = document.getElementById('terminal-area');
-      if (area) {
-        var panes = area.querySelectorAll('.terminal-pane');
-        panes.forEach(function(p) {
-          p.style.display = p.getAttribute('data-session-id') === sessionID ? '' : 'none';
-        });
-        if (terminals[sessionID].fitAddon) terminals[sessionID].fitAddon.fit();
+
+    // If already showing this tab AND its terminal is in the DOM, just focus
+    if (sessionID === currentlyShowingTabId) {
+      var termInDom = document.getElementById('term-' + focusTarget);
+      if (termInDom) {
+        focusPane(focusTarget);
+        return;
       }
+      // Terminal not in DOM — fall through to reload
+      currentlyShowingTabId = null;
     }
+
+    activeTabId = sessionID;
+    currentlyShowingTabId = sessionID;
+    renderTabs();
+
+    var tab = openTabs.find(function(t) { return t.id === sessionID; });
+
+    // Clear the terminal area first
+    var area = document.getElementById('terminal-area');
+    if (area) {
+      for (var sid in terminals) {
+        var el = document.getElementById('term-' + sid);
+        if (el && area.contains(el)) disconnectSession(sid);
+      }
+      while (area.firstChild) area.removeChild(area.firstChild);
+      area.style.flexDirection = '';
+    }
+
+    // If this tab has a split tree, rebuild the split layout
+    if (tab && tab.splitTree) {
+      rebuildSplitLayout(tab);
+      // Focus the target pane after a short delay for DOM to settle
+      setTimeout(function() { focusPane(focusTarget); }, 300);
+      return;
+    }
+
+    // Iframe tab
+    if (tab && tab.type === 'iframe') {
+      var pane = document.createElement('div');
+      pane.className = 'split-pane';
+      area.appendChild(pane);
+      loadPaneIframe(pane, tab.id, tab.url, tab.name);
+      return;
+    }
+
+    // Single session tab
+    htmx.ajax('POST', '/sessions/' + encodeURIComponent(sessionID) + '/open', {
+      target: '#terminal-area',
+      swap: 'innerHTML'
+    });
+    setTimeout(function() { focusPane(focusTarget); }, 300);
+  }
+
+  function rebuildSplitLayout(tab) {
+    var area = document.getElementById('terminal-area');
+    if (!area || !tab.splitTree) return;
+
+    function buildNode(node, container) {
+      if (node.type === 'iframe') {
+        var pane = document.createElement('div');
+        pane.className = 'split-pane';
+        container.appendChild(pane);
+        loadPaneIframe(pane, node.id, node.url, node.name);
+        return pane;
+      }
+      if (node.type === 'session') {
+        var pane = document.createElement('div');
+        pane.className = 'split-pane';
+        container.appendChild(pane);
+        loadPaneSession(pane, node.id);
+        return pane;
+      }
+      // Split node
+      container.style.display = 'flex';
+      container.style.flexDirection = splitFlex(node.dir);
+      container.style.overflow = 'hidden';
+
+      var panes = [];
+      node.children.forEach(function(child) {
+        var pane = document.createElement('div');
+        pane.className = 'split-pane';
+        pane.style.overflow = 'hidden';
+        container.appendChild(pane);
+        panes.push(pane);
+        if (child.type === 'split') {
+          buildNode(child, pane);
+        } else if (child.type === 'iframe') {
+          loadPaneIframe(pane, child.id, child.url, child.name);
+        } else {
+          loadPaneSession(pane, child.id);
+        }
+      });
+
+      createSplit(panes, node.dir);
+    }
+
+    buildNode(tab.splitTree, area);
+  }
+
+  function openIframeTab(iframeUrl, title) {
+    var id = 'iframe-' + Date.now();
+    var name = title || 'Iframe';
+    var tab = { id: id, name: name, state: 'iframe', type: 'iframe', url: iframeUrl };
+    openTabs.push(tab);
+    activeTabId = id;
+    currentlyShowingTabId = id;
+    renderTabs();
+
+    var area = document.getElementById('terminal-area');
+    if (area) {
+      for (var sid in terminals) {
+        var el = document.getElementById('term-' + sid);
+        if (el && area.contains(el)) disconnectSession(sid);
+      }
+      while (area.firstChild) area.removeChild(area.firstChild);
+      area.style.flexDirection = '';
+      var pane = document.createElement('div');
+      pane.className = 'split-pane';
+      area.appendChild(pane);
+      loadPaneIframe(pane, id, iframeUrl, name);
+    }
+    saveTabState();
   }
 
   function closeTab(sessionID, e) {
     if (e) { e.stopPropagation(); e.preventDefault(); }
+    var tab = openTabs.find(function(t) { return t.id === sessionID; });
+    var hadGroup = tab && tab.splitTree;
+    // Disconnect all sessions in the group
+    if (hadGroup) {
+      treeSessionIds(tab.splitTree).forEach(function(sid) { if (terminals[sid]) disconnectSession(sid); });
+    }
     openTabs = openTabs.filter(function(t) { return t.id !== sessionID; });
     if (terminals[sessionID]) disconnectSession(sessionID);
-    saveTabState();
+    // Refresh sidebar to update group tree
+    if (hadGroup) {
+      saveTabState().then(function() {
+        refreshSidebar();
+      });
+    } else {
+      saveTabState();
+    }
     if (activeTabId === sessionID) {
       if (openTabs.length > 0) {
         openTab(openTabs[openTabs.length - 1].id, openTabs[openTabs.length - 1].name, openTabs[openTabs.length - 1].state);
@@ -671,8 +1028,43 @@ window.websessions = (function() {
       btn.appendChild(dot);
 
       var nameSpan = document.createElement('span');
+      nameSpan.className = 'tab-name';
       nameSpan.textContent = tab.name;
+      nameSpan.addEventListener('dblclick', function(e) {
+        e.stopPropagation();
+        var input = document.createElement('input');
+        input.className = 'tab-rename-input';
+        input.value = tab.name;
+        input.addEventListener('keydown', function(ev) {
+          if (ev.key === 'Enter') {
+            tab.name = input.value || tab.name;
+            saveTabState();
+            renderTabs();
+          } else if (ev.key === 'Escape') {
+            renderTabs();
+          }
+        });
+        input.addEventListener('blur', function() {
+          tab.name = input.value || tab.name;
+          saveTabState();
+          renderTabs();
+        });
+        nameSpan.replaceWith(input);
+        input.focus();
+        input.select();
+      });
       btn.appendChild(nameSpan);
+
+      if (tab.splitTree) {
+        var ids = treeSessionIds(tab.splitTree);
+        if (ids.length > 1) {
+          var splitBadge = document.createElement('span');
+          splitBadge.className = 'tab-split-badge';
+          splitBadge.textContent = ids.length;
+          splitBadge.title = ids.join(' | ');
+          btn.appendChild(splitBadge);
+        }
+      }
 
       var closeSpan = document.createElement('span');
       closeSpan.className = 'tab-close';
@@ -787,8 +1179,10 @@ window.websessions = (function() {
     var activeJson = activeTabId || '';
     try { localStorage.setItem('ws-open-tabs', tabsJson); } catch(e) {}
     try { localStorage.setItem('ws-active-tab', activeJson); } catch(e) {}
-    savePref('open-tabs', tabsJson);
-    savePref('active-tab', activeJson);
+    return Promise.all([
+      savePref('open-tabs', tabsJson),
+      savePref('active-tab', activeJson),
+    ]);
   }
 
   function loadTabState() {
@@ -807,8 +1201,18 @@ window.websessions = (function() {
         try {
           var serverTabs = JSON.parse(prefs['open-tabs']);
           if (serverTabs && serverTabs.length) {
+            // Merge: prefer local split trees over server ones (server may be stale)
+            var localMap = {};
+            openTabs.forEach(function(t) { localMap[t.id] = t; });
+            serverTabs.forEach(function(st) {
+              var local = localMap[st.id];
+              if (local && local.splitTree && !st.splitTree) {
+                st.splitTree = local.splitTree;
+              }
+            });
             openTabs = serverTabs;
-            try { localStorage.setItem('ws-open-tabs', prefs['open-tabs']); } catch(e) {}
+            // Push merged state back to server
+            saveTabState();
           }
         } catch(e) {}
       }
@@ -818,30 +1222,59 @@ window.websessions = (function() {
       }
       renderTabs();
       if (activeTabId) {
-        var tab = openTabs.find(function(t) { return t.id === activeTabId; });
-        if (tab) {
-          htmx.ajax('POST', '/sessions/' + encodeURIComponent(activeTabId) + '/open', {
-            target: '#terminal-area',
-            swap: 'innerHTML'
-          });
-        }
+        currentlyShowingTabId = null;
+        openTab(activeTabId);
       }
     }).catch(function() {});
+  }
+
+  // Prune tabs whose sessions no longer exist on the server
+  function pruneDeadTabs() {
+    fetch('/api/sessions')
+      .then(function(r) { return r.json(); })
+      .then(function(sessions) {
+        var activeIds = {};
+        (sessions || []).forEach(function(s) { activeIds[s.id] = true; });
+        var changed = false;
+        openTabs = openTabs.filter(function(tab) {
+          // Iframe tabs have no server-side session — keep them
+          if (tab.type === 'iframe') return true;
+          // For split tabs, check if at least one session is alive
+          if (tab.splitTree) {
+            var ids = treeSessionIds(tab.splitTree);
+            var anyAlive = ids.some(function(id) { return activeIds[id]; });
+            if (!anyAlive) { changed = true; return false; }
+            return true;
+          }
+          if (!activeIds[tab.id]) { changed = true; return false; }
+          return true;
+        });
+        if (changed) {
+          if (activeTabId && !openTabs.find(function(t) { return t.id === activeTabId; })) {
+            activeTabId = openTabs.length > 0 ? openTabs[0].id : null;
+          }
+          saveTabState();
+          renderTabs();
+          if (activeTabId) {
+            currentlyShowingTabId = null;
+            openTab(activeTabId);
+          }
+        }
+      }).catch(function() {});
   }
 
   // Load tabs on page load (localStorage for instant render, then sync from server)
   loadTabState();
   document.addEventListener('DOMContentLoaded', function() {
     renderTabs();
-    // Reopen the active tab from localStorage cache
+    // Fix sidebar nesting (browser parser breaks it on initial load due to inline scripts)
+    refreshSidebar();
+    // Prune dead tabs first, then restore active tab
+    pruneDeadTabs();
+    // Reopen the active tab (handles both single and split tabs)
     if (activeTabId) {
-      var tab = openTabs.find(function(t) { return t.id === activeTabId; });
-      if (tab) {
-        htmx.ajax('POST', '/sessions/' + encodeURIComponent(activeTabId) + '/open', {
-          target: '#terminal-area',
-          swap: 'innerHTML'
-        });
-      }
+      currentlyShowingTabId = null; // force re-render
+      openTab(activeTabId);
     }
     // Sync from server (authoritative) — overrides localStorage if different
     syncTabStateFromServer();
@@ -858,7 +1291,7 @@ window.websessions = (function() {
         if (sid) {
           openTab(sid, sname || 'terminal', 'running');
         }
-        htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+        refreshSidebar();
         return r.text(); // consume body
       });
   }
@@ -913,7 +1346,7 @@ window.websessions = (function() {
           saveTabState();
           renderTabs();
           document.getElementById('terminal-area').innerHTML = '<div class="empty-state"><p>All sessions killed</p></div>';
-          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+          refreshSidebar();
           showToast('Sessions killed', data.killed + ' session(s) terminated.', 'completed');
         });
     };
@@ -934,10 +1367,17 @@ window.websessions = (function() {
     fetch('/sessions/' + encodeURIComponent(sessionID) + '/kill', { method: 'POST' })
       .then(function(r) {
         if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
-        closeTab(sessionID);
-        // Small delay to let mgr.Wait() finish removing from active list
+        // If session is in a split group, remove the pane; otherwise close the tab
+        var groupTab = openTabs.find(function(t) {
+          return t.splitTree && treeFind(t.splitTree, sessionID);
+        });
+        if (groupTab) {
+          unsplitPane(sessionID);
+        } else {
+          closeTab(sessionID);
+        }
         setTimeout(function() {
-          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+          refreshSidebar();
         }, 500);
       })
       .catch(function(err) { console.error('kill failed:', err); });
@@ -948,37 +1388,44 @@ window.websessions = (function() {
     var area = document.getElementById('terminal-area');
     if (!area) return;
 
-    var panes = area.querySelectorAll('.split-pane');
-    // If not in a split layout, just close the tab
-    if (panes.length < 2) {
+    // Find which tab owns this session
+    var tab = openTabs.find(function(t) {
+      return t.splitTree && treeFind(t.splitTree, sessionID);
+    });
+
+    // Not in a split — just close the tab
+    if (!tab) {
       closeTab(sessionID);
       return;
     }
 
-    // Find the other pane(s) — keep those, remove this one
-    var keepSessionID = null;
-    panes.forEach(function(pane) {
-      var termPane = pane.querySelector('.terminal-pane[data-session-id]');
-      if (termPane) {
-        var sid = termPane.getAttribute('data-session-id');
-        if (sid === sessionID) {
-          // Disconnect this terminal
-          disconnectSession(sid);
-        } else {
-          keepSessionID = sid;
-        }
-      }
+    // Disconnect the terminal being removed
+    if (terminals[sessionID]) disconnectSession(sessionID);
+
+    // Remove from split tree
+    treeRemove(tab.splitTree, sessionID);
+
+    // If tree collapsed to a single session, clear it
+    if (tab.splitTree && tab.splitTree.type === 'session') {
+      tab.splitTree = null;
+    }
+    saveTabState();
+
+    // Disconnect all remaining terminals and rebuild the layout
+    var remainingIds = tab.splitTree ? treeSessionIds(tab.splitTree) : [tab.id];
+    remainingIds.forEach(function(sid) {
+      if (terminals[sid]) disconnectSession(sid);
     });
 
-    // Rebuild area with just the remaining session
-    if (keepSessionID) {
-      // Clear everything and reload the remaining session
-      area.style.flexDirection = '';
-      htmx.ajax('POST', '/sessions/' + encodeURIComponent(keepSessionID) + '/open', {
-        target: '#terminal-area',
-        swap: 'innerHTML'
-      });
-    }
+    // Clear and rebuild
+    while (area.firstChild) area.removeChild(area.firstChild);
+    area.style.flexDirection = '';
+    currentlyShowingTabId = null;
+    // Save then refresh sidebar after persistence
+    saveTabState().then(function() {
+      refreshSidebar();
+    });
+    openTab(tab.id);
   }
 
   // Git diff viewer
@@ -1289,6 +1736,66 @@ window.websessions = (function() {
     });
   }
 
+  function managePlannotator(action) {
+    var feedback = document.getElementById('plannotator-feedback');
+    if (feedback) { feedback.textContent = action === 'enable' ? 'Enabling...' : 'Disabling...'; feedback.className = 'hooks-feedback'; }
+
+    fetch('/settings/plannotator', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: action }),
+    })
+    .then(function(r) { return r.json().then(function(d) { return { ok: r.ok, data: d }; }); })
+    .then(function(result) {
+      var status = document.getElementById('plannotator-status');
+      if (!status) return;
+      while (status.firstChild) status.removeChild(status.firstChild);
+
+      if (result.ok && result.data.enabled) {
+        var badge = document.createElement('span');
+        badge.className = 'hooks-badge hooks-active';
+        badge.textContent = 'Enabled';
+        status.appendChild(badge);
+
+        var disableBtn = document.createElement('button');
+        disableBtn.type = 'button';
+        disableBtn.className = 'btn-cancel btn-small';
+        disableBtn.textContent = 'Disable';
+        disableBtn.addEventListener('click', function() { managePlannotator('disable'); });
+        status.appendChild(disableBtn);
+      } else {
+        var badge2 = document.createElement('span');
+        badge2.className = 'hooks-badge hooks-inactive';
+        badge2.textContent = 'Disabled';
+        status.appendChild(badge2);
+
+        var enableBtn = document.createElement('button');
+        enableBtn.type = 'button';
+        enableBtn.className = 'btn-create btn-small';
+        enableBtn.textContent = 'Enable';
+        enableBtn.addEventListener('click', function() { managePlannotator('enable'); });
+        status.appendChild(enableBtn);
+      }
+
+      if (feedback) {
+        if (result.ok) {
+          feedback.textContent = action === 'enable' ? 'Plannotator integration enabled' : 'Plannotator integration disabled';
+          feedback.className = 'hooks-feedback hooks-feedback-ok';
+        } else {
+          feedback.textContent = 'Error: ' + (result.data.error || 'Unknown error');
+          feedback.className = 'hooks-feedback hooks-feedback-err';
+        }
+        setTimeout(function() { feedback.textContent = ''; feedback.className = ''; }, 4000);
+      }
+    })
+    .catch(function(err) {
+      if (feedback) {
+        feedback.textContent = 'Error: ' + err.message;
+        feedback.className = 'hooks-feedback hooks-feedback-err';
+      }
+    });
+  }
+
   // Settings page directory picker
   var settingsDirDebounce = null;
   function settingsDirAutocomplete(input) {
@@ -1554,6 +2061,51 @@ window.websessions = (function() {
   });
 
   // Session search/filter
+  // Collapsed group state persisted in localStorage
+  function getCollapsedGroups() {
+    try { return JSON.parse(localStorage.getItem('ws-collapsed-groups') || '{}'); } catch(e) { return {}; }
+  }
+  function saveCollapsedGroups(collapsed) {
+    try { localStorage.setItem('ws-collapsed-groups', JSON.stringify(collapsed)); } catch(e) {}
+  }
+  function toggleGroupCollapsed(header) {
+    var group = header.parentElement;
+    group.classList.toggle('collapsed');
+    var name = group.querySelector('.session-group-name');
+    if (name) {
+      var collapsed = getCollapsedGroups();
+      if (group.classList.contains('collapsed')) {
+        collapsed[name.textContent] = true;
+      } else {
+        delete collapsed[name.textContent];
+      }
+      saveCollapsedGroups(collapsed);
+    }
+  }
+
+  // Refresh sidebar using plain fetch + innerHTML (not htmx, which flattens nested groups)
+  function refreshSidebar() {
+    fetch('/sidebar').then(function(r) { return r.text(); }).then(function(html) {
+      var sidebar = document.getElementById('sidebar');
+      if (sidebar) {
+        sidebar.innerHTML = html;
+        htmx.process(sidebar);
+        // Restore collapsed state from localStorage
+        var collapsed = getCollapsedGroups();
+        sidebar.querySelectorAll('.session-group').forEach(function(g) {
+          var name = g.querySelector('.session-group-name');
+          if (name && collapsed[name.textContent]) {
+            g.classList.add('collapsed');
+          }
+        });
+        restoreSidebarTab();
+      }
+    }).catch(function() {});
+  }
+
+  // Periodic sidebar refresh
+  setInterval(refreshSidebar, 30000);
+
   function filterSessions(query) {
     var q = (query || '').toLowerCase();
     var items = document.querySelectorAll('.session-item');
@@ -1718,7 +2270,10 @@ window.websessions = (function() {
             showToast(notifTitle, notifBody, msg.event);
           }
           // Refresh sidebar to update session states
-          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+          refreshSidebar();
+        }
+        if (msg.type === 'iframe-open') {
+          openIframeTab(msg.url, msg.title);
         }
       } catch(e) {}
     };
@@ -1956,6 +2511,7 @@ window.websessions = (function() {
     connectSession: connectSession,
     disconnectSession: disconnectSession,
     openTab: openTab,
+    openIframeTab: openIframeTab,
     closeTab: closeTab,
     showDiff: showDiff,
     unsplitPane: unsplitPane,
@@ -1964,6 +2520,9 @@ window.websessions = (function() {
     toggleTheme: toggleTheme,
     toggleShortcuts: toggleShortcuts,
     killAllSessions: killAllSessions,
+    focusPane: focusPane,
+    toggleGroupCollapsed: toggleGroupCollapsed,
+    refreshSidebar: refreshSidebar,
     killSession: killSession,
     startRename: startRename,
     dirAutocomplete: dirAutocomplete,
@@ -1978,6 +2537,7 @@ window.websessions = (function() {
     switchSidebarTab: switchSidebarTab,
     filterSessions: filterSessions,
     manageHooks: manageHooks,
+    managePlannotator: managePlannotator,
     checkForUpdate: checkForUpdate,
     manageService: manageService,
     settingsDirAutocomplete: settingsDirAutocomplete,

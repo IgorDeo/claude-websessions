@@ -75,8 +75,8 @@ WantedBy=default.target
 }
 
 func Uninstall() error {
-	exec.Command("systemctl", "--user", "stop", unitName).Run()
-	exec.Command("systemctl", "--user", "disable", unitName).Run()
+	_ = exec.Command("systemctl", "--user", "stop", unitName).Run()
+	_ = exec.Command("systemctl", "--user", "disable", unitName).Run()
 
 	if err := os.Remove(unitPath()); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("removing unit file: %w", err)
