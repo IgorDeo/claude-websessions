@@ -47,13 +47,16 @@ templ sidebarSessions(sessions []SessionView) {
 	for _, s := range sessions {
 		if s.GroupName != "" && isFirstInGroup(s, sessions) {
 			<div class="session-group">
-				<div class="session-group-header">
-					<span class="session-group-icon">&#9707;</span>
+				<div class="session-group-header" onclick="this.parentElement.classList.toggle('collapsed')">
+					<span class="session-group-chevron">&#9662;</span>
 					<span class="session-group-name">{ s.GroupName }</span>
+					<span class="session-group-count">{ itoa(countInGroup(s.GroupName, sessions)) }</span>
 				</div>
-				for _, gs := range sessionsInGroup(s.GroupName, sessions) {
-					@sessionItem(gs, true)
-				}
+				<div class="session-group-body">
+					for _, gs := range sessionsInGroup(s.GroupName, sessions) {
+						@sessionItem(gs, true)
+					}
+				</div>
 			</div>
 		} else if s.GroupName == "" {
 			@sessionItem(s, false)
@@ -146,4 +149,14 @@ func sessionsInGroup(groupName string, sessions []SessionView) []SessionView {
 		}
 	}
 	return result
+}
+
+func countInGroup(groupName string, sessions []SessionView) int {
+	count := 0
+	for _, s := range sessions {
+		if s.GroupName == groupName {
+			count++
+		}
+	}
+	return count
 }
