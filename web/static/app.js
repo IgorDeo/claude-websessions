@@ -41,7 +41,7 @@ window.websessions = (function() {
   }
 
   function savePref(key, value) {
-    fetch('/api/preferences', {
+    return fetch('/api/preferences', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: key, value: value }),
@@ -291,27 +291,26 @@ window.websessions = (function() {
         .then(function(r) {
           var sid = r.headers.get('X-Session-ID');
           if (sid) doSplit(currentSessionID, sid, direction);
-          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+          refreshSidebar();
           return r.text();
         });
     });
     newSection.appendChild(newTermBtn);
     content.appendChild(newSection);
 
-    // Build set of session IDs already in this tab group
-    var groupTab = openTabs.find(function(t) {
-      return t.id === currentSessionID || (t.splitTree && treeFind(t.splitTree, currentSessionID));
+    // Build set of session IDs already in ANY split group (not standalone tabs)
+    var usedIds = {};
+    usedIds[currentSessionID] = true;
+    openTabs.forEach(function(t) {
+      if (t.splitTree) {
+        treeSessionIds(t.splitTree).forEach(function(id) { usedIds[id] = true; });
+      }
     });
-    var groupIds = {};
-    if (groupTab && groupTab.splitTree) {
-      treeSessionIds(groupTab.splitTree).forEach(function(id) { groupIds[id] = true; });
-    }
-    groupIds[currentSessionID] = true;
 
     // Existing sessions
     var hasOthers = false;
     sessions.forEach(function(s) {
-      if (groupIds[s.id]) return;
+      if (usedIds[s.id]) return;
       hasOthers = true;
       var btn = document.createElement('button');
       btn.className = 'recent-item';
@@ -542,8 +541,11 @@ window.websessions = (function() {
       }
       // Remove sessionID2 from top-level tabs
       openTabs = openTabs.filter(function(t) { return t.id !== sessionID2; });
-      saveTabState();
       renderTabs();
+      // Save and refresh sidebar after persistence completes
+      saveTabState().then(function() {
+        refreshSidebar();
+      });
     }
   }
 
@@ -632,15 +634,19 @@ window.websessions = (function() {
       if (sid) {
         // Add tab without reloading terminal (openTab would clear the area)
         var existing = openTabs.find(function(t) { return t.id === sid; });
-        if (!existing) {
+        var isNew = !existing;
+        if (isNew) {
           openTabs.push({ id: sid, name: sname || sid, state: 'running' });
         }
         activeTabId = sid;
         currentlyShowingTabId = sid;
         saveTabState();
         renderTabs();
+        // Only refresh sidebar for new sessions (takeover/create), not regular opens
+        if (isNew) {
+          refreshSidebar();
+        }
       }
-      htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
     }
   });
 
@@ -763,7 +769,7 @@ window.websessions = (function() {
       body: 'name=' + encodeURIComponent(newName),
     }).then(function() {
       // Refresh sidebar to show new name
-      htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+      refreshSidebar();
     });
   }
 
@@ -813,10 +819,15 @@ window.websessions = (function() {
       saveTabState();
     }
 
-    // If already showing this tab, just focus the target pane
+    // If already showing this tab AND its terminal is in the DOM, just focus
     if (sessionID === currentlyShowingTabId) {
-      focusPane(focusTarget);
-      return;
+      var termInDom = document.getElementById('term-' + focusTarget);
+      if (termInDom) {
+        focusPane(focusTarget);
+        return;
+      }
+      // Terminal not in DOM — fall through to reload
+      currentlyShowingTabId = null;
     }
 
     activeTabId = sessionID;
@@ -892,13 +903,21 @@ window.websessions = (function() {
   function closeTab(sessionID, e) {
     if (e) { e.stopPropagation(); e.preventDefault(); }
     var tab = openTabs.find(function(t) { return t.id === sessionID; });
+    var hadGroup = tab && tab.splitTree;
     // Disconnect all sessions in the group
-    if (tab && tab.splitTree) {
+    if (hadGroup) {
       treeSessionIds(tab.splitTree).forEach(function(sid) { if (terminals[sid]) disconnectSession(sid); });
     }
     openTabs = openTabs.filter(function(t) { return t.id !== sessionID; });
     if (terminals[sessionID]) disconnectSession(sessionID);
-    saveTabState();
+    // Refresh sidebar to update group tree
+    if (hadGroup) {
+      saveTabState().then(function() {
+        refreshSidebar();
+      });
+    } else {
+      saveTabState();
+    }
     if (activeTabId === sessionID) {
       if (openTabs.length > 0) {
         openTab(openTabs[openTabs.length - 1].id, openTabs[openTabs.length - 1].name, openTabs[openTabs.length - 1].state);
@@ -1092,8 +1111,10 @@ window.websessions = (function() {
     var activeJson = activeTabId || '';
     try { localStorage.setItem('ws-open-tabs', tabsJson); } catch(e) {}
     try { localStorage.setItem('ws-active-tab', activeJson); } catch(e) {}
-    savePref('open-tabs', tabsJson);
-    savePref('active-tab', activeJson);
+    return Promise.all([
+      savePref('open-tabs', tabsJson),
+      savePref('active-tab', activeJson),
+    ]);
   }
 
   function loadTabState() {
@@ -1112,8 +1133,18 @@ window.websessions = (function() {
         try {
           var serverTabs = JSON.parse(prefs['open-tabs']);
           if (serverTabs && serverTabs.length) {
+            // Merge: prefer local split trees over server ones (server may be stale)
+            var localMap = {};
+            openTabs.forEach(function(t) { localMap[t.id] = t; });
+            serverTabs.forEach(function(st) {
+              var local = localMap[st.id];
+              if (local && local.splitTree && !st.splitTree) {
+                st.splitTree = local.splitTree;
+              }
+            });
             openTabs = serverTabs;
-            try { localStorage.setItem('ws-open-tabs', prefs['open-tabs']); } catch(e) {}
+            // Push merged state back to server
+            saveTabState();
           }
         } catch(e) {}
       }
@@ -1123,7 +1154,7 @@ window.websessions = (function() {
       }
       renderTabs();
       if (activeTabId) {
-        currentlyShowingTabId = null; // force re-render
+        currentlyShowingTabId = null;
         openTab(activeTabId);
       }
     }).catch(function() {});
@@ -1166,6 +1197,8 @@ window.websessions = (function() {
   loadTabState();
   document.addEventListener('DOMContentLoaded', function() {
     renderTabs();
+    // Fix sidebar nesting (browser parser breaks it on initial load due to inline scripts)
+    refreshSidebar();
     // Prune dead tabs first, then restore active tab
     pruneDeadTabs();
     // Reopen the active tab (handles both single and split tabs)
@@ -1188,7 +1221,7 @@ window.websessions = (function() {
         if (sid) {
           openTab(sid, sname || 'terminal', 'running');
         }
-        htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+        refreshSidebar();
         return r.text(); // consume body
       });
   }
@@ -1243,7 +1276,7 @@ window.websessions = (function() {
           saveTabState();
           renderTabs();
           document.getElementById('terminal-area').innerHTML = '<div class="empty-state"><p>All sessions killed</p></div>';
-          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+          refreshSidebar();
           showToast('Sessions killed', data.killed + ' session(s) terminated.', 'completed');
         });
     };
@@ -1274,7 +1307,7 @@ window.websessions = (function() {
           closeTab(sessionID);
         }
         setTimeout(function() {
-          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+          refreshSidebar();
         }, 500);
       })
       .catch(function(err) { console.error('kill failed:', err); });
@@ -1318,6 +1351,10 @@ window.websessions = (function() {
     while (area.firstChild) area.removeChild(area.firstChild);
     area.style.flexDirection = '';
     currentlyShowingTabId = null;
+    // Save then refresh sidebar after persistence
+    saveTabState().then(function() {
+      refreshSidebar();
+    });
     openTab(tab.id);
   }
 
@@ -1894,6 +1931,51 @@ window.websessions = (function() {
   });
 
   // Session search/filter
+  // Collapsed group state persisted in localStorage
+  function getCollapsedGroups() {
+    try { return JSON.parse(localStorage.getItem('ws-collapsed-groups') || '{}'); } catch(e) { return {}; }
+  }
+  function saveCollapsedGroups(collapsed) {
+    try { localStorage.setItem('ws-collapsed-groups', JSON.stringify(collapsed)); } catch(e) {}
+  }
+  function toggleGroupCollapsed(header) {
+    var group = header.parentElement;
+    group.classList.toggle('collapsed');
+    var name = group.querySelector('.session-group-name');
+    if (name) {
+      var collapsed = getCollapsedGroups();
+      if (group.classList.contains('collapsed')) {
+        collapsed[name.textContent] = true;
+      } else {
+        delete collapsed[name.textContent];
+      }
+      saveCollapsedGroups(collapsed);
+    }
+  }
+
+  // Refresh sidebar using plain fetch + innerHTML (not htmx, which flattens nested groups)
+  function refreshSidebar() {
+    fetch('/sidebar').then(function(r) { return r.text(); }).then(function(html) {
+      var sidebar = document.getElementById('sidebar');
+      if (sidebar) {
+        sidebar.innerHTML = html;
+        htmx.process(sidebar);
+        // Restore collapsed state from localStorage
+        var collapsed = getCollapsedGroups();
+        sidebar.querySelectorAll('.session-group').forEach(function(g) {
+          var name = g.querySelector('.session-group-name');
+          if (name && collapsed[name.textContent]) {
+            g.classList.add('collapsed');
+          }
+        });
+        restoreSidebarTab();
+      }
+    }).catch(function() {});
+  }
+
+  // Periodic sidebar refresh
+  setInterval(refreshSidebar, 30000);
+
   function filterSessions(query) {
     var q = (query || '').toLowerCase();
     var items = document.querySelectorAll('.session-item');
@@ -2058,7 +2140,7 @@ window.websessions = (function() {
             showToast(notifTitle, notifBody, msg.event);
           }
           // Refresh sidebar to update session states
-          htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+          refreshSidebar();
         }
       } catch(e) {}
     };
@@ -2305,6 +2387,8 @@ window.websessions = (function() {
     toggleShortcuts: toggleShortcuts,
     killAllSessions: killAllSessions,
     focusPane: focusPane,
+    toggleGroupCollapsed: toggleGroupCollapsed,
+    refreshSidebar: refreshSidebar,
     killSession: killSession,
     startRename: startRename,
     dirAutocomplete: dirAutocomplete,
