@@ -813,8 +813,11 @@ window.websessions = (function() {
       saveTabState();
     }
 
-    // Skip if already showing this tab (prevents re-split on double click)
-    if (sessionID === currentlyShowingTabId) return;
+    // If already showing this tab, just focus the target pane
+    if (sessionID === currentlyShowingTabId) {
+      focusPane(focusTarget);
+      return;
+    }
 
     activeTabId = sessionID;
     currentlyShowingTabId = sessionID;
