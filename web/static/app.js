@@ -816,10 +816,15 @@ window.websessions = (function() {
       saveTabState();
     }
 
-    // If already showing this tab, just focus the target pane
+    // If already showing this tab AND its terminal is in the DOM, just focus
     if (sessionID === currentlyShowingTabId) {
-      focusPane(focusTarget);
-      return;
+      var termInDom = document.getElementById('term-' + focusTarget);
+      if (termInDom) {
+        focusPane(focusTarget);
+        return;
+      }
+      // Terminal not in DOM — fall through to reload
+      currentlyShowingTabId = null;
     }
 
     activeTabId = sessionID;
