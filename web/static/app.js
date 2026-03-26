@@ -544,6 +544,10 @@ window.websessions = (function() {
       openTabs = openTabs.filter(function(t) { return t.id !== sessionID2; });
       saveTabState();
       renderTabs();
+      // Refresh sidebar to show the new group
+      setTimeout(function() {
+        htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+      }, 300);
     }
   }
 
@@ -1319,6 +1323,10 @@ window.websessions = (function() {
     area.style.flexDirection = '';
     currentlyShowingTabId = null;
     openTab(tab.id);
+    // Refresh sidebar to update group display
+    setTimeout(function() {
+      htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
+    }, 300);
   }
 
   // Git diff viewer
