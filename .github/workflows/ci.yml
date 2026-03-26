@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install templ
+        run: go install github.com/a-h/templ/cmd/templ@v0.3.1001
+
+      - name: Generate templates
+        run: templ generate ./web/templates/
+
+      - name: Check generated files are up to date
+        run: |
+          if [ -n "$(git diff --name-only)" ]; then
+            echo "::error::Generated files are out of date. Run 'templ generate' and commit."
+            git diff --name-only
+            exit 1
+          fi
+
+      - name: Build
+        run: go build ./...
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install templ
+        run: go install github.com/a-h/templ/cmd/templ@v0.3.1001
+
+      - name: Generate templates
+        run: templ generate ./web/templates/
+
+      - name: Run tests
+        run: go test ./... -v
