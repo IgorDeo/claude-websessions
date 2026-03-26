@@ -26,7 +26,7 @@ func TestIntegration_CreateSessionAndStream(t *testing.T) {
 	mgr := session.NewManager(cfg.Sessions.OutputBufferSize)
 	bus := notification.NewBus()
 	sink := notification.NewInAppSink(100)
-	srv := server.New(cfg, mgr, bus, sink)
+	srv := server.New(cfg, mgr, bus, sink, nil)
 
 	ts := httptest.NewServer(srv.Handler())
 	defer ts.Close()

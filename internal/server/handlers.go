@@ -479,6 +479,7 @@ func sessionToView(s *session.Session) templates.SessionView {
 		ID: s.ID, Name: s.Name, WorkDir: s.WorkDir,
 		State: string(s.GetState()), Type: sessionType(s.ID), Owned: s.Owned,
 		Sandboxed: s.Sandboxed,
+		TeamName:  s.TeamName, TeamRole: s.TeamRole,
 	}
 }
 
