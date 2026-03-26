@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"os"
@@ -25,14 +26,14 @@ type Manager struct {
 	bufferSize    int64
 	onStateChange StateChangeFunc
 	onOutput      OutputFunc
-	stopReaders   map[string]chan struct{} // signal to stop reading for a session
+	stopReaders   map[string]context.CancelFunc // signal to stop reading for a session
 }
 
 func NewManager(bufferSize int64) *Manager {
 	return &Manager{
 		sessions:    make(map[string]*Session),
 		bufferSize:  bufferSize,
-		stopReaders: make(map[string]chan struct{}),
+		stopReaders: make(map[string]context.CancelFunc),
 	}
 }
 
@@ -204,9 +205,9 @@ func (m *Manager) failSession(s *Session, errMsg string) {
 // startReader attaches to the tmux session and reads output.
 // Uses `tmux pipe-pane` to stream output, or attaches a reader PTY.
 func (m *Manager) startReader(s *Session) {
-	stop := make(chan struct{})
+	ctx, cancel := context.WithCancel(context.Background())
 	m.mu.Lock()
-	m.stopReaders[s.ID] = stop
+	m.stopReaders[s.ID] = cancel
 	m.mu.Unlock()
 
 	go func() {
@@ -223,12 +224,13 @@ func (m *Manager) startReader(s *Session) {
 			s.SetReaderPTY(nil)
 			ptmx.Close()
 			cmd.Process.Kill()
+			cmd.Wait() // reap zombie process
 		}()
 
 		buf := make([]byte, 4096)
 		for {
 			select {
-			case <-stop:
+			case <-ctx.Done():
 				return
 			default:
 			}
@@ -267,8 +269,8 @@ func (m *Manager) startReader(s *Session) {
 // stopReader stops the output reader for a session.
 func (m *Manager) stopReader(id string) {
 	m.mu.Lock()
-	if ch, ok := m.stopReaders[id]; ok {
-		close(ch)
+	if cancel, ok := m.stopReaders[id]; ok {
+		cancel()
 		delete(m.stopReaders, id)
 	}
 	m.mu.Unlock()
