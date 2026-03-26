@@ -41,7 +41,7 @@ window.websessions = (function() {
   }
 
   function savePref(key, value) {
-    fetch('/api/preferences', {
+    return fetch('/api/preferences', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key: key, value: value }),
@@ -541,12 +541,11 @@ window.websessions = (function() {
       }
       // Remove sessionID2 from top-level tabs
       openTabs = openTabs.filter(function(t) { return t.id !== sessionID2; });
-      saveTabState();
       renderTabs();
-      // Refresh sidebar to show the new group
-      setTimeout(function() {
+      // Save and refresh sidebar after persistence completes
+      saveTabState().then(function() {
         htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
-      }, 300);
+      });
     }
   }
 
@@ -911,12 +910,13 @@ window.websessions = (function() {
     }
     openTabs = openTabs.filter(function(t) { return t.id !== sessionID; });
     if (terminals[sessionID]) disconnectSession(sessionID);
-    saveTabState();
     // Refresh sidebar to update group tree
     if (hadGroup) {
-      setTimeout(function() {
+      saveTabState().then(function() {
         htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
-      }, 300);
+      });
+    } else {
+      saveTabState();
     }
     if (activeTabId === sessionID) {
       if (openTabs.length > 0) {
@@ -1111,8 +1111,10 @@ window.websessions = (function() {
     var activeJson = activeTabId || '';
     try { localStorage.setItem('ws-open-tabs', tabsJson); } catch(e) {}
     try { localStorage.setItem('ws-active-tab', activeJson); } catch(e) {}
-    savePref('open-tabs', tabsJson);
-    savePref('active-tab', activeJson);
+    return Promise.all([
+      savePref('open-tabs', tabsJson),
+      savePref('active-tab', activeJson),
+    ]);
   }
 
   function loadTabState() {
@@ -1337,11 +1339,11 @@ window.websessions = (function() {
     while (area.firstChild) area.removeChild(area.firstChild);
     area.style.flexDirection = '';
     currentlyShowingTabId = null;
-    openTab(tab.id);
-    // Refresh sidebar to update group display
-    setTimeout(function() {
+    // Save then refresh sidebar after persistence
+    saveTabState().then(function() {
       htmx.ajax('GET', '/sidebar', { target: '#sidebar', swap: 'innerHTML' });
-    }, 300);
+    });
+    openTab(tab.id);
   }
 
   // Git diff viewer
