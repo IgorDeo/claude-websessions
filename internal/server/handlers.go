@@ -1084,16 +1084,12 @@ func (s *Server) handlePlannotatorIntegration(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// Resolve the path to ws-open-url relative to the running binary
-	exePath, _ := os.Executable()
-	scriptPath := filepath.Join(filepath.Dir(exePath), "ws-open-url")
-
 	var err error
 	switch payload.Action {
 	case "enable":
-		err = hooks.SetPlannotatorIntegration(true, scriptPath)
+		err = hooks.SetPlannotatorIntegration(true)
 	case "disable":
-		err = hooks.SetPlannotatorIntegration(false, "")
+		err = hooks.SetPlannotatorIntegration(false)
 	default:
 		http.Error(w, "action must be 'enable' or 'disable'", http.StatusBadRequest)
 		return
