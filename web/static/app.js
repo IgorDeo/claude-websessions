@@ -665,6 +665,7 @@ window.websessions = (function() {
           openTab(sessionID, sessionName || sessionID, 'running');
         }
       }
+      refreshSidebar();
     }
   });
 

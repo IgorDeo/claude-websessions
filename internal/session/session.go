@@ -15,6 +15,7 @@ const (
 	StateDiscovered State = "discovered"
 	StateTakeover   State = "takeover"
 	StateCreated    State = "created"
+	StateStarting   State = "starting"
 	StateRunning    State = "running"
 	StateWaiting    State = "waiting"
 	StateCompleted  State = "completed"
@@ -48,7 +49,8 @@ type Session struct {
 var validTransitions = map[State][]State{
 	StateDiscovered: {StateTakeover},
 	StateTakeover:   {StateRunning, StateErrored},
-	StateCreated:    {StateRunning},
+	StateCreated:    {StateRunning, StateStarting},
+	StateStarting:   {StateRunning, StateErrored},
 	StateRunning:    {StateWaiting, StateCompleted, StateErrored},
 	StateWaiting:    {StateRunning, StateCompleted, StateErrored},
 }
@@ -73,6 +75,12 @@ func (s *Session) GetState() State {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.State
+}
+
+func (s *Session) GetError() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.Error
 }
 
 func (s *Session) Output() *RingBuf {

@@ -371,6 +371,7 @@ html, body {
 .state-completed .status-dot { background: var(--text-muted); }
 .state-errored .status-dot { background: var(--red); box-shadow: 0 0 6px var(--red-glow); }
 .state-waiting .status-dot { background: var(--yellow); box-shadow: 0 0 6px var(--yellow-glow); animation: pulse 2s ease-in-out infinite; }
+.state-starting .status-dot { background: var(--blue); animation: pulse 2s ease-in-out infinite; }
 .state-discovered .status-dot { background: var(--blue); }
 .state-offline .status-dot { background: none; border: 1.5px dashed var(--text-muted); }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }

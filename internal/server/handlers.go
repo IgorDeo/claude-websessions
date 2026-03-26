@@ -202,10 +202,11 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 			Sandboxed: sess.Sandboxed, SandboxName: sess.SandboxName,
 		})
 	}
-	// Tell the client to auto-open this session
+	// Tell the client to auto-open this session and refresh the sidebar
 	w.Header().Set("X-Session-ID", sess.ID)
 	w.Header().Set("X-Session-Name", sess.Name)
-	s.handleSidebar(w, r)
+	w.Header().Set("HX-Trigger", "refreshSidebar")
+	w.WriteHeader(http.StatusOK)
 }
 
 func (s *Server) handleCreateTerminal(w http.ResponseWriter, r *http.Request) {
