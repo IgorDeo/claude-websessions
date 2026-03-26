@@ -325,9 +325,22 @@ html, body {
   font-size: 0.65rem; font-weight: 600;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border);
+  cursor: pointer; user-select: none;
 }
-.session-group-icon { font-size: 0.7rem; color: var(--accent); }
-.session-group-name { font-family: var(--font-mono); }
+.session-group-header:hover { background: var(--bg-elevated); }
+.session-group-chevron {
+  font-size: 0.6rem; color: var(--text-muted);
+  transition: transform var(--transition-fast);
+  display: inline-block;
+}
+.session-group.collapsed .session-group-chevron { transform: rotate(-90deg); }
+.session-group.collapsed .session-group-body { display: none; }
+.session-group-name { font-family: var(--font-mono); flex: 1; }
+.session-group-count {
+  font-size: 0.55rem; color: var(--text-muted);
+  background: var(--bg-input); padding: 0.05rem 0.3rem;
+  border-radius: 8px;
+}
 .session-item-grouped {
   border-left: 2px solid var(--accent);
   margin: 0 !important;
