@@ -75,6 +75,9 @@ func (s *Server) routes() http.Handler {
 	r.Get("/sidebar", s.handleSidebar)
 	r.Get("/notifications", s.handleNotifications)
 
+	// Metrics
+	r.Get("/metrics", s.handleMetrics)
+
 	// APIs
 	r.Post("/api/hook", s.handleHookCallback)
 	r.Get("/api/dirs", s.handleListDirs)
