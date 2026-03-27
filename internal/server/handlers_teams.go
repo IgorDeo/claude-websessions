@@ -175,7 +175,7 @@ func (s *Server) handleCreateTeam(w http.ResponseWriter, r *http.Request) {
 	sess.TeamRole = "lead"
 
 	// Send the agent teams env and the team creation prompt to the session
-	envCmd := fmt.Sprintf("export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1\n")
+	envCmd := "export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1\n"
 	_ = s.mgr.WriteInput(id, []byte(envCmd))
 
 	// Wait briefly for the session to start, then send the prompt
