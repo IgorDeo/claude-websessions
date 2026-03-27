@@ -14,18 +14,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
+      - name: Install mise
+        uses: jdx/mise-action@v2
 
-      - name: Install templ
-        run: go install github.com/a-h/templ/cmd/templ@v0.3.1001
+      - name: Check Go version sync
+        run: mise run check-go-version
+
+      - name: Setup tooling
+        run: mise run setup
 
       - name: Generate templates
-        run: templ generate ./web/templates/
+        run: mise run generate
 
       - name: Run tests
-        run: go test ./... -v
+        run: mise run test
 
   build:
     needs: test
@@ -49,15 +51,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
+      - name: Install mise
+        uses: jdx/mise-action@v2
 
-      - name: Install templ
-        run: go install github.com/a-h/templ/cmd/templ@v0.3.1001
+      - name: Check Go version sync
+        run: mise run check-go-version
 
-      - name: Generate templates
-        run: templ generate ./web/templates/
+      - name: Setup tooling
+        run: mise run setup
 
       - name: Build
         env:
@@ -66,10 +67,7 @@ jobs:
           CGO_ENABLED: '0'
           VERSION: ${{ github.ref_name }}
           SUFFIX: ${{ matrix.suffix }}
-        run: |
-          go build -ldflags="-s -w -X main.version=${VERSION}" \
-            -o "websessions-${SUFFIX}" \
-            ./cmd/websessions
+        run: mise run build-release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -83,15 +81,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go.mod
+      - name: Install mise
+        uses: jdx/mise-action@v2
 
-      - name: Install templ
-        run: go install github.com/a-h/templ/cmd/templ@v0.3.1001
+      - name: Check Go version sync
+        run: mise run check-go-version
 
-      - name: Generate templates
-        run: templ generate ./web/templates/
+      - name: Setup tooling
+        run: mise run setup
 
       - name: Install WebKit2GTK dev libs
         run: |
@@ -99,15 +96,12 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev
 
       - name: Build webview helper
-        run: make build-webview-helper
+        run: mise run build-webview-helper
 
       - name: Build GUI binary
         env:
           VERSION: ${{ github.ref_name }}
-        run: |
-          go build -tags gui -ldflags="-s -w -X main.version=${VERSION}" \
-            -o "websessions-gui-linux-amd64" \
-            ./cmd/websessions
+        run: mise run build-release-gui
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

@@ -1,0 +1,71 @@
+[tools]
+go = "1.26.1"
+
+[env]
+BUILD_DIR = "./bin"
+
+[tasks.setup]
+description = "Install development tools"
+run = "go install github.com/a-h/templ/cmd/templ@v0.3.1001"
+
+[tasks."check-go-version"]
+description = "Verify Go version matches go.mod"
+run = "MOD_GO=$(awk '/^go / {print $2; exit}' go.mod) && MISE_GO=$(awk -F'\"' '/^go = / {print $2; exit}' mise.toml) && [ \"$MOD_GO\" = \"$MISE_GO\" ] || { echo \"Go version mismatch: go.mod=$MOD_GO, mise.toml=$MISE_GO\"; exit 1; }"
+
+[tasks.generate]
+description = "Regenerate templ templates"
+run = "templ generate"
+
+[tasks.build]
+description = "Build the websessions binary"
+depends = ["generate"]
+run = """
+go build -o bin/websessions ./cmd/websessions
+cp scripts/ws-open-url ${BUILD_DIR}/ws-open-url
+"""
+
+[tasks."build-release"]
+description = "Build release binary using VERSION and SUFFIX"
+depends = ["generate"]
+run = "go build -ldflags=\"-s -w -X main.version=${VERSION}\" -o websessions-${SUFFIX} ./cmd/websessions"
+
+[tasks."build-gui"]
+description = "Build with GUI support (requires GTK/WebKit)"
+depends = ["generate", "build-webview-helper"]
+run = "go build -tags gui -o bin/websessions ./cmd/websessions"
+
+[tasks."build-release-gui"]
+description = "Build GUI release binary using VERSION"
+depends = ["generate", "build-webview-helper"]
+run = "go build -tags gui -ldflags=\"-s -w -X main.version=${VERSION}\" -o websessions-gui-linux-amd64 ./cmd/websessions"
+
+[tasks."build-webview-helper"]
+description = "Compile the webview helper (requires gtk+-3.0 and webkit2gtk-4.1)"
+run = """
+cc $(pkg-config --cflags gtk+-3.0 webkit2gtk-4.1) \
+  cmd/webview-helper/main.c \
+  $(pkg-config --libs gtk+-3.0 webkit2gtk-4.1) \
+  -o cmd/websessions/webview-helper
+"""
+
+[tasks.run]
+description = "Run websessions in development mode"
+depends = ["generate"]
+run = "go run ./cmd/websessions"
+
+[tasks."run-gui"]
+description = "Run with GUI support"
+depends = ["generate", "build-webview-helper"]
+run = "go run -tags gui ./cmd/websessions --gui"
+
+[tasks.test]
+description = "Run all tests"
+run = "go test ./... -v"
+
+[tasks.lint]
+description = "Run linter"
+run = "golangci-lint run ./..."
+
+[tasks.clean]
+description = "Remove build artifacts"
+run = "rm -rf bin cmd/websessions/webview-helper"
