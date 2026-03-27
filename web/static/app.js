@@ -2255,6 +2255,31 @@ window.websessions = (function() {
     var cb = document.getElementById('notif-sounds-toggle');
     if (cb) cb.checked = getNotifSoundsEnabled();
     initAutoSaveSettings();
+
+    var dragCounter = 0;
+    document.addEventListener('dragenter', function(e) {
+      if (e.dataTransfer && e.dataTransfer.types.indexOf('Files') >= 0) {
+        e.preventDefault();
+        dragCounter++;
+        var overlay = document.getElementById('drop-overlay');
+        if (overlay) overlay.classList.add('visible');
+      }
+    });
+    document.addEventListener('dragleave', function() {
+      dragCounter--;
+      if (dragCounter <= 0) {
+        dragCounter = 0;
+        var overlay = document.getElementById('drop-overlay');
+        if (overlay) overlay.classList.remove('visible');
+      }
+    });
+    document.addEventListener('drop', function(e) {
+      e.preventDefault();
+      dragCounter = 0;
+      var overlay = document.getElementById('drop-overlay');
+      if (overlay) overlay.classList.remove('visible');
+    });
+    document.addEventListener('dragover', function(e) { e.preventDefault(); });
   });
 
   function initAutoSaveSettings() {
