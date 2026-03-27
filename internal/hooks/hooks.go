@@ -160,6 +160,15 @@ func InstallTeamHooks(baseURL string) error {
 
 const teamHookMarker = "websessions-team-hook"
 
+// HasTeamHooks checks if agent team hooks are registered.
+func (s *ClaudeSettings) HasTeamHooks() bool {
+	hooks, ok := s.raw["hooks"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+	return hasTeamHooks(hooks)
+}
+
 func hasTeamHooks(hooks map[string]interface{}) bool {
 	for _, eventHooks := range hooks {
 		entries, ok := eventHooks.([]interface{})
