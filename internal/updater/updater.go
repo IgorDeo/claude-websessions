@@ -1,6 +1,9 @@
 package updater
 
 import (
+	"bufio"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -90,14 +93,124 @@ func CheckForUpdate(currentVersion string) (*UpdateInfo, error) {
 	return info, nil
 }
 
-// SelfUpdate downloads the latest binary and replaces the current one.
+// verifyChecksum verifies a file's SHA-256 hash against the expected hex string.
+// If expected is empty, verification is skipped and nil is returned.
+func verifyChecksum(filePath, expectedSHA256Hex string) error {
+	if expectedSHA256Hex == "" {
+		return nil
+	}
+
+	f, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("opening file for checksum: %w", err)
+	}
+	defer f.Close() //nolint:errcheck
+
+	h := sha256.New()
+	if _, err := io.Copy(h, f); err != nil {
+		return fmt.Errorf("hashing file: %w", err)
+	}
+
+	actual := hex.EncodeToString(h.Sum(nil))
+	if actual != strings.ToLower(expectedSHA256Hex) {
+		return fmt.Errorf("checksum mismatch: got %s, expected %s", actual, expectedSHA256Hex)
+	}
+	return nil
+}
+
+// safeSelfUpdate atomically replaces exePath with newData, verifying checksum if provided.
+// On failure after the backup rename, it attempts to restore from .bak.
+// The .bak file is kept for manual rollback.
+func safeSelfUpdate(exePath string, newData []byte, expectedHash string) error {
+	if len(newData) == 0 {
+		return fmt.Errorf("new binary data is empty")
+	}
+
+	tmpPath := exePath + ".update"
+	bakPath := exePath + ".bak"
+
+	// Write new binary to temp file
+	if err := os.WriteFile(tmpPath, newData, 0755); err != nil {
+		return fmt.Errorf("writing update file: %w", err)
+	}
+
+	// Verify checksum before replacing
+	if err := verifyChecksum(tmpPath, expectedHash); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("checksum verification failed: %w", err)
+	}
+
+	// Rename current binary to .bak
+	if err := os.Rename(exePath, bakPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("backing up current binary: %w", err)
+	}
+
+	// Rename .update to current binary path
+	if err := os.Rename(tmpPath, exePath); err != nil {
+		// Attempt rollback
+		_ = os.Rename(bakPath, exePath)
+		return fmt.Errorf("installing update: %w", err)
+	}
+
+	// Keep .bak for manual rollback — do NOT delete it
+
+	return nil
+}
+
+// fetchExpectedHash downloads the checksums.txt from the same release and returns
+// the SHA-256 hash for the asset matching the given downloadURL's filename.
+// Returns "" on any failure (best-effort).
+func fetchExpectedHash(downloadURL string) string {
+	if downloadURL == "" {
+		return ""
+	}
+
+	// Replace the asset filename in the URL with "checksums.txt"
+	// Use strings.LastIndex to avoid mangling the "://" in the scheme.
+	idx := strings.LastIndex(downloadURL, "/")
+	if idx < 0 {
+		return ""
+	}
+	checksumsURL := downloadURL[:idx] + "/checksums.txt"
+
+	resp, err := http.Get(checksumsURL) //nolint:noctx
+	if err != nil {
+		return ""
+	}
+	defer resp.Body.Close() //nolint:errcheck
+
+	if resp.StatusCode != 200 {
+		return ""
+	}
+
+	// Determine the asset filename we're looking for
+	assetName := downloadURL[idx+1:]
+
+	// Parse lines in format "hash  filename"
+	scanner := bufio.NewScanner(resp.Body)
+	for scanner.Scan() {
+		line := scanner.Text()
+		parts := strings.Fields(line)
+		if len(parts) == 2 && parts[1] == assetName {
+			return parts[0]
+		}
+	}
+
+	return ""
+}
+
+// SelfUpdate downloads the latest binary and replaces the current one safely.
 func SelfUpdate(downloadURL string) error {
 	if downloadURL == "" {
 		return fmt.Errorf("no download URL for this platform")
 	}
 
-	// Download to a temp file
-	resp, err := http.Get(downloadURL)
+	// Try to fetch expected checksum (best-effort)
+	expectedHash := fetchExpectedHash(downloadURL)
+
+	// Download the new binary
+	resp, err := http.Get(downloadURL) //nolint:noctx
 	if err != nil {
 		return fmt.Errorf("downloading update: %w", err)
 	}
@@ -107,45 +220,18 @@ func SelfUpdate(downloadURL string) error {
 		return fmt.Errorf("download returned %d", resp.StatusCode)
 	}
 
+	newData, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("reading update: %w", err)
+	}
+
 	// Get current binary path
 	exePath, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("finding executable: %w", err)
 	}
 
-	// Write to temp file next to the binary
-	tmpPath := exePath + ".update"
-	tmpFile, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
-	if err != nil {
-		return fmt.Errorf("creating temp file: %w", err)
-	}
-
-	_, err = io.Copy(tmpFile, resp.Body)
-	_ = tmpFile.Close()
-	if err != nil {
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("writing update: %w", err)
-	}
-
-	// Replace the current binary: rename old to .bak, rename new to current
-	bakPath := exePath + ".bak"
-	_ = os.Remove(bakPath) // clean up any previous backup
-
-	if err := os.Rename(exePath, bakPath); err != nil {
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("backing up current binary: %w", err)
-	}
-
-	if err := os.Rename(tmpPath, exePath); err != nil {
-		// Try to restore backup
-		_ = os.Rename(bakPath, exePath)
-		return fmt.Errorf("installing update: %w", err)
-	}
-
-	// Clean up backup
-	_ = os.Remove(bakPath)
-
-	return nil
+	return safeSelfUpdate(exePath, newData, expectedHash)
 }
 
 func platformSuffix() string {
