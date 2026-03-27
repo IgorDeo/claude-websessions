@@ -95,6 +95,9 @@ func (s *Server) routes() http.Handler {
 	r.Post("/sessions/{sessionID}/rename", func(w http.ResponseWriter, r *http.Request) {
 		s.handleRenameSession(w, r, chi.URLParam(r, "sessionID"))
 	})
+	r.Get("/sessions/{sessionID}/export", func(w http.ResponseWriter, r *http.Request) {
+		s.handleExportOutput(w, r, chi.URLParam(r, "sessionID"))
+	})
 	r.Get("/sessions/{sessionID}/diff", func(w http.ResponseWriter, r *http.Request) {
 		s.handleGitDiff(w, r, chi.URLParam(r, "sessionID"))
 	})

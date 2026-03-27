@@ -645,6 +645,69 @@ func (s *Server) handleRestartSession(w http.ResponseWriter, r *http.Request, se
 	}
 }
 
+// stripAnsi removes ANSI escape sequences from terminal output.
+func stripAnsi(data []byte) []byte {
+	out := make([]byte, 0, len(data))
+	i := 0
+	for i < len(data) {
+		if data[i] != 0x1b {
+			out = append(out, data[i])
+			i++
+			continue
+		}
+		// ESC byte — need at least one more byte
+		if i+1 >= len(data) {
+			i++
+			continue
+		}
+		switch data[i+1] {
+		case '[': // CSI sequence: skip until final byte 0x40-0x7e
+			i += 2
+			for i < len(data) {
+				b := data[i]
+				i++
+				if b >= 0x40 && b <= 0x7e {
+					break
+				}
+			}
+		case ']': // OSC sequence: skip until BEL (0x07) or ST (ESC \)
+			i += 2
+			for i < len(data) {
+				if data[i] == 0x07 {
+					i++
+					break
+				}
+				if data[i] == 0x1b && i+1 < len(data) && data[i+1] == '\\' {
+					i += 2
+					break
+				}
+				i++
+			}
+		default: // other 2-byte ESC sequence
+			i += 2
+		}
+	}
+	return out
+}
+
+// handleExportOutput exports a session's terminal output as plain text with ANSI sequences stripped.
+func (s *Server) handleExportOutput(w http.ResponseWriter, r *http.Request, sessionID string) {
+	sess, ok := s.mgr.Get(sessionID)
+	if !ok {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+	raw := sess.Output().Bytes()
+	plain := stripAnsi(raw)
+	name := sess.Name
+	if name == "" {
+		name = sessionID
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", name+".txt"))
+	_, _ = w.Write(plain)
+}
+
 // handleGitDiff returns git diff and status for a session's working directory.
 func (s *Server) handleGitDiff(w http.ResponseWriter, r *http.Request, sessionID string) {
 	sess, ok := s.mgr.Get(sessionID)

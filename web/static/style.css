@@ -1022,3 +1022,18 @@ html, body {
   .sidebar { display: none; }
   .content { width: 100%; }
 }
+
+/* ============================================================
+   Export Button
+   ============================================================ */
+.export-btn {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 16px;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+.export-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
