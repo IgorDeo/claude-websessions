@@ -28,6 +28,11 @@ type SettingsData struct {
 	ServiceName      string
 	Version          string
 	Doctor           []DoctorCheck
+	TeamsEnabled         bool
+	TeamsScanInterval    string
+	TeamsHooksInstalled  bool
+	ClaudeVersion        string
+	ClaudeVersionOK      bool
 }
 
 type DoctorCheck struct {
@@ -228,7 +233,87 @@ templ Settings(data SettingsData) {
 					<div id="plannotator-feedback"></div>
 					<p class="settings-note">Takes effect for new Claude sessions. Restart existing sessions for them to use this.</p>
 				</div>
-				<div class="settings-section" id="service-section">
+				<div class="settings-section" id="teams-section">
+				<h3>Agent Teams</h3>
+				<p class="hooks-description">
+					Integrate with Claude Code's experimental
+					<a href="https://code.claude.com/docs/en/agent-teams" target="_blank">Agent Teams</a> feature.
+					When enabled, websessions discovers active teams and provides a visual dashboard
+					with task boards, member rosters, and inter-agent message logs.
+				</p>
+				if data.ClaudeVersion != "" {
+					<div class="settings-row">
+						<span class="settings-sublabel">Claude Code version</span>
+						<span class="update-version">
+							{ data.ClaudeVersion }
+							if data.ClaudeVersionOK {
+								<span class="hooks-badge hooks-active" style="margin-left:0.5rem;">Compatible</span>
+							} else {
+								<span class="hooks-badge hooks-inactive" style="margin-left:0.5rem;">v2.1.32+ required</span>
+							}
+						</span>
+					</div>
+				} else {
+					<div class="settings-row">
+						<span class="settings-sublabel">Claude Code version</span>
+						<span class="update-version" style="color:var(--text-muted);">Not found in PATH</span>
+					</div>
+				}
+				<form id="teams-settings-form" method="POST" action="/settings">
+					<!-- Carry over all existing settings as hidden fields so they don't get reset -->
+					<input type="hidden" name="port" value={ itoa(data.Port) }/>
+					<input type="hidden" name="host" value={ data.Host }/>
+					<input type="hidden" name="scan_interval" value={ data.ScanInterval }/>
+					<input type="hidden" name="output_buffer_size" value={ data.OutputBufferSize }/>
+					<input type="hidden" name="default_dir" value={ data.DefaultDir }/>
+					if data.DesktopNotifs {
+						<input type="hidden" name="desktop_notifs" value="on"/>
+					}
+					if data.SoundEnabled {
+						<input type="hidden" name="sound_enabled" value="on"/>
+					}
+					<input type="hidden" name="audio_device" value={ data.AudioDevice }/>
+					if data.NotifCompleted {
+						<input type="hidden" name="notif_completed" value="on"/>
+					}
+					if data.NotifErrored {
+						<input type="hidden" name="notif_errored" value="on"/>
+					}
+					if data.NotifWaiting {
+						<input type="hidden" name="notif_waiting" value="on"/>
+					}
+					<input type="hidden" name="reminder_minutes" value={ itoa(data.ReminderMinutes) }/>
+					<div class="settings-row">
+						<label class="checkbox-label">
+							if data.TeamsEnabled {
+								<input type="checkbox" name="teams_enabled" checked/>
+							} else {
+								<input type="checkbox" name="teams_enabled"/>
+							}
+							Enable Agent Teams integration
+						</label>
+					</div>
+					<div class="settings-row">
+						<label for="teams_scan_interval">Team Scan Interval</label>
+						<input type="text" id="teams_scan_interval" name="teams_scan_interval" value={ data.TeamsScanInterval } placeholder="5s"/>
+						<span class="settings-hint">How often to check for team changes on disk. Lower values = faster updates, more I/O.</span>
+					</div>
+					<div class="settings-actions">
+						<button type="submit" class="btn-create btn-small">Save Teams Settings</button>
+					</div>
+				</form>
+				<div class="settings-row hooks-status" id="teams-hooks-status" style="margin-top:1rem;">
+					<span class="settings-sublabel">Team Hooks</span>
+					if data.TeamsHooksInstalled {
+						<span class="hooks-badge hooks-active">Installed</span>
+					} else {
+						<span class="hooks-badge hooks-inactive">Not installed</span>
+						<button type="button" class="btn-create btn-small" hx-post="/teams/install-hooks" hx-target="#teams-hooks-status" hx-swap="innerHTML">Install Team Hooks</button>
+					}
+				</div>
+				<p class="settings-note">Team hooks provide real-time event notifications (TeammateIdle, TaskCreated, TaskCompleted). Requires a server restart after enabling teams.</p>
+			</div>
+			<div class="settings-section" id="service-section">
 					<h3>Background Service</h3>
 					<p class="hooks-description">
 						Run websessions as a { data.ServiceName } service so it starts automatically

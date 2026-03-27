@@ -25,6 +25,7 @@ import (
 	"github.com/IgorDeo/claude-websessions/internal/notification"
 	"github.com/IgorDeo/claude-websessions/internal/session"
 	"github.com/IgorDeo/claude-websessions/internal/store"
+	"github.com/IgorDeo/claude-websessions/internal/teams"
 	"github.com/IgorDeo/claude-websessions/web/templates"
 )
 
@@ -1290,6 +1291,9 @@ func (s *Server) handleTestSound(w http.ResponseWriter, r *http.Request) {
 
 // handleListDirs returns a JSON list of directories for the file finder autocomplete.
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
+	// Check Claude Code version for agent teams
+	claudeVer, claudeVerOK := teams.CheckClaudeVersion()
+
 	data := templates.SettingsData{
 		Port:             s.cfg.Server.Port,
 		Host:             s.cfg.Server.Host,
@@ -1301,6 +1305,10 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		SoundEnabled:    s.cfg.Notifications.Sound,
 		AudioDevice:     s.cfg.Notifications.AudioDevice,
 		Version:         s.version,
+		TeamsEnabled:        s.cfg.Teams.Enabled,
+		TeamsScanInterval:   s.cfg.Teams.ScanIntervalRaw,
+		ClaudeVersion:       claudeVer,
+		ClaudeVersionOK:     claudeVerOK,
 	}
 	// Populate audio devices
 	for _, d := range notification.ListAudioDevices() {
@@ -1322,6 +1330,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		data.HooksInstalled = claudeSettings.IsInstalled()
 		data.PlannotatorIntegration = claudeSettings.IsPlannotatorIntegrated()
+		data.TeamsHooksInstalled = claudeSettings.HasTeamHooks()
 	}
 	// Check service status (systemd on Linux, launchd on macOS)
 	data.ServiceInstalled = service.IsInstalled()
@@ -1371,6 +1380,12 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	s.cfg.Notifications.AudioDevice = r.FormValue("audio_device")
 	s.sound.SetEnabled(s.cfg.Notifications.Sound)
 	s.sound.SetAudioDevice(s.cfg.Notifications.AudioDevice)
+
+	// Agent Teams settings
+	s.cfg.Teams.Enabled = r.FormValue("teams_enabled") == "on"
+	if v := r.FormValue("teams_scan_interval"); v != "" {
+		s.cfg.Teams.ScanIntervalRaw = v
+	}
 
 	// If port or host changed, uninstall hooks (they contain the old URL)
 	if s.cfg.Server.Port != oldPort || s.cfg.Server.Host != oldHost {
