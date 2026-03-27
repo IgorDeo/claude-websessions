@@ -276,13 +276,16 @@ func (s *Server) handleTeamHookCallback(w http.ResponseWriter, r *http.Request) 
 }
 
 // handleInstallTeamHooks installs agent team hooks into Claude's settings.json.
+// Returns an HTML partial for htmx to swap into #teams-hooks-status.
 func (s *Server) handleInstallTeamHooks(w http.ResponseWriter, r *http.Request) {
 	baseURL := fmt.Sprintf("http://localhost:%d", s.cfg.Server.Port)
 	if err := hooks.InstallTeamHooks(baseURL); err != nil {
 		slog.Error("failed to install team hooks", "error", err)
-		http.Error(w, fmt.Sprintf("failed to install hooks: %v", err), http.StatusInternalServerError)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusInternalServerError)
+		fmt.Fprintf(w, `<span class="settings-sublabel">Team Hooks</span><span class="hooks-badge hooks-inactive">Error: %s</span>`, err.Error())
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]string{"status": "installed"})
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprint(w, `<span class="settings-sublabel">Team Hooks</span><span class="hooks-badge hooks-active">Installed</span>`)
 }
