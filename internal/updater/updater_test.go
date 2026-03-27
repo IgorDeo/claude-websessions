@@ -171,7 +171,7 @@ func TestFetchExpectedHash_ReturnsHashForMatchingAsset(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/releases/download/v1.2.3/checksums.txt" {
-			fmt.Fprint(w, checksumContent)
+			_, _ = fmt.Fprint(w, checksumContent)
 			return
 		}
 		http.NotFound(w, r)
@@ -187,7 +187,7 @@ func TestFetchExpectedHash_ReturnsHashForMatchingAsset(t *testing.T) {
 
 func TestFetchExpectedHash_ReturnsEmptyWhenAssetNotListed(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "abc123  other-asset\n")
+		_, _ = fmt.Fprint(w, "abc123  other-asset\n")
 	}))
 	defer srv.Close()
 

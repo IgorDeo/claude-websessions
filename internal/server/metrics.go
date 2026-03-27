@@ -23,13 +23,13 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// websessions_sessions_total
-	fmt.Fprintf(w, "# HELP websessions_sessions_total Number of sessions per state\n")
-	fmt.Fprintf(w, "# TYPE websessions_sessions_total gauge\n")
+	_, _ = fmt.Fprintf(w, "# HELP websessions_sessions_total Number of sessions per state\n")
+	_, _ = fmt.Fprintf(w, "# TYPE websessions_sessions_total gauge\n")
 	if len(stateCounts) == 0 {
-		fmt.Fprintf(w, "websessions_sessions_total{state=\"none\"} 0\n")
+		_, _ = fmt.Fprintf(w, "websessions_sessions_total{state=\"none\"} 0\n")
 	} else {
 		for state, count := range stateCounts {
-			fmt.Fprintf(w, "websessions_sessions_total{state=%q} %d\n", state, count)
+			_, _ = fmt.Fprintf(w, "websessions_sessions_total{state=%q} %d\n", state, count)
 		}
 	}
 
@@ -41,34 +41,34 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 			activeCount++
 		}
 	}
-	fmt.Fprintf(w, "# HELP websessions_sessions_active Number of active (running or waiting) sessions\n")
-	fmt.Fprintf(w, "# TYPE websessions_sessions_active gauge\n")
-	fmt.Fprintf(w, "websessions_sessions_active %d\n", activeCount)
+	_, _ = fmt.Fprintf(w, "# HELP websessions_sessions_active Number of active (running or waiting) sessions\n")
+	_, _ = fmt.Fprintf(w, "# TYPE websessions_sessions_active gauge\n")
+	_, _ = fmt.Fprintf(w, "websessions_sessions_active %d\n", activeCount)
 
 	// websessions_uptime_seconds
 	uptime := time.Since(startTime).Seconds()
-	fmt.Fprintf(w, "# HELP websessions_uptime_seconds Seconds since server start\n")
-	fmt.Fprintf(w, "# TYPE websessions_uptime_seconds gauge\n")
-	fmt.Fprintf(w, "websessions_uptime_seconds %g\n", uptime)
+	_, _ = fmt.Fprintf(w, "# HELP websessions_uptime_seconds Seconds since server start\n")
+	_, _ = fmt.Fprintf(w, "# TYPE websessions_uptime_seconds gauge\n")
+	_, _ = fmt.Fprintf(w, "websessions_uptime_seconds %g\n", uptime)
 
 	// websessions_goroutines
-	fmt.Fprintf(w, "# HELP websessions_goroutines Number of goroutines\n")
-	fmt.Fprintf(w, "# TYPE websessions_goroutines gauge\n")
-	fmt.Fprintf(w, "websessions_goroutines %d\n", runtime.NumGoroutine())
+	_, _ = fmt.Fprintf(w, "# HELP websessions_goroutines Number of goroutines\n")
+	_, _ = fmt.Fprintf(w, "# TYPE websessions_goroutines gauge\n")
+	_, _ = fmt.Fprintf(w, "websessions_goroutines %d\n", runtime.NumGoroutine())
 
 	// websessions_memory_alloc_bytes
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)
-	fmt.Fprintf(w, "# HELP websessions_memory_alloc_bytes Bytes of allocated heap objects\n")
-	fmt.Fprintf(w, "# TYPE websessions_memory_alloc_bytes gauge\n")
-	fmt.Fprintf(w, "websessions_memory_alloc_bytes %d\n", m.Alloc)
+	_, _ = fmt.Fprintf(w, "# HELP websessions_memory_alloc_bytes Bytes of allocated heap objects\n")
+	_, _ = fmt.Fprintf(w, "# TYPE websessions_memory_alloc_bytes gauge\n")
+	_, _ = fmt.Fprintf(w, "websessions_memory_alloc_bytes %d\n", m.Alloc)
 
 	// websessions_notifications_pending
-	fmt.Fprintf(w, "# HELP websessions_notifications_pending Number of unread notifications\n")
-	fmt.Fprintf(w, "# TYPE websessions_notifications_pending gauge\n")
+	_, _ = fmt.Fprintf(w, "# HELP websessions_notifications_pending Number of unread notifications\n")
+	_, _ = fmt.Fprintf(w, "# TYPE websessions_notifications_pending gauge\n")
 	pendingCount := 0
 	if s.sink != nil {
 		pendingCount = s.sink.UnreadCount()
 	}
-	fmt.Fprintf(w, "websessions_notifications_pending %d\n", pendingCount)
+	_, _ = fmt.Fprintf(w, "websessions_notifications_pending %d\n", pendingCount)
 }

@@ -1,23 +1,16 @@
 package store
 
 import (
-	"os"
+	"path/filepath"
 	"testing"
 )
 
 func TestOutputSaveLoadRoundTrip(t *testing.T) {
-	f, err := os.CreateTemp("", "ws-output-test-*.db")
+	st, err := Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
-	defer os.Remove(f.Name())
-
-	st, err := Open(f.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	defer st.Close() //nolint:errcheck
 
 	sessionID := "test-session-1"
 	data := []byte("hello terminal output\r\nline 2\r\n")
@@ -36,18 +29,11 @@ func TestOutputSaveLoadRoundTrip(t *testing.T) {
 }
 
 func TestOutputLoadMissingReturnsNil(t *testing.T) {
-	f, err := os.CreateTemp("", "ws-output-test-*.db")
+	st, err := Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
-	defer os.Remove(f.Name())
-
-	st, err := Open(f.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	defer st.Close() //nolint:errcheck
 
 	got, err := st.LoadOutput("nonexistent-session")
 	if err != nil {
@@ -59,18 +45,11 @@ func TestOutputLoadMissingReturnsNil(t *testing.T) {
 }
 
 func TestOutputDelete(t *testing.T) {
-	f, err := os.CreateTemp("", "ws-output-test-*.db")
+	st, err := Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
-	defer os.Remove(f.Name())
-
-	st, err := Open(f.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	defer st.Close() //nolint:errcheck
 
 	sessionID := "test-session-delete"
 	data := []byte("some output data")
@@ -93,18 +72,11 @@ func TestOutputDelete(t *testing.T) {
 }
 
 func TestOutputSaveOverwrite(t *testing.T) {
-	f, err := os.CreateTemp("", "ws-output-test-*.db")
+	st, err := Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
-	defer os.Remove(f.Name())
-
-	st, err := Open(f.Name())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer st.Close()
+	defer st.Close() //nolint:errcheck
 
 	sessionID := "test-session-overwrite"
 	first := []byte("first output")
