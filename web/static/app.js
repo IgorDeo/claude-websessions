@@ -224,6 +224,28 @@ window.websessions = (function() {
     session.resizeObserver = resizeObserver;
 
     terminals[sessionID] = session;
+    pollResources(sessionID);
+  }
+
+  function pollResources(sessionID) {
+    function poll() {
+      var pane = document.querySelector('.terminal-pane[data-session-id="' + sessionID + '"]');
+      if (!pane) return; // pane removed, stop polling
+      var el = pane.querySelector('.pane-resources');
+      if (!el) return;
+      fetch('/sessions/' + sessionID + '/resources')
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.rss_kb > 0) {
+            el.textContent = Math.round(data.rss_kb / 1024) + ' MB';
+          } else {
+            el.textContent = '';
+          }
+        })
+        .catch(function() {});
+      setTimeout(poll, 10000);
+    }
+    setTimeout(poll, 2000); // initial delay
   }
 
   function disconnectSession(sessionID) {

@@ -702,6 +702,34 @@ func stripAnsi(data []byte) []byte {
 	return out
 }
 
+// handleSessionResources returns memory usage for a session.
+func (s *Server) handleSessionResources(w http.ResponseWriter, r *http.Request, sessionID string) {
+	sess, ok := s.mgr.Get(sessionID)
+	if !ok {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if sess.TmuxSession == "" {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"rss_kb": 0})
+		return
+	}
+	pid, err := session.GetTmuxPanePID(sess.TmuxSession)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"rss_kb": 0})
+		return
+	}
+	usage, err := session.GetResourceUsage(pid)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"rss_kb": 0})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"rss_kb": usage.RSSKB})
+}
+
 // handleExportOutput exports a session's terminal output as plain text with ANSI sequences stripped.
 func (s *Server) handleExportOutput(w http.ResponseWriter, r *http.Request, sessionID string) {
 	sess, ok := s.mgr.Get(sessionID)

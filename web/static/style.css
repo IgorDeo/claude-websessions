@@ -1137,3 +1137,13 @@ html, body {
     color: var(--text-primary);
     font-weight: 500;
 }
+
+/* ============================================================
+   Session Resource Usage
+   ============================================================ */
+.pane-resources {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    margin-left: auto;
+    padding: 0 8px;
+}
