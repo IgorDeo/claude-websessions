@@ -2232,7 +2232,47 @@ window.websessions = (function() {
     // Restore notification sounds toggle on settings page
     var cb = document.getElementById('notif-sounds-toggle');
     if (cb) cb.checked = getNotifSoundsEnabled();
+    initAutoSaveSettings();
   });
+
+  function initAutoSaveSettings() {
+    var form = document.getElementById('settings-form');
+    if (!form) return;
+    var indicator = document.getElementById('auto-save-indicator');
+    var hideTimer = null;
+
+    function showIndicator() {
+      if (indicator) {
+        indicator.classList.add('visible');
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(function() {
+          indicator.classList.remove('visible');
+        }, 2000);
+      }
+    }
+
+    function doSave() {
+      fetch(form.action, { method: 'POST', body: new FormData(form) })
+        .then(function() { showIndicator(); })
+        .catch(function() {});
+    }
+
+    var debounceTimer = null;
+    function debouncedSave() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(doSave, 800);
+    }
+
+    var inputs = form.querySelectorAll('input, select');
+    inputs.forEach(function(el) {
+      var type = (el.type || '').toLowerCase();
+      if (el.tagName.toLowerCase() === 'select' || type === 'checkbox' || type === 'radio') {
+        el.addEventListener('change', debouncedSave);
+      } else {
+        el.addEventListener('input', debouncedSave);
+      }
+    });
+  }
 
   // Global notification WebSocket
   var notifWs = null;
