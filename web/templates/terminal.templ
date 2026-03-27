@@ -11,6 +11,15 @@ templ Terminal(sessionID string, sessionName string, workDir string, state strin
 			>{ sessionName }</span>
 			<span class="pane-status">{ state }</span>
 			<span class="pane-dir">{ workDir }</span>
+			<input
+				type="text"
+				class="pane-note"
+				placeholder="Add note..."
+				value=""
+				data-session-id={ sessionID }
+				onblur="window.websessions.saveNote(this)"
+				onkeydown="if(event.key==='Enter')this.blur()"
+			/>
 			<div class="pane-actions">
 				<a class="export-btn" title="Export output as text" href={ templ.SafeURL("/sessions/" + sessionID + "/export") } download>&#8615;</a>
 				<button class="diff-btn" title="View git changes" onclick={ diffAction(sessionID) }>&#916;</button>

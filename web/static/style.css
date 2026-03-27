@@ -1037,3 +1037,28 @@ html, body {
     color: var(--text-primary);
     background: var(--bg-hover);
 }
+
+/* ============================================================
+   Session Notes
+   ============================================================ */
+.pane-note {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    padding: 1px 4px;
+    max-width: 200px;
+}
+.pane-note:focus {
+    border-color: var(--border);
+    outline: none;
+    background: var(--bg-secondary);
+}
+.session-note {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    font-style: italic;
+    display: block;
+    margin-top: 1px;
+}

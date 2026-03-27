@@ -2507,6 +2507,16 @@ window.websessions = (function() {
       return;
     }
   });
+
+  function saveNote(input) {
+    var sid = input.dataset.sessionId;
+    fetch('/sessions/' + sid + '/note', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ note: input.value })
+    });
+  }
+
   return {
     connectSession: connectSession,
     disconnectSession: disconnectSession,
@@ -2549,5 +2559,6 @@ window.websessions = (function() {
     drop: drop,
     dragEnd: dragEnd,
     terminals: terminals,
+    saveNote: saveNote,
   };
 })();

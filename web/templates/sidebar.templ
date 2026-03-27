@@ -96,6 +96,9 @@ templ sessionItem(s SessionView, grouped bool) {
 						}
 					</div>
 					<span class="session-dir">{ s.WorkDir }</span>
+					if s.Note != "" {
+						<span class="session-note">{ s.Note }</span>
+					}
 				</div>
 			</div>
 		} else {
@@ -110,6 +113,9 @@ templ sessionItem(s SessionView, grouped bool) {
 						}
 					</div>
 					<span class="session-dir">{ s.WorkDir }</span>
+					if s.Note != "" {
+						<span class="session-note">{ s.Note }</span>
+					}
 				</div>
 			</div>
 		}

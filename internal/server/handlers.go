@@ -33,6 +33,10 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	views := make([]templates.SessionView, len(sessions))
 	for i, sess := range sessions {
 		views[i] = sessionToView(sess)
+		if s.store != nil {
+			note, _ := s.store.GetPreference("session-note:" + sess.ID)
+			views[i].Note = note
+		}
 	}
 	s.applyTabGroups(views)
 	data := templates.PageData{Sessions: views, UnreadCount: s.sink.UnreadCount()}
@@ -47,6 +51,10 @@ func (s *Server) handleSidebar(w http.ResponseWriter, r *http.Request) {
 	views := make([]templates.SessionView, len(sessions))
 	for i, sess := range sessions {
 		views[i] = sessionToView(sess)
+		if s.store != nil {
+			note, _ := s.store.GetPreference("session-note:" + sess.ID)
+			views[i].Note = note
+		}
 	}
 	s.applyTabGroups(views)
 	if err := templates.Sidebar(views, s.loadHistory(views)).Render(r.Context(), w); err != nil {
@@ -1431,4 +1439,21 @@ func (s *Server) handleListDirs(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(dirs)
+}
+
+func (s *Server) handleSetSessionNote(w http.ResponseWriter, r *http.Request, sessionID string) {
+	var payload struct {
+		Note string `json:"note"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if s.store != nil {
+		if err := s.store.SetPreference("session-note:"+sessionID, payload.Note); err != nil {
+			http.Error(w, "failed to save note", http.StatusInternalServerError)
+			return
+		}
+	}
+	w.WriteHeader(http.StatusOK)
 }
