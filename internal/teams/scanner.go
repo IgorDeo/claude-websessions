@@ -163,12 +163,7 @@ func ScanMailbox(teamName string) ([]Message, error) {
 		if err := json.Unmarshal(data, &mf); err != nil {
 			continue
 		}
-		messages = append(messages, Message{
-			From:      mf.From,
-			To:        mf.To,
-			Content:   mf.Content,
-			Timestamp: mf.Timestamp,
-		})
+		messages = append(messages, Message(mf))
 	}
 	return messages, nil
 }
