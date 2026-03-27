@@ -1,5 +1,7 @@
 package templates
 
+import "strings"
+
 templ Sidebar(sessions []SessionView, history []SessionView) {
 	<div class="sidebar-tabs">
 		<button class="sidebar-tab sidebar-tab-active" onclick="window.websessions.switchSidebarTab('active', this)">Active</button>
@@ -25,7 +27,14 @@ templ Sidebar(sessions []SessionView, history []SessionView) {
 					<span class="status-dot"></span>
 					<div class="session-info">
 						<span class="session-name">{ s.Name }</span>
-						<span class="session-dir">{ s.WorkDir }</span>
+						<span class="session-dir" title={ s.WorkDir }>
+							for i, seg := range pathBreadcrumbs(s.WorkDir) {
+								if i > 0 {
+									<span class="path-sep">/</span>
+								}
+								<span class="path-segment">{ seg }</span>
+							}
+						</span>
 						<span class="session-status-label">{ s.State }</span>
 					</div>
 					<button
@@ -99,7 +108,14 @@ templ sessionItem(s SessionView, grouped bool) {
 							<span class="sandbox-badge" title="Running in Docker sandbox VM">&#128737;</span>
 						}
 					</div>
-					<span class="session-dir">{ s.WorkDir }</span>
+					<span class="session-dir" title={ s.WorkDir }>
+						for i, seg := range pathBreadcrumbs(s.WorkDir) {
+							if i > 0 {
+								<span class="path-sep">/</span>
+							}
+							<span class="path-segment">{ seg }</span>
+						}
+					</span>
 					if s.Note != "" {
 						<span class="session-note">{ s.Note }</span>
 					}
@@ -116,7 +132,14 @@ templ sessionItem(s SessionView, grouped bool) {
 							<span class="sandbox-badge" title="Running in Docker sandbox VM">&#128737;</span>
 						}
 					</div>
-					<span class="session-dir">{ s.WorkDir }</span>
+					<span class="session-dir" title={ s.WorkDir }>
+						for i, seg := range pathBreadcrumbs(s.WorkDir) {
+							if i > 0 {
+								<span class="path-sep">/</span>
+							}
+							<span class="path-segment">{ seg }</span>
+						}
+					</span>
 					if s.Note != "" {
 						<span class="session-note">{ s.Note }</span>
 					}
@@ -185,4 +208,12 @@ func countInGroup(groupName string, sessions []SessionView) int {
 		}
 	}
 	return count
+}
+
+func pathBreadcrumbs(fullPath string) []string {
+	parts := strings.Split(fullPath, "/")
+	if len(parts) <= 3 {
+		return parts
+	}
+	return append([]string{"..."}, parts[len(parts)-2:]...)
 }

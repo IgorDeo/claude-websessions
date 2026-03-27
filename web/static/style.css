@@ -1122,3 +1122,18 @@ html, body {
 .auto-save-indicator.visible {
     opacity: 1;
 }
+
+/* ============================================================
+   Path Breadcrumbs
+   ============================================================ */
+.path-sep {
+    color: var(--text-tertiary);
+    margin: 0 1px;
+}
+.path-segment {
+    color: var(--text-secondary);
+}
+.path-segment:last-child {
+    color: var(--text-primary);
+    font-weight: 500;
+}
