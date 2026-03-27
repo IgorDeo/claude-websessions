@@ -20,6 +20,7 @@ type SessionView struct {
 	Sandboxed bool
 	GroupName string // non-empty if session is in a split tab group
 	Note      string
+	Color     string
 }
 
 type NotificationView struct {
@@ -85,7 +86,7 @@ func Index(data PageData) templ.Component {
 				var templ_7745c5c3_Var3 string
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(itoa(data.UnreadCount))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/index.templ`, Line: 64, Col: 69}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/index.templ`, Line: 65, Col: 69}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -112,7 +113,7 @@ func Index(data PageData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div><div id=\"terminal-area\" class=\"terminal-area\"><div class=\"empty-state\"><p>Select a session from the sidebar or create a new one</p><p class=\"empty-state-hint\">Running Claude Code sessions are discovered automatically</p><p class=\"empty-state-keys\"><kbd>Ctrl+N</kbd> new session <kbd>Ctrl+T</kbd> terminal <kbd>Ctrl+Tab</kbd> cycle tabs</p></div></div></div></div><footer class=\"footer\"><button class=\"new-session-btn\" hx-get=\"/sessions/new\" hx-target=\"#modal\" hx-swap=\"innerHTML\">+ New Session</button> <button class=\"new-terminal-btn\" onclick=\"window.websessions.openTerminal()\">&#9002; Terminal</button><div class=\"footer-spacer\"></div><button class=\"kill-all-btn\" onclick=\"window.websessions.killAllSessions()\" title=\"Kill all running sessions\">&#9632; Kill All</button></footer><div id=\"modal\"></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div><div id=\"terminal-area\" class=\"terminal-area\"><div class=\"empty-state\"><p>Select a session from the sidebar or create a new one</p><p class=\"empty-state-hint\">Running Claude Code sessions are discovered automatically</p><p class=\"empty-state-keys\"><kbd>Ctrl+N</kbd> new session <kbd>Ctrl+T</kbd> terminal <kbd>Ctrl+Tab</kbd> cycle tabs</p></div></div><div id=\"drop-overlay\" class=\"drop-overlay\"><div class=\"drop-overlay-content\"><p>Drop not supported by browsers</p><p class=\"drop-hint\">Use Ctrl+N and paste a directory path</p></div></div></div></div><footer class=\"footer\"><button class=\"new-session-btn\" hx-get=\"/sessions/new\" hx-target=\"#modal\" hx-swap=\"innerHTML\">+ New Session</button> <button class=\"new-terminal-btn\" onclick=\"window.websessions.openTerminal()\">&#9002; Terminal</button><div class=\"footer-spacer\"></div><button class=\"kill-all-btn\" onclick=\"window.websessions.killAllSessions()\" title=\"Kill all running sessions\">&#9632; Kill All</button></footer><div id=\"modal\"></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
