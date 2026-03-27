@@ -173,6 +173,9 @@ func main() {
 				ExitCode: s.ExitCode, Status: "killed", PID: s.PID,
 				Sandboxed: s.Sandboxed, SandboxName: s.SandboxName,
 			})
+			if buf := s.Output().Bytes(); len(buf) > 0 {
+				_ = st.SaveOutput(s.ID, buf)
+			}
 			return
 		}
 
@@ -198,6 +201,11 @@ func main() {
 		_ = st.SaveNotification(store.NotificationRecord{
 			SessionID: s.ID, EventType: string(eventType), Timestamp: time.Now(),
 		})
+		if to == session.StateCompleted || to == session.StateErrored {
+			if buf := s.Output().Bytes(); len(buf) > 0 {
+				_ = st.SaveOutput(s.ID, buf)
+			}
+		}
 	})
 
 	// Check tmux availability
@@ -212,6 +220,14 @@ func main() {
 	recoveredCount := mgr.RecoverTmuxSessions()
 	if recoveredCount > 0 {
 		fmt.Fprintf(os.Stderr, "  %s%s● Reattached to %d tmux session(s)%s\n", colorGreen, colorBold, recoveredCount, colorReset)
+		// Preload persisted output for reattached sessions
+		for _, s := range mgr.List() {
+			if s.GetState() == session.StateRunning {
+				if data, err := st.LoadOutput(s.ID); err == nil && len(data) > 0 {
+					s.PreloadOutput(data)
+				}
+			}
+		}
 	}
 
 	// Restore previous sessions from SQLite as offline (only those not already recovered)
@@ -235,7 +251,10 @@ func main() {
 			if name == "" {
 				name = rec.ID
 			}
-			mgr.AddOffline(rec.ID, name, rec.ClaudeID, rec.WorkDir)
+			offlineSess := mgr.AddOffline(rec.ID, name, rec.ClaudeID, rec.WorkDir)
+			if data, err := st.LoadOutput(rec.ID); err == nil && len(data) > 0 {
+				offlineSess.PreloadOutput(data)
+			}
 			offlineCount++
 		}
 	}
@@ -439,6 +458,9 @@ func main() {
 			ExitCode: s.ExitCode, Status: string(s.GetState()), PID: s.PID,
 			Sandboxed: s.Sandboxed, SandboxName: s.SandboxName,
 		})
+		if buf := s.Output().Bytes(); len(buf) > 0 {
+			_ = st.SaveOutput(s.ID, buf)
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

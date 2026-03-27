@@ -87,6 +87,13 @@ func (s *Session) Output() *RingBuf {
 	return s.output
 }
 
+// PreloadOutput writes previously persisted output into the ring buffer.
+func (s *Session) PreloadOutput(data []byte) {
+	if len(data) > 0 {
+		s.output.Write(data) //nolint:errcheck
+	}
+}
+
 // Resize resizes the tmux window and the reader PTY for this session.
 func (s *Session) Resize(rows, cols uint16) error {
 	s.mu.RLock()

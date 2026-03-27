@@ -66,6 +66,11 @@ func migrate(db *sql.DB) error {
 	CREATE TABLE IF NOT EXISTS preferences (
 		key TEXT PRIMARY KEY,
 		value TEXT
+	);
+	CREATE TABLE IF NOT EXISTS session_output (
+		session_id TEXT PRIMARY KEY,
+		data BLOB,
+		updated_at DATETIME
 	);`
 	_, err := db.Exec(schema)
 	if err != nil {
@@ -210,6 +215,31 @@ func (s *Store) GetAllPreferences() (map[string]string, error) {
 		prefs[k] = v
 	}
 	return prefs, rows.Err()
+}
+
+func (s *Store) SaveOutput(sessionID string, data []byte) error {
+	_, err := s.db.Exec(
+		`INSERT OR REPLACE INTO session_output (session_id, data, updated_at) VALUES (?, ?, ?)`,
+		sessionID, data, time.Now(),
+	)
+	return err
+}
+
+func (s *Store) LoadOutput(sessionID string) ([]byte, error) {
+	var data []byte
+	err := s.db.QueryRow(`SELECT data FROM session_output WHERE session_id = ?`, sessionID).Scan(&data)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+func (s *Store) DeleteOutput(sessionID string) error {
+	_, err := s.db.Exec(`DELETE FROM session_output WHERE session_id = ?`, sessionID)
+	return err
 }
 
 func (s *Store) LogAudit(action, sessionID, clientIP string) error {
