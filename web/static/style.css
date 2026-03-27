@@ -1139,6 +1139,45 @@ html, body {
 }
 
 /* ============================================================
+   Multi-Select Sidebar
+   ============================================================ */
+.session-checkbox {
+    appearance: auto;
+    margin-right: 4px;
+    flex-shrink: 0;
+    cursor: pointer;
+    opacity: 0;
+    width: 0;
+    transition: opacity 0.2s, width 0.2s;
+}
+.session-item:hover .session-checkbox,
+.session-checkbox:checked {
+    opacity: 1;
+    width: 14px;
+}
+.bulk-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+}
+.bulk-action-btn {
+    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    font-size: 11px;
+}
+.bulk-action-btn:hover {
+    background: var(--accent);
+    color: white;
+}
+
+/* ============================================================
    Session Resource Usage
    ============================================================ */
 .pane-resources {

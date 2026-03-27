@@ -15,6 +15,11 @@ templ Sidebar(sessions []SessionView, history []SessionView) {
 	<div class="sidebar-search">
 		<input type="text" id="session-search" placeholder="Search sessions..." oninput="window.websessions.filterSessions(this.value)"/>
 	</div>
+	<div id="bulk-actions" class="bulk-actions" style="display:none">
+		<span id="bulk-count">0 selected</span>
+		<div class="bulk-action-btn" onclick="window.websessions.bulkKill()">Kill</div>
+		<div class="bulk-action-btn" onclick="window.websessions.bulkClearSelection()">Cancel</div>
+	</div>
 	<div id="sidebar-active" class="sidebar-panel sidebar-panel-visible">
 		<div class="session-list" id="session-list">
 			@sidebarSessions(sessions)
@@ -90,6 +95,9 @@ templ sessionItem(s SessionView, grouped bool) {
 	>
 		if s.Color != "" {
 			<div class="session-color-bar" style={ "background-color:" + s.Color }></div>
+		}
+		if s.State != "offline" && s.State != "discovered" {
+			<input type="checkbox" class="session-checkbox" data-session-id={ s.ID } onclick="window.websessions.toggleSessionSelect(this, event)"/>
 		}
 		if !grouped {
 			<div class="drag-handle" title="Drag to reorder">&#8801;</div>
