@@ -77,7 +77,11 @@ templ sessionItem(s SessionView, grouped bool) {
 		ondragover="window.websessions.dragOver(event)"
 		ondrop="window.websessions.drop(event)"
 		ondragend="window.websessions.dragEnd(event)"
+		oncontextmenu={ colorPickerAction(s.ID) }
 	>
+		if s.Color != "" {
+			<div class="session-color-bar" style={ "background-color:" + s.Color }></div>
+		}
 		if !grouped {
 			<div class="drag-handle" title="Drag to reorder">&#8801;</div>
 		}
@@ -130,6 +134,11 @@ templ sessionItem(s SessionView, grouped bool) {
 
 script openSession(id string, name string, state string) {
 	window.websessions.openTab(id, name, state);
+}
+
+script colorPickerAction(id string) {
+	event.preventDefault();
+	window.websessions.showColorPicker(id, event);
 }
 
 func stateClass(state string) string {

@@ -1062,3 +1062,49 @@ html, body {
     display: block;
     margin-top: 1px;
 }
+
+/* ============================================================
+   Session Color Coding
+   ============================================================ */
+.session-color-bar {
+    width: 3px;
+    border-radius: 2px;
+    align-self: stretch;
+    flex-shrink: 0;
+}
+.color-picker-menu {
+    position: fixed;
+    display: flex;
+    gap: 4px;
+    padding: 6px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.color-swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+}
+.color-swatch:hover {
+    border-color: var(--text-primary);
+}
+.color-swatch-clear {
+    background: var(--bg-secondary);
+    border: 2px dashed var(--border);
+    position: relative;
+}
+.color-swatch-clear::after {
+    content: "\00d7";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 12px;
+}

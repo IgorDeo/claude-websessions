@@ -2560,5 +2560,59 @@ window.websessions = (function() {
     dragEnd: dragEnd,
     terminals: terminals,
     saveNote: saveNote,
+    showColorPicker: function(sessionID, event) {
+      var existing = document.querySelector('.color-picker-menu');
+      if (existing) existing.remove();
+
+      var colors = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899'];
+      var menu = document.createElement('div');
+      menu.className = 'color-picker-menu';
+
+      var clear = document.createElement('div');
+      clear.className = 'color-swatch color-swatch-clear';
+      clear.onclick = function() { window.websessions.setSessionColor(sessionID, ''); menu.remove(); };
+      menu.appendChild(clear);
+
+      colors.forEach(function(c) {
+        var swatch = document.createElement('div');
+        swatch.className = 'color-swatch';
+        swatch.style.backgroundColor = c;
+        swatch.onclick = function() { window.websessions.setSessionColor(sessionID, c); menu.remove(); };
+        menu.appendChild(swatch);
+      });
+
+      menu.style.position = 'fixed';
+      menu.style.left = event.clientX + 'px';
+      menu.style.top = event.clientY + 'px';
+      document.body.appendChild(menu);
+
+      setTimeout(function() {
+        document.addEventListener('click', function handler() {
+          menu.remove();
+          document.removeEventListener('click', handler);
+        });
+      }, 0);
+    },
+    setSessionColor: function(sessionID, color) {
+      fetch('/sessions/' + sessionID + '/color', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ color: color })
+      }).then(function() {
+        var item = document.querySelector('.session-item[data-session-id="' + sessionID + '"]');
+        if (!item) return;
+        var bar = item.querySelector('.session-color-bar');
+        if (color) {
+          if (!bar) {
+            bar = document.createElement('div');
+            bar.className = 'session-color-bar';
+            item.insertBefore(bar, item.firstChild);
+          }
+          bar.style.backgroundColor = color;
+        } else if (bar) {
+          bar.remove();
+        }
+      });
+    },
   };
 })();

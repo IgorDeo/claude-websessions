@@ -113,6 +113,9 @@ func (s *Server) routes() http.Handler {
 	r.Put("/sessions/{sessionID}/note", func(w http.ResponseWriter, r *http.Request) {
 		s.handleSetSessionNote(w, r, chi.URLParam(r, "sessionID"))
 	})
+	r.Put("/sessions/{sessionID}/color", func(w http.ResponseWriter, r *http.Request) {
+		s.handleSetSessionColor(w, r, chi.URLParam(r, "sessionID"))
+	})
 
 	// Iframe panes
 	r.Post("/panes/iframe/open", s.handleOpenIframe)

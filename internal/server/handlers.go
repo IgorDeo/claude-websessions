@@ -36,6 +36,8 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		if s.store != nil {
 			note, _ := s.store.GetPreference("session-note:" + sess.ID)
 			views[i].Note = note
+			color, _ := s.store.GetPreference("session-color:" + sess.ID)
+			views[i].Color = color
 		}
 	}
 	s.applyTabGroups(views)
@@ -54,6 +56,8 @@ func (s *Server) handleSidebar(w http.ResponseWriter, r *http.Request) {
 		if s.store != nil {
 			note, _ := s.store.GetPreference("session-note:" + sess.ID)
 			views[i].Note = note
+			color, _ := s.store.GetPreference("session-color:" + sess.ID)
+			views[i].Color = color
 		}
 	}
 	s.applyTabGroups(views)
@@ -1452,6 +1456,23 @@ func (s *Server) handleSetSessionNote(w http.ResponseWriter, r *http.Request, se
 	if s.store != nil {
 		if err := s.store.SetPreference("session-note:"+sessionID, payload.Note); err != nil {
 			http.Error(w, "failed to save note", http.StatusInternalServerError)
+			return
+		}
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleSetSessionColor(w http.ResponseWriter, r *http.Request, sessionID string) {
+	var payload struct {
+		Color string `json:"color"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if s.store != nil {
+		if err := s.store.SetPreference("session-color:"+sessionID, payload.Color); err != nil {
+			http.Error(w, "failed to save color", http.StatusInternalServerError)
 			return
 		}
 	}
