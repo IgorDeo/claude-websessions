@@ -342,6 +342,10 @@ func main() {
 					if p.WorkDir != "" && existingDirs[p.WorkDir] {
 						continue
 					}
+					// Skip if this PID was recently killed by the user
+					if mgr.WasKilled(p.PID) {
+						continue
+					}
 					id := fmt.Sprintf("discovered-%d", p.PID)
 					s := mgr.AddDiscovered(id, p.ClaudeID, p.WorkDir, p.PID, p.StartTime)
 					_ = st.SaveSession(store.SessionRecord{

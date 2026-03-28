@@ -61,6 +61,8 @@ func tmuxCreateSession(name, workDir, command string, args []string) error {
 	_, _ = tmuxRun("set-option", "-t", name, "default-terminal", "xterm-256color")
 	// Use the largest client size (not smallest) so the window expands to fill
 	_, _ = tmuxRun("set-window-option", "-t", name, "aggressive-resize", "on")
+	// Signal wait-for channel when pane dies for fast exit detection
+	_, _ = tmuxRun("set-hook", "-t", name, "pane-died", "run-shell 'tmux wait-for -S "+name+"-done'")
 
 	return nil
 }

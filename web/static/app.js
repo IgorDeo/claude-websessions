@@ -2336,6 +2336,7 @@ window.websessions = (function() {
           if (!badge && bell) {
             badge = document.createElement('span');
             badge.className = 'badge';
+            badge.id = 'notif-badge';
             badge.textContent = '0';
             bell.appendChild(badge);
           }

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/creack/pty"
@@ -26,6 +27,7 @@ type Manager struct {
 	onStateChange StateChangeFunc
 	onOutput      OutputFunc
 	stopReaders   map[string]chan struct{} // signal to stop reading for a session
+	killedPIDs    map[int]time.Time       // PIDs of killed sessions, with kill time
 }
 
 func NewManager(bufferSize int64) *Manager {
@@ -33,7 +35,33 @@ func NewManager(bufferSize int64) *Manager {
 		sessions:    make(map[string]*Session),
 		bufferSize:  bufferSize,
 		stopReaders: make(map[string]chan struct{}),
+		killedPIDs:  make(map[int]time.Time),
 	}
+}
+
+// TrackKilledPID records a PID as killed so discovery skips it.
+func (m *Manager) TrackKilledPID(pid int) {
+	if pid <= 0 {
+		return
+	}
+	m.mu.Lock()
+	m.killedPIDs[pid] = time.Now()
+	m.mu.Unlock()
+}
+
+// WasKilled reports whether a PID was recently killed (within the last 5 minutes).
+func (m *Manager) WasKilled(pid int) bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	t, ok := m.killedPIDs[pid]
+	if !ok {
+		return false
+	}
+	// Expire after 5 minutes so stale entries don't accumulate
+	if time.Since(t) > 5*time.Minute {
+		return false
+	}
+	return true
 }
 
 // CreateOptions holds optional parameters for session creation.
@@ -219,33 +247,94 @@ func (m *Manager) startReader(s *Session) {
 			return
 		}
 		s.SetReaderPTY(ptmx)
+
+		// Fast exit detection: tmux wait-for signals immediately when pane dies,
+		// rather than waiting for the PTY EOF which has inherent delay.
+		paneDone := make(chan struct{})
+		waitCmd := exec.Command("tmux", "wait-for", s.TmuxSession+"-done")
+		if waitErr := waitCmd.Start(); waitErr == nil {
+			go func() {
+				_ = waitCmd.Wait()
+				close(paneDone)
+			}()
+		} else {
+			// Fallback: if wait-for fails to start, paneDone never closes
+			// and we rely on normal PTY EOF detection.
+			slog.Debug("tmux wait-for failed to start, using PTY EOF detection", "error", waitErr)
+		}
+
 		defer func() {
 			s.SetReaderPTY(nil)
 			_ = ptmx.Close()
 			_ = cmd.Process.Kill()
+			// Clean up wait-for process if still running
+			if waitCmd.Process != nil {
+				_ = waitCmd.Process.Kill()
+			}
 		}()
 
-		buf := make([]byte, 4096)
+		// Read PTY output in a separate goroutine so we can select on multiple channels.
+		type readResult struct {
+			buf []byte
+			err error
+		}
+		readCh := make(chan readResult, 1)
+		go func() {
+			buf := make([]byte, 4096)
+			for {
+				n, err := ptmx.Read(buf)
+				if n > 0 {
+					data := make([]byte, n)
+					copy(data, buf[:n])
+					readCh <- readResult{buf: data}
+				}
+				if err != nil {
+					readCh <- readResult{err: err}
+					return
+				}
+			}
+		}()
+
 		for {
 			select {
 			case <-stop:
 				return
-			default:
-			}
-
-			n, err := ptmx.Read(buf)
-			if n > 0 {
-				_, _ = s.Output().Write(buf[:n])
-				if m.onOutput != nil {
-					m.onOutput(s.ID, buf[:n])
+			case <-paneDone:
+				// Pane died — drain remaining buffered output then transition state.
+				drainTimer := time.After(200 * time.Millisecond)
+			drain:
+				for {
+					select {
+					case res := <-readCh:
+						if len(res.buf) > 0 {
+							_, _ = s.Output().Write(res.buf)
+							if m.onOutput != nil {
+								m.onOutput(s.ID, res.buf)
+							}
+						}
+						if res.err != nil {
+							break drain
+						}
+					case <-drainTimer:
+						break drain
+					}
 				}
-				m.checkWaitingState(s, buf[:n])
-			}
-			if err != nil {
-				break
+				goto exited
+			case res := <-readCh:
+				if len(res.buf) > 0 {
+					_, _ = s.Output().Write(res.buf)
+					if m.onOutput != nil {
+						m.onOutput(s.ID, res.buf)
+					}
+					m.checkWaitingState(s, res.buf)
+				}
+				if res.err != nil {
+					goto exited
+				}
 			}
 		}
 
+	exited:
 		// Reader stopped — check if we were explicitly stopped by Kill
 		select {
 		case <-stop:
@@ -384,6 +473,9 @@ func (m *Manager) Kill(id string) error {
 	m.stopReader(id)
 	if s.TmuxSession != "" {
 		_ = tmuxKillSession(s.TmuxSession)
+	} else if s.PID > 0 {
+		// No tmux session (discovered/external) — kill the process directly.
+		_ = syscall.Kill(s.PID, syscall.SIGTERM)
 	}
 	// Stop sandbox VM asynchronously to avoid blocking the UI
 	if s.Sandboxed && s.SandboxName != "" {
@@ -409,6 +501,12 @@ func (m *Manager) Kill(id string) error {
 	s.mu.Unlock()
 	if m.onStateChange != nil {
 		m.onStateChange(s, from, s.GetState())
+	}
+	// Track killed PID so discovery doesn't re-add it
+	if s.PID > 0 {
+		m.mu.Lock()
+		m.killedPIDs[s.PID] = time.Now()
+		m.mu.Unlock()
 	}
 	m.Remove(id)
 	return nil
