@@ -724,10 +724,11 @@ window.websessions = (function() {
     dirDebounce = setTimeout(function() {
       var q = input.value;
       if (!q) return;
+      // Find the sibling suggestions box relative to the input
+      var box = input.parentElement.querySelector('.dir-suggestions');
       fetch('/api/dirs?q=' + encodeURIComponent(q))
         .then(function(r) { return r.json(); })
         .then(function(dirs) {
-          var box = document.getElementById('dir-suggestions');
           if (!box) return;
           while (box.firstChild) box.removeChild(box.firstChild);
           if (!dirs || dirs.length === 0) return;
@@ -747,12 +748,12 @@ window.websessions = (function() {
             // Single click = select this dir and close
             div.addEventListener('click', function(e) {
               e.stopPropagation();
-              selectDir(d, false);
+              selectDir(input, box, d, false);
             });
             // Double click = drill into subdirectories
             div.addEventListener('dblclick', function(e) {
               e.stopPropagation();
-              selectDir(d, true);
+              selectDir(input, box, d, true);
             });
             box.appendChild(div);
           });
@@ -760,28 +761,29 @@ window.websessions = (function() {
     }, 200);
   }
 
-  function selectDir(path, drillDown) {
-    var input = document.getElementById('work_dir');
+  function selectDir(input, box, path, drillDown) {
     if (input) input.value = path;
-    var box = document.getElementById('dir-suggestions');
     if (box) { while (box.firstChild) box.removeChild(box.firstChild); }
     if (drillDown && input) {
       input.value = path + '/';
       dirAutocomplete(input);
     } else {
-      var nameInput = document.getElementById('name');
+      // Auto-fill name field if empty (for new session modal)
+      var nameInput = input.closest('form').querySelector('#name, #team-name');
       if (nameInput && !nameInput.value) {
         nameInput.value = path.split('/').pop();
       }
       if (nameInput) nameInput.focus();
-      // Load claude sessions for the selected directory
-      loadClaudeSessions(path);
+      // Load claude sessions for the selected directory (new session modal only)
+      if (document.getElementById('claude-sessions')) {
+        loadClaudeSessions(path);
+      }
     }
   }
 
   function closeDirSuggestions() {
-    var box = document.getElementById('dir-suggestions');
-    if (box) { while (box.firstChild) box.removeChild(box.firstChild); }
+    var boxes = document.querySelectorAll('.dir-suggestions');
+    boxes.forEach(function(box) { while (box.firstChild) box.removeChild(box.firstChild); });
   }
 
   // Close suggestions when clicking outside
