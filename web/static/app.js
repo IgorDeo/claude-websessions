@@ -383,6 +383,10 @@ window.websessions = (function() {
         el.classList.add('pane-focused');
       }
     });
+    // Focus the xterm.js instance so keyboard input goes to this terminal
+    if (terminals[sessionID] && terminals[sessionID].term) {
+      terminals[sessionID].term.focus();
+    }
   }
 
   function refitAllTerminals() {
