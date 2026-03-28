@@ -1,0 +1,67 @@
+package templates
+
+templ Dashboard() {
+	<!DOCTYPE html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<title>websessions - Metrics</title>
+		<link rel="icon" type="image/svg+xml" href="/static/favicon.svg"/>
+		<link rel="preconnect" href="https://fonts.googleapis.com"/>
+		<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+		<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+		<link rel="stylesheet" href="/static/style.css"/>
+		<link rel="stylesheet" href="/static/uplot.min.css"/>
+		<script src="/static/uplot.min.js"></script>
+	</head>
+	<body>
+		<div class="app">
+			<header class="topbar">
+				<h1 class="topbar-title"><a href="/" class="topbar-link">websessions</a> / Metrics</h1>
+				<div class="topbar-actions">
+					<button class="theme-toggle" onclick="toggleDashboardTheme()" title="Toggle light/dark theme" id="theme-toggle-btn">&#9790;</button>
+				</div>
+			</header>
+			<div class="dashboard-page">
+				<div class="dashboard-controls">
+					<div class="range-buttons">
+						<div class="range-btn range-btn-active" data-range="1h">1h</div>
+						<div class="range-btn" data-range="6h">6h</div>
+						<div class="range-btn" data-range="24h">24h</div>
+						<div class="range-btn" data-range="7d">7d</div>
+					</div>
+					<div class="dashboard-status" id="dashboard-status">Loading...</div>
+				</div>
+				<div class="dashboard-grid">
+					<div class="chart-panel">
+						<div class="chart-title">Active Sessions</div>
+						<div class="chart-container" id="chart-sessions-active"></div>
+					</div>
+					<div class="chart-panel">
+						<div class="chart-title">Sessions by State</div>
+						<div class="chart-container" id="chart-sessions-state"></div>
+					</div>
+					<div class="chart-panel">
+						<div class="chart-title">Memory (MB)</div>
+						<div class="chart-container" id="chart-memory"></div>
+					</div>
+					<div class="chart-panel">
+						<div class="chart-title">Goroutines</div>
+						<div class="chart-container" id="chart-goroutines"></div>
+					</div>
+					<div class="chart-panel">
+						<div class="chart-title">Pending Notifications</div>
+						<div class="chart-container" id="chart-notifications"></div>
+					</div>
+					<div class="chart-panel">
+						<div class="chart-title">Uptime (hours)</div>
+						<div class="chart-container" id="chart-uptime"></div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<script src="/static/dashboard.js"></script>
+	</body>
+	</html>
+}
