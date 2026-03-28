@@ -162,8 +162,11 @@ func (s *Server) handleCreateTeam(w http.ResponseWriter, r *http.Request) {
 		args = append(args, "--model", model)
 	}
 
-	// Create the session — the CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS env var
-	// is set by injecting it into the tmux session environment
+	// Ensure the agent teams env var is set in ~/.claude/settings.json
+	// so all Claude Code sessions pick it up automatically.
+	_ = hooks.SetAgentTeams(true)
+
+	// Create the session
 	sess, err := s.mgr.Create(id, workDir, "claude", args)
 	if err != nil {
 		slog.Error("failed to create team lead session", "error", err)
@@ -174,12 +177,7 @@ func (s *Server) handleCreateTeam(w http.ResponseWriter, r *http.Request) {
 	sess.TeamName = name
 	sess.TeamRole = "lead"
 
-	// Send the agent teams env and the team creation prompt to the session
-	envCmd := "export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1\n"
-	_ = s.mgr.WriteInput(id, []byte(envCmd))
-
-	// Wait briefly for the session to start, then send the prompt
-	// The prompt tells Claude to create an agent team
+	// Send the team creation prompt to the session
 	teamPrompt := prompt + "\n"
 	_ = s.mgr.WriteInput(id, []byte(teamPrompt))
 
