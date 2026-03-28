@@ -26,7 +26,7 @@ func openGUI(url string) error {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	helperPath := filepath.Join(tmpDir, "webview-helper")
+	helperPath := filepath.Join(tmpDir, "websessions")
 	if err := os.WriteFile(helperPath, helperBin, 0755); err != nil {
 		return fmt.Errorf("writing helper binary: %w", err)
 	}

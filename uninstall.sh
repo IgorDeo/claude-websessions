@@ -141,6 +141,18 @@ main() {
         say "  Removed $bin_path"
     fi
 
+    # Remove desktop entry and icon (Linux)
+    desktop_file="$HOME/.local/share/applications/websessions.desktop"
+    icon_file="$HOME/.local/share/icons/hicolor/scalable/apps/websessions.svg"
+    if [ -f "$desktop_file" ]; then
+        rm -f "$desktop_file"
+        say "  Removed desktop entry"
+    fi
+    if [ -f "$icon_file" ]; then
+        rm -f "$icon_file"
+        say "  Removed icon"
+    fi
+
     # Remove data
     if [ -d "$data_dir" ]; then
         if confirm "Delete all data in $data_dir? (config, database, logs)"; then
