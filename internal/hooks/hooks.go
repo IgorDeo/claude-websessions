@@ -394,8 +394,12 @@ func SetAgentTeams(enable bool) error {
 
 	if enable {
 		env["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] = "1"
+		// Use in-process mode so teammates run inside the lead's terminal.
+		// tmux split-pane mode conflicts with websessions' own terminal management.
+		settings.raw["teammateMode"] = "in-process"
 	} else {
 		delete(env, "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS")
+		delete(settings.raw, "teammateMode")
 		if len(env) == 0 {
 			delete(settings.raw, "env")
 		}
