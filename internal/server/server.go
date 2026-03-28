@@ -77,6 +77,8 @@ func (s *Server) routes() http.Handler {
 
 	// Metrics
 	r.Get("/metrics", s.handleMetrics)
+	r.Get("/metrics/dashboard", s.handleMetricsDashboard)
+	r.Get("/api/metrics/history", s.handleMetricsHistory)
 
 	// APIs
 	r.Post("/api/hook", s.handleHookCallback)

@@ -14,6 +14,7 @@ import (
 	"github.com/IgorDeo/claude-websessions/internal/config"
 	"github.com/IgorDeo/claude-websessions/internal/discovery"
 	"github.com/IgorDeo/claude-websessions/internal/docker"
+	"github.com/IgorDeo/claude-websessions/internal/metrics"
 	"github.com/IgorDeo/claude-websessions/internal/notification"
 	"github.com/IgorDeo/claude-websessions/internal/server"
 	"github.com/IgorDeo/claude-websessions/internal/session"
@@ -418,6 +419,11 @@ func main() {
 	srv.SetSnoozeFunc(func(sessionID string, minutes int) {
 		snoozedSessions[sessionID] = time.Now().Add(time.Duration(minutes) * time.Minute)
 	})
+
+	// Metrics collector
+	mc := metrics.New(st, mgr, sink, cfg.Metrics.SampleInterval, cfg.Metrics.RetentionDays)
+	mc.Start()
+	defer mc.Stop()
 
 	httpServer := &http.Server{Addr: srv.Addr(), Handler: srv.Handler()}
 

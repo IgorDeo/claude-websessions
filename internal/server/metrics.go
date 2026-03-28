@@ -1,12 +1,14 @@
 package server
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"runtime"
 	"time"
 
 	"github.com/IgorDeo/claude-websessions/internal/session"
+	"github.com/IgorDeo/claude-websessions/web/templates"
 )
 
 var startTime = time.Now()
@@ -71,4 +73,57 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 		pendingCount = s.sink.UnreadCount()
 	}
 	_, _ = fmt.Fprintf(w, "websessions_notifications_pending %d\n", pendingCount)
+}
+
+func (s *Server) handleMetricsDashboard(w http.ResponseWriter, r *http.Request) {
+	if err := templates.Dashboard().Render(r.Context(), w); err != nil {
+		http.Error(w, "render error", http.StatusInternalServerError)
+	}
+}
+
+type metricPoint struct {
+	T int64   `json:"t"`
+	V float64 `json:"v"`
+}
+
+func (s *Server) handleMetricsHistory(w http.ResponseWriter, r *http.Request) {
+	if s.store == nil {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"metrics": map[string]interface{}{}})
+		return
+	}
+
+	rangeParam := r.URL.Query().Get("range")
+	var dur time.Duration
+	switch rangeParam {
+	case "6h":
+		dur = 6 * time.Hour
+	case "24h":
+		dur = 24 * time.Hour
+	case "7d":
+		dur = 7 * 24 * time.Hour
+	default:
+		dur = 1 * time.Hour
+	}
+
+	to := time.Now()
+	from := to.Add(-dur)
+
+	all, err := s.store.QueryAllMetrics(from, to)
+	if err != nil {
+		http.Error(w, "query failed", http.StatusInternalServerError)
+		return
+	}
+
+	result := make(map[string][]metricPoint)
+	for metric, samples := range all {
+		points := make([]metricPoint, len(samples))
+		for i, s := range samples {
+			points[i] = metricPoint{T: s.Timestamp.Unix(), V: s.Value}
+		}
+		result[metric] = points
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"metrics": result})
 }

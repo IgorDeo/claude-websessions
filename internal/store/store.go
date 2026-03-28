@@ -71,7 +71,14 @@ func migrate(db *sql.DB) error {
 		session_id TEXT PRIMARY KEY,
 		data BLOB,
 		updated_at DATETIME
-	);`
+	);
+	CREATE TABLE IF NOT EXISTS metrics_samples (
+		id        INTEGER PRIMARY KEY AUTOINCREMENT,
+		timestamp DATETIME NOT NULL,
+		metric    TEXT NOT NULL,
+		value     REAL NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS idx_metrics_metric_ts ON metrics_samples(metric, timestamp);`
 	_, err := db.Exec(schema)
 	if err != nil {
 		return err
@@ -248,4 +255,83 @@ func (s *Store) LogAudit(action, sessionID, clientIP string) error {
 		action, sessionID, clientIP, time.Now(),
 	)
 	return err
+}
+
+// MetricSample represents a single time-series data point.
+type MetricSample struct {
+	Timestamp time.Time
+	Value     float64
+}
+
+// SaveMetricSamples writes a batch of metric samples in a single transaction.
+func (s *Store) SaveMetricSamples(samples map[string]float64, ts time.Time) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	stmt, err := tx.Prepare(`INSERT INTO metrics_samples (timestamp, metric, value) VALUES (?, ?, ?)`)
+	if err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	defer stmt.Close() //nolint:errcheck
+	for metric, value := range samples {
+		if _, err := stmt.Exec(ts, metric, value); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// QueryMetrics returns time-series data for a single metric within a time range.
+func (s *Store) QueryMetrics(metric string, from, to time.Time) ([]MetricSample, error) {
+	rows, err := s.db.Query(
+		`SELECT timestamp, value FROM metrics_samples WHERE metric = ? AND timestamp >= ? AND timestamp <= ? ORDER BY timestamp ASC`,
+		metric, from, to,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck
+	var samples []MetricSample
+	for rows.Next() {
+		var m MetricSample
+		if err := rows.Scan(&m.Timestamp, &m.Value); err != nil {
+			return nil, err
+		}
+		samples = append(samples, m)
+	}
+	return samples, rows.Err()
+}
+
+// QueryAllMetrics returns time-series data for all metrics within a time range.
+func (s *Store) QueryAllMetrics(from, to time.Time) (map[string][]MetricSample, error) {
+	rows, err := s.db.Query(
+		`SELECT metric, timestamp, value FROM metrics_samples WHERE timestamp >= ? AND timestamp <= ? ORDER BY timestamp ASC`,
+		from, to,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close() //nolint:errcheck
+	result := make(map[string][]MetricSample)
+	for rows.Next() {
+		var metric string
+		var m MetricSample
+		if err := rows.Scan(&metric, &m.Timestamp, &m.Value); err != nil {
+			return nil, err
+		}
+		result[metric] = append(result[metric], m)
+	}
+	return result, rows.Err()
+}
+
+// PruneMetrics deletes metric samples older than the given time.
+func (s *Store) PruneMetrics(before time.Time) (int64, error) {
+	result, err := s.db.Exec(`DELETE FROM metrics_samples WHERE timestamp < ?`, before)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
 }

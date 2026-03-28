@@ -15,6 +15,13 @@ type Config struct {
 	Sessions      SessionsConfig      `yaml:"sessions"`
 	Notifications NotificationsConfig `yaml:"notifications"`
 	Docker        DockerConfig        `yaml:"docker"`
+	Metrics       MetricsConfig       `yaml:"metrics"`
+}
+
+type MetricsConfig struct {
+	SampleInterval    time.Duration `yaml:"-"`
+	SampleIntervalRaw string        `yaml:"sample_interval"`
+	RetentionDays     int           `yaml:"retention_days"`
 }
 
 type DockerConfig struct {
@@ -53,6 +60,10 @@ func defaults() *Config {
 		},
 		Notifications: NotificationsConfig{Desktop: true, Sound: true, Events: []string{"completed", "errored", "waiting"}, ReminderMinutes: 5},
 		Docker:        DockerConfig{CopyCredentials: true},
+		Metrics: MetricsConfig{
+			SampleInterval: 60 * time.Second, SampleIntervalRaw: "60s",
+			RetentionDays: 7,
+		},
 	}
 }
 
@@ -88,6 +99,13 @@ func (c *Config) parseRawFields() error {
 			return fmt.Errorf("parsing output_buffer_size: %w", err)
 		}
 		c.Sessions.OutputBufferSize = size
+	}
+	if c.Metrics.SampleIntervalRaw != "" {
+		d, err := time.ParseDuration(c.Metrics.SampleIntervalRaw)
+		if err != nil {
+			return fmt.Errorf("parsing metrics sample_interval: %w", err)
+		}
+		c.Metrics.SampleInterval = d
 	}
 	return nil
 }
