@@ -22,6 +22,8 @@ type SessionRecord struct {
 	PID         int
 	Sandboxed   bool
 	SandboxName string
+	TeamName    string
+	TeamRole    string
 }
 
 type NotificationRecord struct {
@@ -88,6 +90,9 @@ func migrate(db *sql.DB) error {
 	// Migration: add sandbox columns
 	_, _ = db.Exec("ALTER TABLE sessions ADD COLUMN sandboxed BOOLEAN DEFAULT FALSE")
 	_, _ = db.Exec("ALTER TABLE sessions ADD COLUMN sandbox_name TEXT DEFAULT ''")
+	// Migration: add team columns
+	_, _ = db.Exec("ALTER TABLE sessions ADD COLUMN team_name TEXT DEFAULT ''")
+	_, _ = db.Exec("ALTER TABLE sessions ADD COLUMN team_role TEXT DEFAULT ''")
 
 	// Agent Teams tables
 	teamsSchema := `
@@ -122,15 +127,15 @@ func migrate(db *sql.DB) error {
 
 func (s *Store) SaveSession(r SessionRecord) error {
 	_, err := s.db.Exec(
-		`INSERT OR REPLACE INTO sessions (id, name, claude_id, work_dir, start_time, end_time, exit_code, status, pid, sandboxed, sandbox_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		r.ID, r.Name, r.ClaudeID, r.WorkDir, r.StartTime, r.EndTime, r.ExitCode, r.Status, r.PID, r.Sandboxed, r.SandboxName,
+		`INSERT OR REPLACE INTO sessions (id, name, claude_id, work_dir, start_time, end_time, exit_code, status, pid, sandboxed, sandbox_name, team_name, team_role) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		r.ID, r.Name, r.ClaudeID, r.WorkDir, r.StartTime, r.EndTime, r.ExitCode, r.Status, r.PID, r.Sandboxed, r.SandboxName, r.TeamName, r.TeamRole,
 	)
 	return err
 }
 
 func (s *Store) ListSessions(limit int) ([]SessionRecord, error) {
 	rows, err := s.db.Query(
-		`SELECT id, COALESCE(name, ''), claude_id, work_dir, start_time, end_time, exit_code, status, pid, COALESCE(sandboxed, 0), COALESCE(sandbox_name, '') FROM sessions ORDER BY start_time DESC LIMIT ?`,
+		`SELECT id, COALESCE(name, ''), claude_id, work_dir, start_time, end_time, exit_code, status, pid, COALESCE(sandboxed, 0), COALESCE(sandbox_name, ''), COALESCE(team_name, ''), COALESCE(team_role, '') FROM sessions ORDER BY start_time DESC LIMIT ?`,
 		limit,
 	)
 	if err != nil {
@@ -140,7 +145,7 @@ func (s *Store) ListSessions(limit int) ([]SessionRecord, error) {
 	var records []SessionRecord
 	for rows.Next() {
 		var r SessionRecord
-		if err := rows.Scan(&r.ID, &r.Name, &r.ClaudeID, &r.WorkDir, &r.StartTime, &r.EndTime, &r.ExitCode, &r.Status, &r.PID, &r.Sandboxed, &r.SandboxName); err != nil {
+		if err := rows.Scan(&r.ID, &r.Name, &r.ClaudeID, &r.WorkDir, &r.StartTime, &r.EndTime, &r.ExitCode, &r.Status, &r.PID, &r.Sandboxed, &r.SandboxName, &r.TeamName, &r.TeamRole); err != nil {
 			return nil, err
 		}
 		records = append(records, r)
@@ -181,8 +186,8 @@ func (s *Store) ListNotifications(limit int, includeRead bool) ([]NotificationRe
 func (s *Store) GetSession(id string) (*SessionRecord, error) {
 	var r SessionRecord
 	err := s.db.QueryRow(
-		`SELECT id, COALESCE(name, ''), claude_id, work_dir, start_time, end_time, exit_code, status, pid, COALESCE(sandboxed, 0), COALESCE(sandbox_name, '') FROM sessions WHERE id = ?`, id,
-	).Scan(&r.ID, &r.Name, &r.ClaudeID, &r.WorkDir, &r.StartTime, &r.EndTime, &r.ExitCode, &r.Status, &r.PID, &r.Sandboxed, &r.SandboxName)
+		`SELECT id, COALESCE(name, ''), claude_id, work_dir, start_time, end_time, exit_code, status, pid, COALESCE(sandboxed, 0), COALESCE(sandbox_name, ''), COALESCE(team_name, ''), COALESCE(team_role, '') FROM sessions WHERE id = ?`, id,
+	).Scan(&r.ID, &r.Name, &r.ClaudeID, &r.WorkDir, &r.StartTime, &r.EndTime, &r.ExitCode, &r.Status, &r.PID, &r.Sandboxed, &r.SandboxName, &r.TeamName, &r.TeamRole)
 	if err != nil {
 		return nil, err
 	}

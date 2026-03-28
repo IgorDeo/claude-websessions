@@ -174,6 +174,7 @@ func main() {
 				StartTime: s.StartTime, EndTime: s.EndTime,
 				ExitCode: s.ExitCode, Status: "killed", PID: s.PID,
 				Sandboxed: s.Sandboxed, SandboxName: s.SandboxName,
+				TeamName: s.TeamName, TeamRole: s.TeamRole,
 			})
 			if buf := s.Output().Bytes(); len(buf) > 0 {
 				_ = st.SaveOutput(s.ID, buf)
@@ -199,6 +200,7 @@ func main() {
 			StartTime: s.StartTime, EndTime: s.EndTime,
 			ExitCode: s.ExitCode, Status: string(to), PID: s.PID,
 			Sandboxed: s.Sandboxed, SandboxName: s.SandboxName,
+			TeamName: s.TeamName, TeamRole: s.TeamRole,
 		})
 		_ = st.SaveNotification(store.NotificationRecord{
 			SessionID: s.ID, EventType: string(eventType), Timestamp: time.Now(),
@@ -253,7 +255,7 @@ func main() {
 			if name == "" {
 				name = rec.ID
 			}
-			offlineSess := mgr.AddOffline(rec.ID, name, rec.ClaudeID, rec.WorkDir)
+			offlineSess := mgr.AddOffline(rec.ID, name, rec.ClaudeID, rec.WorkDir, rec.TeamName, rec.TeamRole)
 			if data, err := st.LoadOutput(rec.ID); err == nil && len(data) > 0 {
 				offlineSess.PreloadOutput(data)
 			}
@@ -494,6 +496,7 @@ func main() {
 			StartTime: s.StartTime, EndTime: s.EndTime,
 			ExitCode: s.ExitCode, Status: string(s.GetState()), PID: s.PID,
 			Sandboxed: s.Sandboxed, SandboxName: s.SandboxName,
+			TeamName: s.TeamName, TeamRole: s.TeamRole,
 		})
 		if buf := s.Output().Bytes(); len(buf) > 0 {
 			_ = st.SaveOutput(s.ID, buf)

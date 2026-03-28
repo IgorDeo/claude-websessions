@@ -218,6 +218,7 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 			ID: sess.ID, Name: sess.Name, ClaudeID: sess.ClaudeID, WorkDir: sess.WorkDir,
 			StartTime: sess.StartTime, Status: "running", PID: sess.PID,
 			Sandboxed: sess.Sandboxed, SandboxName: sess.SandboxName,
+			TeamName: sess.TeamName, TeamRole: sess.TeamRole,
 		})
 	}
 	// Tell the client to auto-open this session and refresh the sidebar
@@ -593,6 +594,7 @@ func (s *Server) handleKillSession(w http.ResponseWriter, r *http.Request, sessi
 			ID: sess.ID, Name: sess.Name, ClaudeID: sess.ClaudeID, WorkDir: sess.WorkDir,
 			StartTime: sess.StartTime, EndTime: time.Now(),
 			ExitCode: -1, Status: "killed", PID: sess.PID,
+			TeamName: sess.TeamName, TeamRole: sess.TeamRole,
 		})
 	}
 
