@@ -1382,9 +1382,14 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	s.sound.SetAudioDevice(s.cfg.Notifications.AudioDevice)
 
 	// Agent Teams settings
+	teamsWasEnabled := s.cfg.Teams.Enabled
 	s.cfg.Teams.Enabled = r.FormValue("teams_enabled") == "on"
 	if v := r.FormValue("teams_scan_interval"); v != "" {
 		s.cfg.Teams.ScanIntervalRaw = v
+	}
+	// Set/unset CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS in ~/.claude/settings.json
+	if s.cfg.Teams.Enabled != teamsWasEnabled {
+		_ = hooks.SetAgentTeams(s.cfg.Teams.Enabled)
 	}
 
 	// If port or host changed, uninstall hooks (they contain the old URL)

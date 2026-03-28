@@ -368,6 +368,42 @@ func SetPlannotatorIntegration(enable bool) error {
 	return settings.Save()
 }
 
+// IsAgentTeamsEnabled checks if CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS is set to "1".
+func (s *ClaudeSettings) IsAgentTeamsEnabled() bool {
+	env, ok := s.raw["env"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+	val, _ := env["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"].(string)
+	return val == "1"
+}
+
+// SetAgentTeams enables or disables the CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS env var
+// in ~/.claude/settings.json.
+func SetAgentTeams(enable bool) error {
+	settings, err := Load()
+	if err != nil {
+		return err
+	}
+
+	env, ok := settings.raw["env"].(map[string]interface{})
+	if !ok {
+		env = make(map[string]interface{})
+		settings.raw["env"] = env
+	}
+
+	if enable {
+		env["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] = "1"
+	} else {
+		delete(env, "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS")
+		if len(env) == 0 {
+			delete(settings.raw, "env")
+		}
+	}
+
+	return settings.Save()
+}
+
 // Uninstall removes websessions hooks from Claude's settings.
 func Uninstall() error {
 	settings, err := Load()
