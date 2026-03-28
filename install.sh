@@ -216,6 +216,57 @@ SCRIPT
     say ""
     say "Installed websessions to ${install_to}/${BINARY}"
 
+    # Install .desktop entry and icon on Linux
+    if [ "$os" = "linux" ]; then
+        icon_dir="${HOME}/.local/share/icons/hicolor/scalable/apps"
+        desktop_dir="${HOME}/.local/share/applications"
+        mkdir -p "$icon_dir" "$desktop_dir"
+
+        # Extract the SVG favicon from the binary or download it
+        icon_path="${icon_dir}/websessions.svg"
+        icon_url="https://raw.githubusercontent.com/${REPO}/${version}/web/static/favicon.svg"
+        if download "$icon_url" "$icon_path" 2>/dev/null; then
+            :
+        else
+            # Fallback: create a simple placeholder icon
+            cat > "$icon_path" << 'SVGICON'
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect x="4" y="8" width="56" height="48" rx="6" fill="#1a1c27" stroke="#6c8cff" stroke-width="2.5"/>
+  <rect x="4" y="8" width="56" height="12" rx="6" fill="#272937"/>
+  <rect x="4" y="14" width="56" height="6" fill="#272937"/>
+  <circle cx="14" cy="14" r="2.5" fill="#e87070"/>
+  <circle cx="22" cy="14" r="2.5" fill="#d4a843"/>
+  <circle cx="30" cy="14" r="2.5" fill="#7ec87e"/>
+  <text x="12" y="32" font-family="monospace" font-size="10" font-weight="bold" fill="#6c8cff">$</text>
+  <rect x="22" y="27" width="28" height="3" rx="1.5" fill="#8d93b0" opacity="0.6"/>
+  <text x="12" y="44" font-family="monospace" font-size="10" font-weight="bold" fill="#7ec87e">></text>
+  <rect x="22" y="39" width="20" height="3" rx="1.5" fill="#8d93b0" opacity="0.4"/>
+  <rect x="44" y="38" width="2" height="8" rx="1" fill="#6c8cff" opacity="0.9"/>
+  <circle cx="48" cy="50" r="2" fill="#7ec87e"/>
+  <circle cx="54" cy="50" r="2" fill="#6c8cff"/>
+</svg>
+SVGICON
+        fi
+
+        # Create .desktop entry
+        cat > "${desktop_dir}/websessions.desktop" << DESKTOP
+[Desktop Entry]
+Name=websessions
+Comment=Web-based command center for Claude Code sessions
+Exec=${install_to}/${BINARY}
+Icon=websessions
+Terminal=false
+Type=Application
+Categories=Development;Utility;
+StartupWMClass=websessions
+DESKTOP
+        # Update desktop database if available
+        if command -v update-desktop-database > /dev/null 2>&1; then
+            update-desktop-database "$desktop_dir" 2>/dev/null || true
+        fi
+        say "Desktop entry installed — websessions should appear in your app launcher."
+    fi
+
     # PATH check
     case ":${PATH}:" in
         *":${install_to}:"*) ;;
