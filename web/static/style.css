@@ -422,7 +422,7 @@ html, body {
    Content Area
    ============================================================ */
 
-.content { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.content { flex: 1; display: flex; flex-direction: column; overflow: hidden; position: relative; }
 
 /* Tab Bar */
 .tab-bar {
@@ -1021,4 +1021,197 @@ html, body {
 @media (max-width: 768px) {
   .sidebar { display: none; }
   .content { width: 100%; }
+}
+
+/* ============================================================
+   Export Button
+   ============================================================ */
+.export-btn {
+    color: var(--text-secondary);
+    text-decoration: none;
+    font-size: 16px;
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+.export-btn:hover {
+    color: var(--text-primary);
+    background: var(--bg-hover);
+}
+
+/* ============================================================
+   Session Notes
+   ============================================================ */
+.pane-note {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    color: var(--text-secondary);
+    font-size: 11px;
+    padding: 1px 4px;
+    max-width: 200px;
+}
+.pane-note:focus {
+    border-color: var(--border);
+    outline: none;
+    background: var(--bg-secondary);
+}
+.session-note {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    font-style: italic;
+    display: block;
+    margin-top: 1px;
+}
+
+/* ============================================================
+   Session Color Coding
+   ============================================================ */
+.session-color-bar {
+    width: 3px;
+    border-radius: 2px;
+    align-self: stretch;
+    flex-shrink: 0;
+}
+.color-picker-menu {
+    position: fixed;
+    display: flex;
+    gap: 4px;
+    padding: 6px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+}
+.color-swatch {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+}
+.color-swatch:hover {
+    border-color: var(--text-primary);
+}
+.color-swatch-clear {
+    background: var(--bg-secondary);
+    border: 2px dashed var(--border);
+    position: relative;
+}
+.color-swatch-clear::after {
+    content: "\00d7";
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    font-size: 12px;
+}
+
+/* ============================================================
+   Auto-Save Indicator
+   ============================================================ */
+.auto-save-indicator {
+    font-size: 12px;
+    color: var(--text-secondary);
+    opacity: 0;
+    transition: opacity 0.3s;
+    margin-left: 8px;
+}
+.auto-save-indicator.visible {
+    opacity: 1;
+}
+
+/* ============================================================
+   Path Breadcrumbs
+   ============================================================ */
+.path-sep {
+    color: var(--text-tertiary);
+    margin: 0 1px;
+}
+.path-segment {
+    color: var(--text-secondary);
+}
+.path-segment:last-child {
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+/* ============================================================
+   Multi-Select Sidebar
+   ============================================================ */
+.session-checkbox {
+    appearance: auto;
+    margin-right: 4px;
+    flex-shrink: 0;
+    cursor: pointer;
+    opacity: 0;
+    width: 0;
+    transition: opacity 0.2s, width 0.2s;
+}
+.session-item:hover .session-checkbox,
+.session-checkbox:checked {
+    opacity: 1;
+    width: 14px;
+}
+.bulk-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    font-size: 12px;
+}
+.bulk-action-btn {
+    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: var(--bg-hover);
+    color: var(--text-primary);
+    font-size: 11px;
+}
+.bulk-action-btn:hover {
+    background: var(--accent);
+    color: white;
+}
+
+/* ============================================================
+   Session Resource Usage
+   ============================================================ */
+.pane-resources {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    margin-left: auto;
+    padding: 0 8px;
+}
+
+/* ============================================================
+   Drag-Over Hint Overlay
+   ============================================================ */
+.drop-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.drop-overlay.visible {
+    opacity: 1;
+}
+.drop-overlay-content {
+    text-align: center;
+    color: white;
+    font-size: 18px;
+}
+.drop-hint {
+    font-size: 14px;
+    opacity: 0.7;
+    margin-top: 8px;
 }

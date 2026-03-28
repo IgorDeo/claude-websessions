@@ -33,6 +33,12 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	views := make([]templates.SessionView, len(sessions))
 	for i, sess := range sessions {
 		views[i] = sessionToView(sess)
+		if s.store != nil {
+			note, _ := s.store.GetPreference("session-note:" + sess.ID)
+			views[i].Note = note
+			color, _ := s.store.GetPreference("session-color:" + sess.ID)
+			views[i].Color = color
+		}
 	}
 	s.applyTabGroups(views)
 	data := templates.PageData{Sessions: views, UnreadCount: s.sink.UnreadCount()}
@@ -47,6 +53,12 @@ func (s *Server) handleSidebar(w http.ResponseWriter, r *http.Request) {
 	views := make([]templates.SessionView, len(sessions))
 	for i, sess := range sessions {
 		views[i] = sessionToView(sess)
+		if s.store != nil {
+			note, _ := s.store.GetPreference("session-note:" + sess.ID)
+			views[i].Note = note
+			color, _ := s.store.GetPreference("session-color:" + sess.ID)
+			views[i].Color = color
+		}
 	}
 	s.applyTabGroups(views)
 	if err := templates.Sidebar(views, s.loadHistory(views)).Render(r.Context(), w); err != nil {
@@ -643,6 +655,97 @@ func (s *Server) handleRestartSession(w http.ResponseWriter, r *http.Request, se
 	if err := templates.Terminal(v.ID, v.Name, v.WorkDir, v.State).Render(r.Context(), w); err != nil {
 		slog.Error("failed to render terminal", "error", err)
 	}
+}
+
+// stripAnsi removes ANSI escape sequences from terminal output.
+func stripAnsi(data []byte) []byte {
+	out := make([]byte, 0, len(data))
+	i := 0
+	for i < len(data) {
+		if data[i] != 0x1b {
+			out = append(out, data[i])
+			i++
+			continue
+		}
+		// ESC byte — need at least one more byte
+		if i+1 >= len(data) {
+			i++
+			continue
+		}
+		switch data[i+1] {
+		case '[': // CSI sequence: skip until final byte 0x40-0x7e
+			i += 2
+			for i < len(data) {
+				b := data[i]
+				i++
+				if b >= 0x40 && b <= 0x7e {
+					break
+				}
+			}
+		case ']': // OSC sequence: skip until BEL (0x07) or ST (ESC \)
+			i += 2
+			for i < len(data) {
+				if data[i] == 0x07 {
+					i++
+					break
+				}
+				if data[i] == 0x1b && i+1 < len(data) && data[i+1] == '\\' {
+					i += 2
+					break
+				}
+				i++
+			}
+		default: // other 2-byte ESC sequence
+			i += 2
+		}
+	}
+	return out
+}
+
+// handleSessionResources returns memory usage for a session.
+func (s *Server) handleSessionResources(w http.ResponseWriter, r *http.Request, sessionID string) {
+	sess, ok := s.mgr.Get(sessionID)
+	if !ok {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if sess.TmuxSession == "" {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"rss_kb": 0})
+		return
+	}
+	pid, err := session.GetTmuxPanePID(sess.TmuxSession)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"rss_kb": 0})
+		return
+	}
+	usage, err := session.GetResourceUsage(pid)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"rss_kb": 0})
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"rss_kb": usage.RSSKB})
+}
+
+// handleExportOutput exports a session's terminal output as plain text with ANSI sequences stripped.
+func (s *Server) handleExportOutput(w http.ResponseWriter, r *http.Request, sessionID string) {
+	sess, ok := s.mgr.Get(sessionID)
+	if !ok {
+		http.Error(w, "session not found", http.StatusNotFound)
+		return
+	}
+	raw := sess.Output().Bytes()
+	plain := stripAnsi(raw)
+	name := sess.Name
+	if name == "" {
+		name = sessionID
+	}
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", name+".txt"))
+	_, _ = w.Write(plain)
 }
 
 // handleGitDiff returns git diff and status for a session's working directory.
@@ -1368,4 +1471,38 @@ func (s *Server) handleListDirs(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(dirs)
+}
+
+func (s *Server) handleSetSessionNote(w http.ResponseWriter, r *http.Request, sessionID string) {
+	var payload struct {
+		Note string `json:"note"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if s.store != nil {
+		if err := s.store.SetPreference("session-note:"+sessionID, payload.Note); err != nil {
+			http.Error(w, "failed to save note", http.StatusInternalServerError)
+			return
+		}
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) handleSetSessionColor(w http.ResponseWriter, r *http.Request, sessionID string) {
+	var payload struct {
+		Color string `json:"color"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if s.store != nil {
+		if err := s.store.SetPreference("session-color:"+sessionID, payload.Color); err != nil {
+			http.Error(w, "failed to save color", http.StatusInternalServerError)
+			return
+		}
+	}
+	w.WriteHeader(http.StatusOK)
 }

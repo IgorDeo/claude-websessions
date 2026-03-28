@@ -75,6 +75,9 @@ func (s *Server) routes() http.Handler {
 	r.Get("/sidebar", s.handleSidebar)
 	r.Get("/notifications", s.handleNotifications)
 
+	// Metrics
+	r.Get("/metrics", s.handleMetrics)
+
 	// APIs
 	r.Post("/api/hook", s.handleHookCallback)
 	r.Get("/api/dirs", s.handleListDirs)
@@ -92,6 +95,12 @@ func (s *Server) routes() http.Handler {
 	r.Post("/sessions/{sessionID}/rename", func(w http.ResponseWriter, r *http.Request) {
 		s.handleRenameSession(w, r, chi.URLParam(r, "sessionID"))
 	})
+	r.Get("/sessions/{sessionID}/resources", func(w http.ResponseWriter, r *http.Request) {
+		s.handleSessionResources(w, r, chi.URLParam(r, "sessionID"))
+	})
+	r.Get("/sessions/{sessionID}/export", func(w http.ResponseWriter, r *http.Request) {
+		s.handleExportOutput(w, r, chi.URLParam(r, "sessionID"))
+	})
 	r.Get("/sessions/{sessionID}/diff", func(w http.ResponseWriter, r *http.Request) {
 		s.handleGitDiff(w, r, chi.URLParam(r, "sessionID"))
 	})
@@ -103,6 +112,12 @@ func (s *Server) routes() http.Handler {
 	})
 	r.Post("/sessions/{sessionID}/takeover", func(w http.ResponseWriter, r *http.Request) {
 		s.handleTakeover(w, r, chi.URLParam(r, "sessionID"))
+	})
+	r.Put("/sessions/{sessionID}/note", func(w http.ResponseWriter, r *http.Request) {
+		s.handleSetSessionNote(w, r, chi.URLParam(r, "sessionID"))
+	})
+	r.Put("/sessions/{sessionID}/color", func(w http.ResponseWriter, r *http.Request) {
+		s.handleSetSessionColor(w, r, chi.URLParam(r, "sessionID"))
 	})
 
 	// Iframe panes

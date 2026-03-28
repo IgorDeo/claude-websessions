@@ -405,7 +405,7 @@ func Settings(data SettingsData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "\" min=\"0\" placeholder=\"5\"> <span class=\"settings-hint\">0 = disabled. Re-notifies if a session waits without action.</span></div></div><div class=\"settings-actions\"><a href=\"/\" class=\"btn-cancel\">Cancel</a> <button type=\"submit\" class=\"btn-create\">Save Settings</button></div><p class=\"settings-note\">Some changes (port, host) require a server restart to take effect.</p></form><div class=\"settings-section\" id=\"hooks-section\"><h3>Claude Code Hooks</h3><p class=\"hooks-description\">Hooks notify websessions when Claude needs your input (tool approval prompts). This adds an entry to <code>~/.claude/settings.json</code>.</p><div class=\"settings-row hooks-status\" id=\"hooks-status\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 42, "\" min=\"0\" placeholder=\"5\"> <span class=\"settings-hint\">0 = disabled. Re-notifies if a session waits without action.</span></div></div><div class=\"settings-actions\"><a href=\"/\" class=\"btn-cancel\">Cancel</a> <button type=\"submit\" class=\"btn-create\">Save Settings</button> <span id=\"auto-save-indicator\" class=\"auto-save-indicator\">Saved</span></div><p class=\"settings-note\">Some changes (port, host) require a server restart to take effect.</p></form><div class=\"settings-section\" id=\"hooks-section\"><h3>Claude Code Hooks</h3><p class=\"hooks-description\">Hooks notify websessions when Claude needs your input (tool approval prompts). This adds an entry to <code>~/.claude/settings.json</code>.</p><div class=\"settings-row hooks-status\" id=\"hooks-status\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -442,7 +442,7 @@ func Settings(data SettingsData) templ.Component {
 			var templ_7745c5c3_Var18 string
 			templ_7745c5c3_Var18, templ_7745c5c3_Err = templ.JoinStringErrs(data.ServiceName)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/settings.templ`, Line: 233, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/settings.templ`, Line: 234, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var18))
 			if templ_7745c5c3_Err != nil {
@@ -517,7 +517,7 @@ func Settings(data SettingsData) templ.Component {
 			var templ_7745c5c3_Var19 string
 			templ_7745c5c3_Var19, templ_7745c5c3_Err = templ.JoinStringErrs(data.Version)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/settings.templ`, Line: 270, Col: 49}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/settings.templ`, Line: 271, Col: 49}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var19))
 			if templ_7745c5c3_Err != nil {
