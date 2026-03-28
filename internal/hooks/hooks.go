@@ -132,6 +132,97 @@ func Install(baseURL string) error {
 	return settings.Save()
 }
 
+// InstallTeamHooks adds agent team lifecycle hooks to Claude's settings.
+// These hooks notify websessions in real-time when team events occur.
+func InstallTeamHooks(baseURL string) error {
+	settings, err := Load()
+	if err != nil {
+		return err
+	}
+
+	hooks, ok := settings.raw["hooks"].(map[string]interface{})
+	if !ok {
+		hooks = make(map[string]interface{})
+		settings.raw["hooks"] = hooks
+	}
+
+	// Check if team hooks are already installed
+	if hasTeamHooks(hooks) {
+		return nil
+	}
+
+	addTeamHook(hooks, "TeammateIdle", baseURL, "teammate_idle")
+	addTeamHook(hooks, "TaskCreated", baseURL, "task_created")
+	addTeamHook(hooks, "TaskCompleted", baseURL, "task_completed")
+
+	return settings.Save()
+}
+
+const teamHookMarker = "websessions-team-hook"
+
+// HasTeamHooks checks if agent team hooks are registered.
+func (s *ClaudeSettings) HasTeamHooks() bool {
+	hooks, ok := s.raw["hooks"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+	return hasTeamHooks(hooks)
+}
+
+func hasTeamHooks(hooks map[string]interface{}) bool {
+	for _, eventHooks := range hooks {
+		entries, ok := eventHooks.([]interface{})
+		if !ok {
+			continue
+		}
+		for _, entry := range entries {
+			entryMap, ok := entry.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			hooksList, ok := entryMap["hooks"].([]interface{})
+			if !ok {
+				continue
+			}
+			for _, h := range hooksList {
+				hMap, ok := h.(map[string]interface{})
+				if !ok {
+					continue
+				}
+				cmd, _ := hMap["command"].(string)
+				if len(cmd) > 0 && contains(cmd, teamHookMarker) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func addTeamHook(hooks map[string]interface{}, event, baseURL, eventType string) {
+	cmd := fmt.Sprintf(
+		`python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps({'event':'%s','session_id':d.get('session_id',''),'team_name':d.get('team_name',''),'task_id':d.get('task_id',''),'agent_id':d.get('agent_id','')}))" | curl -s -X POST %s/api/hook/team -H "Content-Type: application/json" -d @- # %s`,
+		eventType, baseURL, teamHookMarker,
+	)
+
+	entry := map[string]interface{}{
+		"matcher": "",
+		"hooks": []interface{}{
+			map[string]interface{}{
+				"type":    "command",
+				"command": cmd,
+			},
+		},
+	}
+
+	existing, ok := hooks[event].([]interface{})
+	if !ok {
+		existing = []interface{}{}
+	}
+	existing = append(existing, entry)
+	hooks[event] = existing
+}
+
 func addHook(hooks map[string]interface{}, event, matcher, baseURL, eventType string) {
 	// Claude Code hooks receive JSON on stdin with session_id and cwd.
 	// We read stdin, extract fields with python, and POST to websessions.
@@ -269,6 +360,46 @@ func SetPlannotatorIntegration(enable bool) error {
 		env["PLANNOTATOR_BROWSER"] = scriptPath
 	} else {
 		delete(env, "PLANNOTATOR_BROWSER")
+		if len(env) == 0 {
+			delete(settings.raw, "env")
+		}
+	}
+
+	return settings.Save()
+}
+
+// IsAgentTeamsEnabled checks if CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS is set to "1".
+func (s *ClaudeSettings) IsAgentTeamsEnabled() bool {
+	env, ok := s.raw["env"].(map[string]interface{})
+	if !ok {
+		return false
+	}
+	val, _ := env["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"].(string)
+	return val == "1"
+}
+
+// SetAgentTeams enables or disables the CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS env var
+// in ~/.claude/settings.json.
+func SetAgentTeams(enable bool) error {
+	settings, err := Load()
+	if err != nil {
+		return err
+	}
+
+	env, ok := settings.raw["env"].(map[string]interface{})
+	if !ok {
+		env = make(map[string]interface{})
+		settings.raw["env"] = env
+	}
+
+	if enable {
+		env["CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"] = "1"
+		// Use in-process mode so teammates run inside the lead's terminal.
+		// tmux split-pane mode conflicts with websessions' own terminal management.
+		settings.raw["teammateMode"] = "in-process"
+	} else {
+		delete(env, "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS")
+		delete(settings.raw, "teammateMode")
 		if len(env) == 0 {
 			delete(settings.raw, "env")
 		}
