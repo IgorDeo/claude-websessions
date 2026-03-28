@@ -2365,37 +2365,12 @@ window.websessions = (function() {
         }
       } catch(e) {}
     };
-    notifWs.onopen = function() {
-      hideDisconnectedBanner();
-    };
     notifWs.onclose = function() {
       // Reconnect after 3 seconds
       setTimeout(connectNotifications, 3000);
-      showDisconnectedBanner();
     };
   }
   connectNotifications();
-
-  // ── Connection lost banner ────────────────────────────────────
-  var disconnectedTimer = null;
-  function showDisconnectedBanner() {
-    // Show banner after 10s of disconnect (avoids flashing on brief reconnects)
-    if (disconnectedTimer) return;
-    disconnectedTimer = setTimeout(function() {
-      if (document.getElementById('ws-disconnected')) return;
-      var banner = document.createElement('div');
-      banner.id = 'ws-disconnected';
-      banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#b91c1c;color:#fff;text-align:center;padding:6px 12px;font-size:13px;font-family:var(--font-sans);cursor:pointer;';
-      banner.textContent = 'Connection lost — click to reload';
-      banner.onclick = function() { window.location.reload(); };
-      document.body.appendChild(banner);
-    }, 10000);
-  }
-  function hideDisconnectedBanner() {
-    if (disconnectedTimer) { clearTimeout(disconnectedTimer); disconnectedTimer = null; }
-    var banner = document.getElementById('ws-disconnected');
-    if (banner) banner.remove();
-  }
 
   // ── Favicon badge ───────────────────────────────────────────
   function updateFaviconBadge(count) {
@@ -2607,13 +2582,6 @@ window.websessions = (function() {
     if (ctrl && e.key === 't') {
       e.preventDefault();
       openTerminal();
-      return;
-    }
-
-    // Ctrl+Shift+R — hard refresh (useful in GUI/webview mode)
-    if (ctrl && e.shiftKey && (e.key === 'R' || e.key === 'r')) {
-      e.preventDefault();
-      window.location.reload();
       return;
     }
 
