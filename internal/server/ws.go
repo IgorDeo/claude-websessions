@@ -21,26 +21,52 @@ type wsMessage struct {
 	Cols int    `json:"cols,omitempty"`
 }
 
+// wsConn wraps a websocket.Conn with a write mutex to prevent
+// concurrent writes which cause a panic in gorilla/websocket.
+type wsConn struct {
+	conn *websocket.Conn
+	wmu  sync.Mutex
+}
+
+func newWSConn(conn *websocket.Conn) *wsConn {
+	return &wsConn{conn: conn}
+}
+
+func (c *wsConn) WriteMessage(messageType int, data []byte) error {
+	c.wmu.Lock()
+	defer c.wmu.Unlock()
+	_ = c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	return c.conn.WriteMessage(messageType, data)
+}
+
+func (c *wsConn) ReadMessage() (int, []byte, error) {
+	return c.conn.ReadMessage()
+}
+
+func (c *wsConn) Close() error {
+	return c.conn.Close()
+}
+
 type wsHub struct {
 	mu            sync.RWMutex
-	clients       map[string]map[*websocket.Conn]bool
-	globalClients map[*websocket.Conn]bool // for notification push
+	clients       map[string]map[*wsConn]bool
+	globalClients map[*wsConn]bool // for notification push
 }
 
 func newWSHub() *wsHub {
 	return &wsHub{
-		clients:       make(map[string]map[*websocket.Conn]bool),
-		globalClients: make(map[*websocket.Conn]bool),
+		clients:       make(map[string]map[*wsConn]bool),
+		globalClients: make(map[*wsConn]bool),
 	}
 }
 
-func (h *wsHub) addGlobal(conn *websocket.Conn) {
+func (h *wsHub) addGlobal(conn *wsConn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.globalClients[conn] = true
 }
 
-func (h *wsHub) removeGlobal(conn *websocket.Conn) {
+func (h *wsHub) removeGlobal(conn *wsConn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	delete(h.globalClients, conn)
@@ -48,13 +74,12 @@ func (h *wsHub) removeGlobal(conn *websocket.Conn) {
 
 func (h *wsHub) broadcastNotification(event []byte) {
 	h.mu.RLock()
-	conns := make(map[*websocket.Conn]bool)
+	conns := make([]*wsConn, 0, len(h.globalClients))
 	for c := range h.globalClients {
-		conns[c] = true
+		conns = append(conns, c)
 	}
 	h.mu.RUnlock()
-	for conn := range conns {
-		_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	for _, conn := range conns {
 		if err := conn.WriteMessage(websocket.TextMessage, event); err != nil {
 			slog.Debug("notification ws write error", "error", err)
 			_ = conn.Close()
@@ -63,16 +88,16 @@ func (h *wsHub) broadcastNotification(event []byte) {
 	}
 }
 
-func (h *wsHub) add(sessionID string, conn *websocket.Conn) {
+func (h *wsHub) add(sessionID string, conn *wsConn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.clients[sessionID] == nil {
-		h.clients[sessionID] = make(map[*websocket.Conn]bool)
+		h.clients[sessionID] = make(map[*wsConn]bool)
 	}
 	h.clients[sessionID][conn] = true
 }
 
-func (h *wsHub) remove(sessionID string, conn *websocket.Conn) {
+func (h *wsHub) remove(sessionID string, conn *wsConn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if conns, ok := h.clients[sessionID]; ok {
@@ -85,10 +110,13 @@ func (h *wsHub) remove(sessionID string, conn *websocket.Conn) {
 
 func (h *wsHub) broadcast(sessionID string, data []byte) {
 	h.mu.RLock()
-	conns := h.clients[sessionID]
+	src := h.clients[sessionID]
+	conns := make([]*wsConn, 0, len(src))
+	for c := range src {
+		conns = append(conns, c)
+	}
 	h.mu.RUnlock()
-	for conn := range conns {
-		_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
+	for _, conn := range conns {
 		if err := conn.WriteMessage(websocket.BinaryMessage, data); err != nil {
 			slog.Debug("ws write error", "error", err)
 			_ = conn.Close()
@@ -98,11 +126,12 @@ func (h *wsHub) broadcast(sessionID string, data []byte) {
 }
 
 func (s *Server) handleNotificationWS(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+	raw, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		slog.Error("notification ws upgrade failed", "error", err)
 		return
 	}
+	conn := newWSConn(raw)
 	defer conn.Close() //nolint:errcheck
 	s.hub.addGlobal(conn)
 	defer s.hub.removeGlobal(conn)
@@ -121,16 +150,16 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request, sessionID stri
 		http.Error(w, "session not found", http.StatusNotFound)
 		return
 	}
-	conn, err := upgrader.Upgrade(w, r, nil)
+	raw, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		slog.Error("ws upgrade failed", "error", err)
 		return
 	}
+	conn := newWSConn(raw)
 	defer conn.Close() //nolint:errcheck
 
 	// If session is still provisioning (e.g. Docker sandbox), wait for it
 	if sess.GetState() == session.StateStarting {
-		_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 		_ = conn.WriteMessage(websocket.BinaryMessage, []byte("\x1b[36mProvisioning Docker sandbox...\x1b[0m\r\n"))
 		for i := 0; i < 120; i++ { // wait up to 2 minutes
 			time.Sleep(1 * time.Second)
@@ -155,7 +184,6 @@ func (s *Server) handleWS(w http.ResponseWriter, r *http.Request, sessionID stri
 	defer s.hub.remove(sessionID, conn)
 	// Replay ring buffer
 	if buf := sess.Output().Bytes(); len(buf) > 0 {
-		_ = conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 		_ = conn.WriteMessage(websocket.BinaryMessage, buf)
 	}
 	// Read user input
