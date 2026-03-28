@@ -100,9 +100,6 @@ func (s *Server) routes() http.Handler {
 	r.Get("/sessions/{sessionID}/resources", func(w http.ResponseWriter, r *http.Request) {
 		s.handleSessionResources(w, r, chi.URLParam(r, "sessionID"))
 	})
-	r.Get("/sessions/{sessionID}/export", func(w http.ResponseWriter, r *http.Request) {
-		s.handleExportOutput(w, r, chi.URLParam(r, "sessionID"))
-	})
 	r.Get("/sessions/{sessionID}/diff", func(w http.ResponseWriter, r *http.Request) {
 		s.handleGitDiff(w, r, chi.URLParam(r, "sessionID"))
 	})

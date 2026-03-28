@@ -22,7 +22,6 @@ templ Terminal(sessionID string, sessionName string, workDir string, state strin
 				onkeydown="if(event.key==='Enter')this.blur()"
 			/>
 			<div class="pane-actions">
-				<a class="export-btn" title="Export output as text" href={ templ.SafeURL("/sessions/" + sessionID + "/export") } download>&#8615;</a>
 				<button class="diff-btn" title="View git changes" onclick={ diffAction(sessionID) }>&#916;</button>
 				<button class="split-h-btn" title="Split horizontal" onclick={ splitHAction(sessionID) }>&#9776;</button>
 				<button class="split-v-btn" title="Split vertical" onclick={ splitVAction(sessionID) }>&#9783;</button>
