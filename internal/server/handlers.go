@@ -596,7 +596,9 @@ func (s *Server) handleKillSession(w http.ResponseWriter, r *http.Request, sessi
 
 	// Kill handles: stop reader, kill tmux, fire state change, remove from manager
 	if err := s.mgr.Kill(sessionID); err != nil {
-		// For sessions without tmux (offline/discovered), just remove
+		// For sessions without tmux (offline/discovered), just remove.
+		// Still track the PID so discovery doesn't re-add it.
+		s.mgr.TrackKilledPID(sess.PID)
 		s.mgr.Remove(sessionID)
 	}
 	w.WriteHeader(http.StatusOK)
@@ -862,22 +864,35 @@ func (s *Server) handleClaudeSessions(w http.ResponseWriter, r *http.Request) {
 // handleHookCallback receives notifications from Claude Code hooks.
 func (s *Server) handleHookCallback(w http.ResponseWriter, r *http.Request) {
 	var payload struct {
-		Event     string `json:"event"`
-		SessionID string `json:"session_id"`
-		Project   string `json:"project"`
+		Event          string `json:"event"`
+		SessionID      string `json:"session_id"`
+		Project        string `json:"project"`
+		StopHookActive bool   `json:"stop_hook_active"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
 
-	// Only process "waiting" (permission prompts). Ignore everything else —
-	// "completed" fires too often (every turn), "tool_use" is informational.
-	if payload.Event != "waiting" {
+	// Map hook events to notification types.
+	// "waiting" = permission prompt, "stop" = session finished.
+	// Ignore "tool_use" (informational) and others.
+	var eventType notification.EventType
+	switch payload.Event {
+	case "waiting":
+		eventType = notification.EventWaiting
+	case "stop":
+		// stop_hook_active=true means Claude is continuing (mid-conversation turn),
+		// not actually finishing. Only notify on final stops.
+		if payload.StopHookActive {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		eventType = notification.EventCompleted
+	default:
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	eventType := notification.EventWaiting
 
 	// Map the hook's project path to a websessions session ID.
 	// The hook sends Claude's internal UUID as session_id and the cwd as project.

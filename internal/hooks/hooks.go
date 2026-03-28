@@ -124,9 +124,10 @@ func Install(baseURL string) error {
 		settings.raw["hooks"] = hooks
 	}
 
-	// Only hook into permission prompts — the only event that truly needs attention.
-	// Stop fires after every turn (too noisy), PreToolUse is informational.
+	// Hook into permission prompts (needs immediate attention) and stop events
+	// (session finished — triggers completion notification).
 	addHook(hooks, "Notification", "permission_prompt", baseURL, "waiting")
+	addHook(hooks, "Stop", "", baseURL, "stop")
 
 	return settings.Save()
 }
@@ -135,7 +136,7 @@ func addHook(hooks map[string]interface{}, event, matcher, baseURL, eventType st
 	// Claude Code hooks receive JSON on stdin with session_id and cwd.
 	// We read stdin, extract fields with python, and POST to websessions.
 	cmd := fmt.Sprintf(
-		`python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps({'event':'%s','session_id':d.get('session_id',''),'project':d.get('cwd',d.get('project',''))}))" | curl -s -X POST %s/api/hook -H "Content-Type: application/json" -d @- # %s`,
+		`python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps({'event':'%s','session_id':d.get('session_id',''),'project':d.get('cwd',d.get('project','')),'stop_hook_active':d.get('stop_hook_active',False)}))" | curl -s -X POST %s/api/hook -H "Content-Type: application/json" -d @- # %s`,
 		eventType, baseURL, hookMarker,
 	)
 
@@ -189,12 +190,12 @@ func (s *ClaudeSettings) updateHookURLs(baseURL string) {
 					case "Notification":
 						eventType = "waiting"
 					case "Stop":
-						eventType = "completed"
+						eventType = "stop"
 					case "PreToolUse":
 						eventType = "tool_use"
 					}
 					hMap["command"] = fmt.Sprintf(
-						`python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps({'event':'%s','session_id':d.get('session_id',''),'project':d.get('cwd',d.get('project',''))}))" | curl -s -X POST %s/api/hook -H "Content-Type: application/json" -d @- # %s`,
+						`python3 -c "import sys,json; d=json.load(sys.stdin); print(json.dumps({'event':'%s','session_id':d.get('session_id',''),'project':d.get('cwd',d.get('project','')),'stop_hook_active':d.get('stop_hook_active',False)}))" | curl -s -X POST %s/api/hook -H "Content-Type: application/json" -d @- # %s`,
 						eventType, baseURL, hookMarker,
 					)
 				}
