@@ -121,9 +121,16 @@ func (s *Session) Resize(rows, cols uint16) error {
 	return tmuxResizeWindow(s.TmuxSession, int(cols), int(rows))
 }
 
-// SetReaderPTY stores the reader PTY file for resize operations.
+// SetReaderPTY stores the reader PTY file for resize and input operations.
 func (s *Session) SetReaderPTY(f *os.File) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	s.readerPTY = f
+}
+
+// GetReaderPTY returns the reader PTY file for writing input.
+func (s *Session) GetReaderPTY() *os.File {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.readerPTY
 }

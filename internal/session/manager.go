@@ -238,8 +238,11 @@ func (m *Manager) startReader(s *Session) {
 	m.mu.Unlock()
 
 	go func() {
-		// Attach to the tmux session in read-only mode.
-		cmd := exec.Command("tmux", "attach-session", "-t", s.TmuxSession, "-r")
+		// Attach to the tmux session in read-write mode so that input
+		// (including mouse events) can be forwarded through the PTY.
+		// This enables pane selection in Agent Teams mode where Claude Code
+		// creates multiple tmux panes for subagents.
+		cmd := exec.Command("tmux", "attach-session", "-t", s.TmuxSession)
 		cmd.Env = append(os.Environ(), "TERM=xterm-256color")
 		ptmx, err := pty.StartWithSize(cmd, &pty.Winsize{Rows: 50, Cols: 200})
 		if err != nil {
@@ -564,6 +567,9 @@ func (m *Manager) Reattach(id, name, claudeID, workDir, tmuxName string) *Sessio
 	m.sessions[id] = s
 	m.mu.Unlock()
 
+	// Ensure tmux session has correct config (mouse, prefix, etc.)
+	tmuxConfigureSession(tmuxName)
+
 	// Start reading output
 	m.startReader(s)
 
@@ -655,12 +661,24 @@ func (m *Manager) WriteInput(id string, data []byte) error {
 	if !ok {
 		return fmt.Errorf("session %s not found", id)
 	}
-	if s.TmuxSession == "" {
-		return fmt.Errorf("session %s has no tmux session", id)
-	}
 	// Filter out terminal capability responses from xterm.js
 	if isTerminalResponse(data) {
 		return nil
+	}
+
+	// Write directly to the bidirectional PTY master. This correctly
+	// forwards all bytes including mouse events, which enables tmux pane
+	// selection in Agent Teams mode (where Claude Code creates multiple
+	// tmux panes for subagents). Without this, input only reaches the
+	// last active pane, not the main pane where permissions are requested.
+	if pty := s.GetReaderPTY(); pty != nil {
+		_, err := pty.Write(data)
+		return err
+	}
+
+	// Fallback to send-keys for sessions without a bidirectional PTY
+	if s.TmuxSession == "" {
+		return fmt.Errorf("session %s has no tmux session", id)
 	}
 	return tmuxSendKeys(s.TmuxSession, string(data))
 }

@@ -55,16 +55,32 @@ func tmuxCreateSession(name, workDir, command string, args []string) error {
 		return err
 	}
 
-	// Configure tmux session for clean embedded use
+	tmuxConfigureSession(name)
+	return nil
+}
+
+// tmuxConfigureSession applies standard configuration to a tmux session
+// for clean embedded use within websessions. This is called both when
+// creating new sessions and when reattaching to existing ones.
+func tmuxConfigureSession(name string) {
 	_, _ = tmuxRun("set-option", "-t", name, "status", "off")
-	_, _ = tmuxRun("set-option", "-t", name, "mouse", "off")
 	_, _ = tmuxRun("set-option", "-t", name, "default-terminal", "xterm-256color")
 	// Use the largest client size (not smallest) so the window expands to fill
 	_, _ = tmuxRun("set-window-option", "-t", name, "aggressive-resize", "on")
 	// Signal wait-for channel when pane dies for fast exit detection
 	_, _ = tmuxRun("set-hook", "-t", name, "pane-died", "run-shell 'tmux wait-for -S "+name+"-done'")
 
-	return nil
+	// Enable mouse so clicks can select panes. This is required for Agent
+	// Teams mode where Claude Code creates multiple tmux panes for subagents.
+	// Without mouse support, users cannot click to select the main pane
+	// where permission prompts appear.
+	_, _ = tmuxRun("set-option", "-t", name, "mouse", "on")
+	// Disable prefix key to prevent tmux from intercepting input
+	_, _ = tmuxRun("set-option", "-t", name, "prefix", "None")
+	_, _ = tmuxRun("set-option", "-t", name, "prefix2", "None")
+	// Disable mouse-wheel scrollback in tmux (xterm.js manages its own scrollback)
+	_, _ = tmuxRun("unbind-key", "-T", "root", "WheelUpPane")
+	_, _ = tmuxRun("unbind-key", "-T", "root", "WheelDownPane")
 }
 
 // tmuxKillSession kills a tmux session.
