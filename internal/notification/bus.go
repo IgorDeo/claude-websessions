@@ -11,6 +11,14 @@ const (
 	EventCompleted EventType = "completed"
 	EventErrored   EventType = "errored"
 	EventWaiting   EventType = "waiting"
+
+	// Agent Teams events
+	EventTeamDiscovered EventType = "team_discovered"
+	EventTeamMemberJoin EventType = "team_member_join"
+	EventTaskCreated    EventType = "task_created"
+	EventTaskUpdated    EventType = "task_updated"
+	EventTaskCompleted  EventType = "task_completed"
+	EventTeamMessage    EventType = "team_message"
 )
 
 type SessionEvent struct {
@@ -18,6 +26,8 @@ type SessionEvent struct {
 	Type      EventType
 	Timestamp time.Time
 	Message   string
+	TeamName  string            // non-empty for team-related events
+	Metadata  map[string]string // additional key-value data (task_id, from, to, etc.)
 }
 
 type SubscriberFunc func(SessionEvent)

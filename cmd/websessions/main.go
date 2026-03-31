@@ -19,6 +19,7 @@ import (
 	"github.com/IgorDeo/claude-websessions/internal/server"
 	"github.com/IgorDeo/claude-websessions/internal/session"
 	"github.com/IgorDeo/claude-websessions/internal/store"
+	"github.com/IgorDeo/claude-websessions/internal/teams"
 )
 
 
@@ -173,6 +174,7 @@ func main() {
 				StartTime: s.StartTime, EndTime: s.EndTime,
 				ExitCode: s.ExitCode, Status: "killed", PID: s.PID,
 				Sandboxed: s.Sandboxed, SandboxName: s.SandboxName,
+				TeamName: s.TeamName, TeamRole: s.TeamRole,
 			})
 			if buf := s.Output().Bytes(); len(buf) > 0 {
 				_ = st.SaveOutput(s.ID, buf)
@@ -198,6 +200,7 @@ func main() {
 			StartTime: s.StartTime, EndTime: s.EndTime,
 			ExitCode: s.ExitCode, Status: string(to), PID: s.PID,
 			Sandboxed: s.Sandboxed, SandboxName: s.SandboxName,
+			TeamName: s.TeamName, TeamRole: s.TeamRole,
 		})
 		_ = st.SaveNotification(store.NotificationRecord{
 			SessionID: s.ID, EventType: string(eventType), Timestamp: time.Now(),
@@ -252,7 +255,7 @@ func main() {
 			if name == "" {
 				name = rec.ID
 			}
-			offlineSess := mgr.AddOffline(rec.ID, name, rec.ClaudeID, rec.WorkDir)
+			offlineSess := mgr.AddOffline(rec.ID, name, rec.ClaudeID, rec.WorkDir, rec.TeamName, rec.TeamRole)
 			if data, err := st.LoadOutput(rec.ID); err == nil && len(data) > 0 {
 				offlineSess.PreloadOutput(data)
 			}
@@ -416,7 +419,33 @@ func main() {
 		}()
 	}
 
-	srv := server.New(cfg, mgr, bus, sink, st)
+	// Agent Teams integration (opt-in via config)
+	var teamMgr *teams.Manager
+	if cfg.Teams.Enabled {
+		// Check Claude Code version for agent teams support
+		ver, supported := teams.CheckClaudeVersion()
+		if ver != "" {
+			fmt.Fprintf(os.Stderr, "  %s● Agent teams enabled (Claude Code %s)%s\n", colorGreen, ver, colorReset)
+			if !supported {
+				fmt.Fprintf(os.Stderr, "  %s⚠ Agent teams require Claude Code v2.1.32+%s\n", colorYellow, colorReset)
+			}
+		} else {
+			fmt.Fprintf(os.Stderr, "  %s⚠ Agent teams enabled but Claude Code not found in PATH%s\n", colorYellow, colorReset)
+		}
+
+		teamMgr = teams.NewManager(mgr, bus)
+		go func() {
+			ticker := time.NewTicker(cfg.Teams.ScanInterval)
+			defer ticker.Stop()
+			for range ticker.C {
+				if err := teamMgr.Scan(); err != nil {
+					slog.Debug("team scan error", "error", err)
+				}
+			}
+		}()
+	}
+
+	srv := server.New(cfg, mgr, bus, sink, st, teamMgr)
 	srv.SetVersion(version)
 
 	// Expose snooze function to the server for the snooze API
@@ -467,6 +496,7 @@ func main() {
 			StartTime: s.StartTime, EndTime: s.EndTime,
 			ExitCode: s.ExitCode, Status: string(s.GetState()), PID: s.PID,
 			Sandboxed: s.Sandboxed, SandboxName: s.SandboxName,
+			TeamName: s.TeamName, TeamRole: s.TeamRole,
 		})
 		if buf := s.Output().Bytes(); len(buf) > 0 {
 			_ = st.SaveOutput(s.ID, buf)

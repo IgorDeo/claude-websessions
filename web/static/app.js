@@ -724,10 +724,11 @@ window.websessions = (function() {
     dirDebounce = setTimeout(function() {
       var q = input.value;
       if (!q) return;
+      // Find the sibling suggestions box relative to the input
+      var box = input.parentElement.querySelector('.dir-suggestions');
       fetch('/api/dirs?q=' + encodeURIComponent(q))
         .then(function(r) { return r.json(); })
         .then(function(dirs) {
-          var box = document.getElementById('dir-suggestions');
           if (!box) return;
           while (box.firstChild) box.removeChild(box.firstChild);
           if (!dirs || dirs.length === 0) return;
@@ -747,12 +748,12 @@ window.websessions = (function() {
             // Single click = select this dir and close
             div.addEventListener('click', function(e) {
               e.stopPropagation();
-              selectDir(d, false);
+              selectDir(input, box, d, false);
             });
             // Double click = drill into subdirectories
             div.addEventListener('dblclick', function(e) {
               e.stopPropagation();
-              selectDir(d, true);
+              selectDir(input, box, d, true);
             });
             box.appendChild(div);
           });
@@ -760,28 +761,29 @@ window.websessions = (function() {
     }, 200);
   }
 
-  function selectDir(path, drillDown) {
-    var input = document.getElementById('work_dir');
+  function selectDir(input, box, path, drillDown) {
     if (input) input.value = path;
-    var box = document.getElementById('dir-suggestions');
     if (box) { while (box.firstChild) box.removeChild(box.firstChild); }
     if (drillDown && input) {
       input.value = path + '/';
       dirAutocomplete(input);
     } else {
-      var nameInput = document.getElementById('name');
+      // Auto-fill name field if empty (for new session modal)
+      var nameInput = input.closest('form').querySelector('#name, #team-name');
       if (nameInput && !nameInput.value) {
         nameInput.value = path.split('/').pop();
       }
       if (nameInput) nameInput.focus();
-      // Load claude sessions for the selected directory
-      loadClaudeSessions(path);
+      // Load claude sessions for the selected directory (new session modal only)
+      if (document.getElementById('claude-sessions')) {
+        loadClaudeSessions(path);
+      }
     }
   }
 
   function closeDirSuggestions() {
-    var box = document.getElementById('dir-suggestions');
-    if (box) { while (box.firstChild) box.removeChild(box.firstChild); }
+    var boxes = document.querySelectorAll('.dir-suggestions');
+    boxes.forEach(function(box) { while (box.firstChild) box.removeChild(box.firstChild); });
   }
 
   // Close suggestions when clicking outside
@@ -991,6 +993,109 @@ window.websessions = (function() {
       loadPaneIframe(pane, id, iframeUrl, name);
     }
     saveTabState();
+  }
+
+  // Open agent team dashboard as an htmx-loaded tab
+  function openTeamDashboard(teamName) {
+    var id = 'team-' + teamName;
+    // If already open, just switch to it
+    for (var i = 0; i < openTabs.length; i++) {
+      if (openTabs[i].id === id) {
+        activeTabId = id;
+        currentlyShowingTabId = id;
+        renderTabs();
+        showTab(id);
+        return;
+      }
+    }
+    var tab = { id: id, name: 'Team: ' + teamName, state: 'team', type: 'team', teamName: teamName };
+    openTabs.push(tab);
+    activeTabId = id;
+    currentlyShowingTabId = id;
+    renderTabs();
+
+    var area = document.getElementById('terminal-area');
+    if (area) {
+      for (var sid in terminals) {
+        var el = document.getElementById('term-' + sid);
+        if (el && area.contains(el)) disconnectSession(sid);
+      }
+      while (area.firstChild) area.removeChild(area.firstChild);
+      area.style.flexDirection = '';
+      var pane = document.createElement('div');
+      pane.className = 'split-pane team-dashboard-pane';
+      pane.id = 'team-pane-' + teamName;
+      area.appendChild(pane);
+
+      // Load team dashboard via htmx (same trusted-server pattern as htmx partials)
+      if (window.htmx) {
+        htmx.ajax('GET', '/teams/' + encodeURIComponent(teamName), { target: pane, swap: 'innerHTML' });
+      }
+
+      // Connect team WebSocket for real-time updates
+      connectTeamWS(teamName, pane);
+    }
+    saveTabState();
+  }
+
+  var teamWSConnections = {};
+
+  function connectTeamWS(teamName, pane) {
+    if (teamWSConnections[teamName]) return;
+    var proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    var ws = new WebSocket(proto + '//' + location.host + '/ws/teams/' + encodeURIComponent(teamName));
+    teamWSConnections[teamName] = ws;
+
+    ws.onmessage = function(evt) {
+      try {
+        var data = JSON.parse(evt.data);
+        if (data.type === 'team_event' && pane) {
+          // Refresh task board and messages via htmx when team events arrive
+          var taskBoard = pane.querySelector('.task-board');
+          if (taskBoard && window.htmx) {
+            htmx.trigger(taskBoard, 'teamUpdate');
+          }
+          var msgLog = pane.querySelector('.message-log');
+          if (msgLog && window.htmx) {
+            htmx.trigger(msgLog, 'teamUpdate');
+          }
+        }
+      } catch(e) { /* ignore parse errors */ }
+    };
+
+    ws.onclose = function() {
+      delete teamWSConnections[teamName];
+      // Reconnect after 3s if tab is still open
+      setTimeout(function() {
+        for (var i = 0; i < openTabs.length; i++) {
+          if (openTabs[i].id === 'team-' + teamName) {
+            var p = document.getElementById('team-pane-' + teamName);
+            if (p) connectTeamWS(teamName, p);
+            break;
+          }
+        }
+      }, 3000);
+    };
+  }
+
+  // Focus a session by switching to its tab (used by team member click)
+  function focusSession(sessionId) {
+    for (var i = 0; i < openTabs.length; i++) {
+      if (openTabs[i].id === sessionId) {
+        activeTabId = sessionId;
+        currentlyShowingTabId = sessionId;
+        renderTabs();
+        showTab(sessionId);
+        return;
+      }
+    }
+    // If not open, find the session name and open it
+    var items = document.querySelectorAll('.session-item[data-session-id="' + sessionId + '"]');
+    if (items.length > 0) {
+      var nameEl = items[0].querySelector('.session-name');
+      var name = nameEl ? nameEl.textContent : sessionId;
+      openTab(sessionId, name, 'running');
+    }
   }
 
   function closeTab(sessionID, e) {
@@ -2659,6 +2764,8 @@ window.websessions = (function() {
     dragOver: dragOver,
     drop: drop,
     dragEnd: dragEnd,
+    openTeamDashboard: openTeamDashboard,
+    focusSession: focusSession,
     terminals: terminals,
     saveNote: saveNote,
     showColorPicker: function(sessionID, event) {

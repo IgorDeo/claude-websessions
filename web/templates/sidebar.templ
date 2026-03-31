@@ -58,6 +58,24 @@ templ Sidebar(sessions []SessionView, history []SessionView) {
 }
 
 templ sidebarSessions(sessions []SessionView) {
+	// Team groups (agent team members grouped together)
+	for _, tn := range uniqueTeams(sessions) {
+		<div class="session-group session-group-team">
+			<div class="session-group-header" onclick="window.websessions.toggleGroupCollapsed(this)">
+				<span class="session-group-chevron">&#9662;</span>
+				<span class="session-group-icon">&#x1F46B;</span>
+				<span class="session-group-name">Team: { tn }</span>
+				<span class="session-group-count">{ itoa(countInTeam(tn, sessions)) }</span>
+				<a class="team-dashboard-link" href="#" onclick={ openTeamDashboard(tn) } title="Open team dashboard">&#x1F4CB;</a>
+			</div>
+			<div class="session-group-body">
+				for _, ts := range sessionsInTeam(tn, sessions) {
+					@sessionItem(ts, true)
+				}
+			</div>
+		</div>
+	}
+	// Split tab groups
 	for _, gn := range uniqueGroups(sessions) {
 		<div class="session-group">
 			<div class="session-group-header" onclick="window.websessions.toggleGroupCollapsed(this)">
@@ -73,7 +91,7 @@ templ sidebarSessions(sessions []SessionView) {
 		</div>
 	}
 	for _, s := range sessions {
-		if s.GroupName == "" {
+		if s.GroupName == "" && s.TeamName == "" {
 			@sessionItem(s, false)
 		}
 	}
@@ -115,6 +133,11 @@ templ sessionItem(s SessionView, grouped bool) {
 						if s.Sandboxed {
 							<span class="sandbox-badge" title="Running in Docker sandbox VM">&#128737;</span>
 						}
+						if s.TeamRole == "lead" {
+							<span class="team-badge team-lead" title={ "Team lead: " + s.TeamName }>&#x1F451;</span>
+						} else if s.TeamRole == "teammate" {
+							<span class="team-badge team-teammate" title={ "Teammate: " + s.TeamName }>&#x1F517;</span>
+						}
 					</div>
 					<span class="session-dir" title={ s.WorkDir }>
 						for i, seg := range pathBreadcrumbs(s.WorkDir) {
@@ -138,6 +161,11 @@ templ sessionItem(s SessionView, grouped bool) {
 						<span class={ "session-type-badge", "type-" + s.Type }>{ s.Type }</span>
 						if s.Sandboxed {
 							<span class="sandbox-badge" title="Running in Docker sandbox VM">&#128737;</span>
+						}
+						if s.TeamRole == "lead" {
+							<span class="team-badge team-lead" title={ "Team lead: " + s.TeamName }>&#x1F451;</span>
+						} else if s.TeamRole == "teammate" {
+							<span class="team-badge team-teammate" title={ "Teammate: " + s.TeamName }>&#x1F517;</span>
 						}
 					</div>
 					<span class="session-dir" title={ s.WorkDir }>
@@ -172,6 +200,12 @@ script colorPickerAction(id string) {
 	window.websessions.showColorPicker(id, event);
 }
 
+script openTeamDashboard(teamName string) {
+	if (window.websessions.openTeamDashboard) {
+		window.websessions.openTeamDashboard(teamName);
+	}
+}
+
 func stateClass(state string) string {
 	switch state {
 	case "running": return "state-running"
@@ -186,10 +220,46 @@ func stateClass(state string) string {
 	}
 }
 
+func uniqueTeams(sessions []SessionView) []string {
+	seen := make(map[string]bool)
+	var teams []string
+	for _, s := range sessions {
+		if s.TeamName != "" && !seen[s.TeamName] {
+			seen[s.TeamName] = true
+			teams = append(teams, s.TeamName)
+		}
+	}
+	return teams
+}
+
+func sessionsInTeam(teamName string, sessions []SessionView) []SessionView {
+	var result []SessionView
+	for _, s := range sessions {
+		if s.TeamName == teamName {
+			result = append(result, s)
+		}
+	}
+	return result
+}
+
+func countInTeam(teamName string, sessions []SessionView) int {
+	count := 0
+	for _, s := range sessions {
+		if s.TeamName == teamName {
+			count++
+		}
+	}
+	return count
+}
+
 func uniqueGroups(sessions []SessionView) []string {
 	seen := make(map[string]bool)
 	var groups []string
 	for _, s := range sessions {
+		// Skip sessions that are in a team (they get their own group)
+		if s.TeamName != "" {
+			continue
+		}
 		if s.GroupName != "" && !seen[s.GroupName] {
 			seen[s.GroupName] = true
 			groups = append(groups, s.GroupName)

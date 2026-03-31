@@ -532,10 +532,11 @@ func (m *Manager) AddDiscovered(id, claudeID, workDir string, pid int, startTime
 }
 
 // AddOffline adds a session from a previous server run (loaded from SQLite).
-func (m *Manager) AddOffline(id, name, claudeID, workDir string) *Session {
+func (m *Manager) AddOffline(id, name, claudeID, workDir, teamName, teamRole string) *Session {
 	s := &Session{
 		ID: id, ClaudeID: claudeID, Name: name, WorkDir: workDir,
 		State: StateOffline, Owned: false,
+		TeamName: teamName, TeamRole: teamRole,
 		output: NewRingBuf(int(m.bufferSize)),
 	}
 	if name == "" {

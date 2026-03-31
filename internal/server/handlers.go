@@ -25,6 +25,7 @@ import (
 	"github.com/IgorDeo/claude-websessions/internal/notification"
 	"github.com/IgorDeo/claude-websessions/internal/session"
 	"github.com/IgorDeo/claude-websessions/internal/store"
+	"github.com/IgorDeo/claude-websessions/internal/teams"
 	"github.com/IgorDeo/claude-websessions/web/templates"
 )
 
@@ -41,7 +42,7 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	s.applyTabGroups(views)
-	data := templates.PageData{Sessions: views, UnreadCount: s.sink.UnreadCount()}
+	data := templates.PageData{Sessions: views, UnreadCount: s.sink.UnreadCount(), TeamsEnabled: s.teamMgr != nil}
 	data.History = s.loadHistory(views)
 	if err := templates.Index(data).Render(r.Context(), w); err != nil {
 		slog.Error("failed to render index", "error", err)
@@ -217,6 +218,7 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 			ID: sess.ID, Name: sess.Name, ClaudeID: sess.ClaudeID, WorkDir: sess.WorkDir,
 			StartTime: sess.StartTime, Status: "running", PID: sess.PID,
 			Sandboxed: sess.Sandboxed, SandboxName: sess.SandboxName,
+			TeamName: sess.TeamName, TeamRole: sess.TeamRole,
 		})
 	}
 	// Tell the client to auto-open this session and refresh the sidebar
@@ -479,6 +481,7 @@ func sessionToView(s *session.Session) templates.SessionView {
 		ID: s.ID, Name: s.Name, WorkDir: s.WorkDir,
 		State: string(s.GetState()), Type: sessionType(s.ID), Owned: s.Owned,
 		Sandboxed: s.Sandboxed,
+		TeamName:  s.TeamName, TeamRole: s.TeamRole,
 	}
 }
 
@@ -591,6 +594,7 @@ func (s *Server) handleKillSession(w http.ResponseWriter, r *http.Request, sessi
 			ID: sess.ID, Name: sess.Name, ClaudeID: sess.ClaudeID, WorkDir: sess.WorkDir,
 			StartTime: sess.StartTime, EndTime: time.Now(),
 			ExitCode: -1, Status: "killed", PID: sess.PID,
+			TeamName: sess.TeamName, TeamRole: sess.TeamRole,
 		})
 	}
 
@@ -1187,6 +1191,19 @@ func (s *Server) setupNotificationBridge() {
 			"timestamp": e.Timestamp.Format("15:04:05"),
 		})
 		s.hub.broadcastNotification(msg)
+
+		// Push team events to team-specific WS clients
+		if e.TeamName != "" {
+			teamMsg, _ := json.Marshal(map[string]interface{}{
+				"type":      "team_event",
+				"event":     string(e.Type),
+				"teamName":  e.TeamName,
+				"message":   e.Message,
+				"timestamp": e.Timestamp.Format("15:04:05"),
+				"metadata":  e.Metadata,
+			})
+			s.hub.broadcastTeam(e.TeamName, teamMsg)
+		}
 	})
 }
 
@@ -1276,6 +1293,9 @@ func (s *Server) handleTestSound(w http.ResponseWriter, r *http.Request) {
 
 // handleListDirs returns a JSON list of directories for the file finder autocomplete.
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
+	// Check Claude Code version for agent teams
+	claudeVer, claudeVerOK := teams.CheckClaudeVersion()
+
 	data := templates.SettingsData{
 		Port:             s.cfg.Server.Port,
 		Host:             s.cfg.Server.Host,
@@ -1287,6 +1307,10 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		SoundEnabled:    s.cfg.Notifications.Sound,
 		AudioDevice:     s.cfg.Notifications.AudioDevice,
 		Version:         s.version,
+		TeamsEnabled:        s.cfg.Teams.Enabled,
+		TeamsScanInterval:   s.cfg.Teams.ScanIntervalRaw,
+		ClaudeVersion:       claudeVer,
+		ClaudeVersionOK:     claudeVerOK,
 	}
 	// Populate audio devices
 	for _, d := range notification.ListAudioDevices() {
@@ -1308,6 +1332,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		data.HooksInstalled = claudeSettings.IsInstalled()
 		data.PlannotatorIntegration = claudeSettings.IsPlannotatorIntegrated()
+		data.TeamsHooksInstalled = claudeSettings.HasTeamHooks()
 	}
 	// Check service status (systemd on Linux, launchd on macOS)
 	data.ServiceInstalled = service.IsInstalled()
@@ -1357,6 +1382,17 @@ func (s *Server) handleSaveSettings(w http.ResponseWriter, r *http.Request) {
 	s.cfg.Notifications.AudioDevice = r.FormValue("audio_device")
 	s.sound.SetEnabled(s.cfg.Notifications.Sound)
 	s.sound.SetAudioDevice(s.cfg.Notifications.AudioDevice)
+
+	// Agent Teams settings
+	teamsWasEnabled := s.cfg.Teams.Enabled
+	s.cfg.Teams.Enabled = r.FormValue("teams_enabled") == "on"
+	if v := r.FormValue("teams_scan_interval"); v != "" {
+		s.cfg.Teams.ScanIntervalRaw = v
+	}
+	// Set/unset CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS in ~/.claude/settings.json
+	if s.cfg.Teams.Enabled != teamsWasEnabled {
+		_ = hooks.SetAgentTeams(s.cfg.Teams.Enabled)
+	}
 
 	// If port or host changed, uninstall hooks (they contain the old URL)
 	if s.cfg.Server.Port != oldPort || s.cfg.Server.Host != oldHost {

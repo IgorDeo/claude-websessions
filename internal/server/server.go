@@ -12,6 +12,7 @@ import (
 	"github.com/IgorDeo/claude-websessions/internal/notification"
 	"github.com/IgorDeo/claude-websessions/internal/session"
 	"github.com/IgorDeo/claude-websessions/internal/store"
+	"github.com/IgorDeo/claude-websessions/internal/teams"
 	"github.com/IgorDeo/claude-websessions/web"
 )
 
@@ -24,6 +25,7 @@ type Server struct {
 	sink      *notification.InAppSink
 	sound     *notification.SoundSink
 	store     *store.Store
+	teamMgr   *teams.Manager // nil when teams feature is disabled
 	hub       *wsHub
 	handler   http.Handler
 	snoozeFn  SnoozeFunc
@@ -34,11 +36,11 @@ func (s *Server) SetVersion(v string) { s.version = v }
 
 func (s *Server) SetSnoozeFunc(fn SnoozeFunc) { s.snoozeFn = fn }
 
-func New(cfg *config.Config, mgr *session.Manager, bus *notification.Bus, sink *notification.InAppSink, st ...*store.Store) *Server {
+func New(cfg *config.Config, mgr *session.Manager, bus *notification.Bus, sink *notification.InAppSink, st *store.Store, teamMgr ...*teams.Manager) *Server {
 	soundSink := notification.NewSoundSink(cfg.Notifications.Sound, cfg.Notifications.AudioDevice)
-	s := &Server{cfg: cfg, mgr: mgr, bus: bus, sink: sink, sound: soundSink, hub: newWSHub()}
-	if len(st) > 0 {
-		s.store = st[0]
+	s := &Server{cfg: cfg, mgr: mgr, bus: bus, sink: sink, sound: soundSink, store: st, hub: newWSHub()}
+	if len(teamMgr) > 0 {
+		s.teamMgr = teamMgr[0]
 	}
 	s.handler = s.routes()
 	s.setupNotificationBridge()
@@ -118,6 +120,22 @@ func (s *Server) routes() http.Handler {
 	r.Put("/sessions/{sessionID}/color", func(w http.ResponseWriter, r *http.Request) {
 		s.handleSetSessionColor(w, r, chi.URLParam(r, "sessionID"))
 	})
+
+	// Agent Teams (only when feature is enabled)
+	if s.teamMgr != nil {
+		r.Get("/api/teams", s.handleListTeams)
+		r.Get("/teams/{name}", s.handleTeamDashboard)
+		r.Get("/teams/{name}/tasks", s.handleTeamTasks)
+		r.Get("/teams/{name}/messages", s.handleTeamMessages)
+		r.Get("/teams/new", s.handleNewTeamModal)
+		r.Post("/teams", s.handleCreateTeam)
+		r.Post("/teams/{name}/messages", s.handleSendTeamMessage)
+		r.Post("/api/hook/team", s.handleTeamHookCallback)
+		r.Post("/teams/install-hooks", s.handleInstallTeamHooks)
+		r.Get("/ws/teams/{name}", func(w http.ResponseWriter, r *http.Request) {
+			s.handleTeamWS(w, r, chi.URLParam(r, "name"))
+		})
+	}
 
 	// Iframe panes
 	r.Post("/panes/iframe/open", s.handleOpenIframe)

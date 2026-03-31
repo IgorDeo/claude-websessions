@@ -51,12 +51,14 @@ type wsHub struct {
 	mu            sync.RWMutex
 	clients       map[string]map[*wsConn]bool
 	globalClients map[*wsConn]bool // for notification push
+	teamClients   map[string]map[*wsConn]bool // team name -> connections
 }
 
 func newWSHub() *wsHub {
 	return &wsHub{
 		clients:       make(map[string]map[*wsConn]bool),
 		globalClients: make(map[*wsConn]bool),
+		teamClients:   make(map[string]map[*wsConn]bool),
 	}
 }
 
@@ -121,6 +123,69 @@ func (h *wsHub) broadcast(sessionID string, data []byte) {
 			slog.Debug("ws write error", "error", err)
 			_ = conn.Close()
 			h.remove(sessionID, conn)
+		}
+	}
+}
+
+func (h *wsHub) addTeam(teamName string, conn *wsConn) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if h.teamClients[teamName] == nil {
+		h.teamClients[teamName] = make(map[*wsConn]bool)
+	}
+	h.teamClients[teamName][conn] = true
+}
+
+func (h *wsHub) removeTeam(teamName string, conn *wsConn) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if conns, ok := h.teamClients[teamName]; ok {
+		delete(conns, conn)
+		if len(conns) == 0 {
+			delete(h.teamClients, teamName)
+		}
+	}
+}
+
+func (h *wsHub) broadcastTeam(teamName string, data []byte) {
+	h.mu.RLock()
+	conns := make([]*wsConn, 0, len(h.teamClients[teamName]))
+	for c := range h.teamClients[teamName] {
+		conns = append(conns, c)
+	}
+	h.mu.RUnlock()
+	for _, conn := range conns {
+		if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+			slog.Debug("team ws write error", "team", teamName, "error", err)
+			_ = conn.Close()
+			h.removeTeam(teamName, conn)
+		}
+	}
+}
+
+func (s *Server) handleTeamWS(w http.ResponseWriter, r *http.Request, teamName string) {
+	if s.teamMgr == nil {
+		http.Error(w, "teams feature is disabled", http.StatusNotFound)
+		return
+	}
+	if _, ok := s.teamMgr.Get(teamName); !ok {
+		http.Error(w, "team not found", http.StatusNotFound)
+		return
+	}
+	raw, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		slog.Error("team ws upgrade failed", "error", err)
+		return
+	}
+	conn := newWSConn(raw)
+	defer conn.Close() //nolint:errcheck
+	s.hub.addTeam(teamName, conn)
+	defer s.hub.removeTeam(teamName, conn)
+	// Keep connection alive
+	for {
+		_, _, err := conn.ReadMessage()
+		if err != nil {
+			break
 		}
 	}
 }
