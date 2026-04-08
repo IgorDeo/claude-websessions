@@ -383,9 +383,6 @@ window.websessions = (function() {
         el.classList.add('pane-focused');
       }
     });
-    // Transfer xterm.js keyboard focus to the correct terminal
-    var t = terminals[sessionID];
-    if (t && t.term) t.term.focus();
   }
 
   function refitAllTerminals() {
@@ -2362,16 +2359,6 @@ window.websessions = (function() {
           }
           // Refresh sidebar to update session states
           refreshSidebar();
-          // Auto-switch to the tab that needs permission approval
-          if (msg.event === 'waiting' && msg.sessionID) {
-            var waitingTab = openTabs.find(function(t) {
-              return t.id === msg.sessionID ||
-                (t.splitTree && treeFind(t.splitTree, msg.sessionID));
-            });
-            if (waitingTab && activeTabId !== waitingTab.id) {
-              openTab(waitingTab.id, waitingTab.name, waitingTab.state, msg.sessionID);
-            }
-          }
         }
         if (msg.type === 'iframe-open') {
           openIframeTab(msg.url, msg.title);
