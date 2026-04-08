@@ -35,10 +35,10 @@ func tmuxSessionExists(name string) bool {
 func tmuxCreateSession(name, workDir, command string, args []string) error {
 	tmuxArgs := []string{
 		"new-session",
-		"-d",       // detached
-		"-s", name, // session name
-		"-x", "200", // initial width
-		"-y", "50", // initial height
+		"-d",           // detached
+		"-s", name,     // session name
+		"-x", "200",    // initial width
+		"-y", "50",     // initial height
 	}
 	if workDir != "" {
 		tmuxArgs = append(tmuxArgs, "-c", workDir)
@@ -78,6 +78,9 @@ func tmuxConfigureSession(name string) {
 	// Disable prefix key to prevent tmux from intercepting input
 	_, _ = tmuxRun("set-option", "-t", name, "prefix", "None")
 	_, _ = tmuxRun("set-option", "-t", name, "prefix2", "None")
+	// Disable mouse-wheel scrollback in tmux (xterm.js manages its own scrollback)
+	_, _ = tmuxRun("unbind-key", "-T", "root", "WheelUpPane")
+	_, _ = tmuxRun("unbind-key", "-T", "root", "WheelDownPane")
 }
 
 // tmuxKillSession kills a tmux session.
